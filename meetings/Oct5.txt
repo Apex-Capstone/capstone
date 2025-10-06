@@ -1,0 +1,11 @@
+Agenda – Oct 5, 2025
+Data Discussion:
+Gather data examples to show professor (feasibility).
+Check if Zillow API access is granted.
+Draft a data plan for support session.
+If time permits: Begin working on SRS and Project Plan.
+Reminder: Meeting with Prof. Mehdi on Oct 6, 9:15 AM.
+
+Meeting Notes – Oct 5, 2025
+Went through potential dataset (new york, manhattan)
+Meeting with Prof 9:15 AM Oct 6,2025
