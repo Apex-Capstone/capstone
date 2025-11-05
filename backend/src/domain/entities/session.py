@@ -21,7 +21,7 @@ class Session(Base):
     started_at = Column(DateTime, default=datetime.utcnow)
     ended_at = Column(DateTime, nullable=True)
     duration_seconds = Column(Integer, default=0)
-    metadata = Column(Text)  # JSON for additional session data
+    session_metadata = Column("metadata", Text)  # JSON for additional session data
     
     # Relationships
     user = relationship("User", back_populates="sessions")

@@ -2,7 +2,8 @@
 
 from typing import Any
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from config.logging import get_logger
 from config.settings import get_settings
@@ -17,8 +18,7 @@ class GeminiAdapter:
         settings = get_settings()
         self.api_key = settings.gemini_api_key
         self.model_id = settings.gemini_model_id
-        genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel(self.model_id)
+        self.client = genai.Client(api_key=self.api_key)
     
     async def generate_response(
         self,
@@ -31,14 +31,15 @@ class GeminiAdapter:
         try:
             full_prompt = f"{context}\n\n{prompt}" if context else prompt
             
-            generation_config = {
-                "max_output_tokens": max_tokens,
-                "temperature": temperature,
-            }
+            config = types.GenerateContentConfig(
+                max_output_tokens=max_tokens,
+                temperature=temperature,
+            )
             
-            response = await self.model.generate_content_async(
-                full_prompt,
-                generation_config=generation_config,
+            response = await self.client.aio.models.generate_content(
+                model=self.model_id,
+                contents=full_prompt,
+                config=config,
             )
             
             return response.text.strip()
@@ -72,9 +73,15 @@ Show appropriate emotional responses based on the conversation stage."""
         full_prompt = f"{system_prompt}\n\nConversation so far:\n{history_text}\n\nPatient's response:"
         
         try:
-            response = await self.model.generate_content_async(
-                full_prompt,
-                generation_config={"max_output_tokens": 300, "temperature": 0.8},
+            config = types.GenerateContentConfig(
+                max_output_tokens=300,
+                temperature=0.8,
+            )
+            
+            response = await self.client.aio.models.generate_content(
+                model=self.model_id,
+                contents=full_prompt,
+                config=config,
             )
             return response.text.strip()
         except Exception as e:
@@ -98,9 +105,15 @@ User's message: "{user_text}"
 Respond in JSON format with keys: empathy_score, question_type, jargon_level, clarity_score"""
         
         try:
-            response = await self.model.generate_content_async(
-                analysis_prompt,
-                generation_config={"max_output_tokens": 200, "temperature": 0.3},
+            config = types.GenerateContentConfig(
+                max_output_tokens=200,
+                temperature=0.3,
+            )
+            
+            response = await self.client.aio.models.generate_content(
+                model=self.model_id,
+                contents=analysis_prompt,
+                config=config,
             )
             
             import json
