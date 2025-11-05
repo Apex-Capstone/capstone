@@ -9,7 +9,6 @@ from controllers import (
     admin_controller,
     auth_controller,
     cases_controller,
-    research_controller,
     sessions_controller,
     ws_controller,
 )
@@ -59,7 +58,6 @@ app.include_router(auth_controller.router, prefix="/v1")
 app.include_router(cases_controller.router, prefix="/v1")
 app.include_router(sessions_controller.router, prefix="/v1")
 app.include_router(admin_controller.router, prefix="/v1")
-app.include_router(research_controller.router, prefix="/v1")
 app.include_router(ws_controller.router, prefix="/v1")
 
 
@@ -69,7 +67,8 @@ async def root():
     return {
         "message": "Medical Case Simulation API",
         "version": "0.1.0",
-        "docs": "/api/docs",
+        "docs": "/v1/docs",
+        "redoc": "/v1/redoc",
     }
 
 
