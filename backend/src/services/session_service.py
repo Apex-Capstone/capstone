@@ -27,6 +27,11 @@ class SessionService:
         self.case_repo = CaseRepository(db)
         self.turn_repo = TurnRepository(db)
     
+    @staticmethod
+    def _row_to_dict(row) -> dict:
+        # Only map real table columns -> values, avoiding SA's `.metadata`
+        return {col.key: getattr(row, col.key) for col in row.__table__.columns}
+    
     async def create_session(
         self,
         user_id: int,
@@ -47,7 +52,7 @@ class SessionService:
         )
         
         created_session = self.session_repo.create(session)
-        return SessionResponse.model_validate(created_session)
+        return SessionResponse.model_validate(self._row_to_dict(created_session))
     
     async def get_session(self, session_id: int) -> SessionDetailResponse:
         """Get session with turns."""
@@ -58,8 +63,8 @@ class SessionService:
         turns = self.turn_repo.get_by_session(session_id)
         
         return SessionDetailResponse(
-            **SessionResponse.model_validate(session).model_dump(),
-            turns=[TurnResponse.model_validate(turn) for turn in turns],
+            **SessionResponse.model_validate(self._row_to_dict(session)).model_dump(),
+            turns=[TurnResponse.model_validate(self._row_to_dict(turn)) for turn in turns],
         )
     
     async def list_user_sessions(
@@ -73,7 +78,7 @@ class SessionService:
         total = len(sessions)
         
         return SessionListResponse(
-            sessions=[SessionResponse.model_validate(s) for s in sessions],
+            sessions=[SessionResponse.model_validate(self._row_to_dict(s)) for s in sessions],
             total=total,
         )
     
@@ -91,5 +96,5 @@ class SessionService:
             session.duration_seconds = int(duration)
         
         updated_session = self.session_repo.update(session)
-        return SessionResponse.model_validate(updated_session)
+        return SessionResponse.model_validate(self._row_to_dict(updated_session))
 

@@ -67,8 +67,8 @@ poetry run uvicorn src.app:app --reload --host 0.0.0.0 --port 8000
 ## API Documentation
 
 Once running, visit:
-- Swagger UI: http://localhost:8000/api/docs
-- ReDoc: http://localhost:8000/api/redoc
+- Swagger UI: http://localhost:8000/v1/docs
+- ReDoc: http://localhost:8000/v1/redoc
 
 ## Key Features
 
@@ -99,6 +99,7 @@ Automated scoring based on:
 
 Run tests:
 ```bash
+$env:PYTHONPATH = "$PWD\src"
 poetry run pytest
 ```
 
