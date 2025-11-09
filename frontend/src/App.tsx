@@ -12,11 +12,10 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 // Component to handle login route with redirect if already authenticated
 const LoginRoute = () => {
   const { isAuthenticated } = useAuthStore()
-  
+
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />
   }
-  
   return <Login />
 }
 
@@ -24,13 +23,11 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Root route - show home page */}
+        {/* Public */}
         <Route path="/" element={<Home />} />
-        
-        {/* Login route - redirect to dashboard if already authenticated */}
         <Route path="/login" element={<LoginRoute />} />
-        
-        {/* Protected routes */}
+
+        {/* Authenticated */}
         <Route
           path="/dashboard"
           element={
@@ -39,7 +36,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-        
         <Route
           path="/case/:caseId"
           element={
@@ -48,7 +44,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-        
         <Route
           path="/feedback/:sessionId"
           element={
@@ -57,28 +52,28 @@ function App() {
             </ProtectedRoute>
           }
         />
-        
-        {/* Admin route - requires admin role */}
+
+        {/* Admin area: admin + instructor */}
         <Route
           path="/admin"
           element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute allowedRoles={['admin', 'instructor']}>
               <Admin />
             </ProtectedRoute>
           }
         />
-        
-        {/* Research route - accessible to both roles */}
+
+        {/* Research: admin + instructor (change/remove allowedRoles if you want all authenticated users) */}
         <Route
           path="/research"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['admin', 'instructor']}>
               <Research />
             </ProtectedRoute>
           }
         />
-        
-        {/* Catch-all route - redirect to root */}
+
+        {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchResearchData } from '@/api/client'
-import type { ResearchData } from '@/api/client'
+import { fetchResearchData, type ResearchData } from '@/api/research.api'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'

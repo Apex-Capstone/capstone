@@ -64,6 +64,22 @@ Or with uvicorn directly:
 poetry run uvicorn src.app:app --reload --host 0.0.0.0 --port 8000
 ```
 
+### Seeding Dev Data
+
+Create admin, instructor, several students, and example cases:
+
+- Admin:      admin@example.com / admin123
+- Instructor: instructor@example.com / instructor123
+- Students:   alice.trainee@example.com / changeme, etc.
+
+Run:
+
+    poetry run seed
+
+Re-seed from scratch (dev only):
+
+    poetry run seed --reset
+
 ## API Documentation
 
 Once running, visit:

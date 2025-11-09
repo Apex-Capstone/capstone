@@ -1,4 +1,4 @@
-import type { Feedback } from '@/api/client'
+import type { Feedback } from '@/api/feedback.api'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 
 interface FeedbackChartProps {

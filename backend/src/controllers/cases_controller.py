@@ -54,7 +54,7 @@ async def create_case(
     return await case_service.create_case(case_data)
 
 
-@router.put("/{case_id}", response_model=CaseResponse)
+@router.patch("/{case_id}", response_model=CaseResponse)
 async def update_case(
     case_id: int,
     case_data: CaseUpdate,

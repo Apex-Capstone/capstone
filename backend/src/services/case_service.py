@@ -55,7 +55,8 @@ class CaseService:
             difficulty=difficulty,
             category=category,
         )
-        total = self.case_repo.count()
+        total = self.case_repo.count(difficulty=difficulty, category=category)
+
         
         return CaseListResponse(
             cases=[CaseResponse.model_validate(case) for case in cases],
