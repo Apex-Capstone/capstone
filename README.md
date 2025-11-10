@@ -2,13 +2,13 @@
 
 Welcome to the MedLLM Interface Capstone Project.
 
-## Overview
+## 📘 Overview
 
 The MedLLM Interface is an AI-powered empathy-training platform designed for medical trainees.
 It allows learners to engage in simulated patient conversations and receive structured feedback aligned with the **SPIKES communication framework**.
 The system integrates an interactive frontend built with React and a FastAPI backend with modular services, data persistence, and authentication.
 
-## Features
+Leveraging large language models (LLMs) and structured empathy frameworks such as **SPIKES** and the **Appraisal Framework for Clinical Empathy**, MedLLM provides measurable, data-driven feedback on communication quality and empathy performance.  
 
 * **Role-based authentication** (Trainee, Instructor, Admin)
 * **Virtual patient cases** with structured scripts and difficulty levels
@@ -45,7 +45,43 @@ project-root/
 └── README.md        # root project overview (this file)
 ```
 
-## Getting Started
+---
+
+## ✨ Features
+
+- **Interactive Empathy Training** – Trainees engage with simulated patients through text or voice conversations.
+- **Real-Time Feedback** – Automated empathy analytics including:
+  - Empathy Score (0 – 1)
+  - Open-Question Ratio
+  - Reassurance Count
+  - SPIKES Stage Coverage
+- **Instructor Dashboard** – View transcripts, empathy metrics, and export anonymized session data.
+- **Bias & Fairness Mode** – Evaluate empathy-score consistency across demographics.
+- **Audio Integration (PoC)** – Speech input/output using Whisper ASR and Wispr Flow TTS.
+- **Research API** – Secure, read-only endpoints for session export and validation.
+- **Security & Compliance** – PIPEDA-compliant; no PHI/PII stored; HTTPS + role-based access.
+
+---
+
+## 🧩 System Architecture
+
+| Layer | Technology / Framework | Description |
+|-------|------------------------|--------------|
+| **Frontend** | React (TypeScript), Tailwind CSS | Real-time chat UI, feedback visualization, and responsive design. |
+| **Backend / API** | Python FastAPI, Pydantic | Dialogue pipeline (NLU → DM → NLG), authentication, API gateway. |
+| **Database** | PostgreSQL | Stores user sessions, feedback metrics, and SPIKES case data. |
+| **Machine Learning** | GPT-4 / Gemini API, Hugging Face | Empathy analysis and model testing engine. |
+| **Deployment** | Docker / OpenShift (GCP Canada) | Containerized deployment and portability. |
+| **Testing** | PyTest, React Testing Library, Locust | Automated CI and load testing for performance validation. |
+
+---
+
+## 🚀 Getting Started
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/AsherHaroon/capstone.git
+   cd capstone
 
 ### 1. Backend Setup
 
