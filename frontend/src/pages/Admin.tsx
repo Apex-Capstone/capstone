@@ -1,18 +1,31 @@
 import { useEffect, useState } from 'react'
-import { fetchAdminStats } from '@/api/client'
-import type { AdminStats } from '@/api/client'
+import { fetchAdminStats, type AdminStats } from '@/api/admin.api'
 import { MetricCard } from '@/components/MetricCard'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
-import { Users, FileText, Activity, TrendingUp, Download, Plus, Settings, BarChart3, MessageSquare } from 'lucide-react'
+import { Users, FileText, Activity, TrendingUp, Download, Plus, BarChart3, MessageSquare } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+
+// ---- NEW: cases CRUD imports ----
+import { CasesTable } from '@/components/admin/CasesTable'
+import { CaseForm } from '@/components/admin/CaseForm'
+import { listCases, createCase, updateCase, deleteCase } from '@/api/cases.api'
+import type { Case } from '@/types/case'
 
 export const Admin = () => {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'sessions' | 'analytics' | 'cases'>('overview')
+
+  // ---- NEW: cases state ----
+  const [caseItems, setCaseItems] = useState<Case[]>([])
+  const [caseLoading, setCaseLoading] = useState(false)
+  const [formOpen, setFormOpen] = useState(false)
+  const [formMode, setFormMode] = useState<'create' | 'edit'>('create')
+  const [editing, setEditing] = useState<Case | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     const loadStats = async () => {
@@ -25,16 +38,33 @@ export const Admin = () => {
         setLoading(false)
       }
     }
-
     loadStats()
   }, [])
 
-  // TODO: FR-7, FR-13, FR-14 - Admin functionality handlers
+  // ---- NEW: fetch cases when switching to the Cases tab ----
+  const refreshCases = async () => {
+    setCaseLoading(true)
+    try {
+      const { items } = await listCases()
+      setCaseItems(items)
+    } catch (e) {
+      console.error('Failed to fetch cases:', e)
+    } finally {
+      setCaseLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'cases') {
+      void refreshCases()
+    }
+  }, [activeTab])
+
   const handleExportData = () => {
     const dataToExport = {
       stats,
       exportedAt: new Date().toISOString(),
-      type: 'admin_analytics'
+      type: 'admin_analytics',
     }
     const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -45,11 +75,6 @@ export const Admin = () => {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-  }
-
-  const handleCreateCase = () => {
-    // TODO: Implement case creation when backend is ready
-    alert('Case creation will be implemented when backend API is ready')
   }
 
   const tabs = [
@@ -76,6 +101,40 @@ export const Admin = () => {
     )
   }
 
+  // ---- NEW: cases handlers ----
+  const onCreateClick = () => {
+    setEditing(null)
+    setFormMode('create')
+    setFormOpen(true)
+  }
+
+  const onEdit = (c: Case) => {
+    setEditing(c)
+    setFormMode('edit')
+    setFormOpen(true)
+  }
+
+  const onDelete = async (id: number) => {
+    if (!confirm('Delete this case?')) return
+    await deleteCase(id)
+    await refreshCases()
+  }
+
+  const onSubmitForm = async (vals: Partial<Case>) => {
+    setSubmitting(true)
+    try {
+      if (formMode === 'create') {
+        await createCase(vals)
+      } else if (editing) {
+        await updateCase(editing.id, vals)
+      }
+      setFormOpen(false)
+      await refreshCases()
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const renderTabContent = () => {
     if (!stats) return null
 
@@ -84,30 +143,10 @@ export const Admin = () => {
         return (
           <div className="space-y-8">
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              <MetricCard
-                title="Total Users"
-                value={stats.totalUsers}
-                icon={Users}
-                description="Registered trainees"
-              />
-              <MetricCard
-                title="Total Cases"
-                value={stats.totalCases}
-                icon={FileText}
-                description="Available training cases"
-              />
-              <MetricCard
-                title="Active Sessions"
-                value={stats.activeSessions}
-                icon={Activity}
-                description="Currently in progress"
-              />
-              <MetricCard
-                title="Average Score"
-                value={`${stats.averageScore}%`}
-                icon={TrendingUp}
-                description="Across all sessions"
-              />
+              <MetricCard title="Total Users" value={stats.totalUsers} icon={Users} description="Registered trainees" />
+              <MetricCard title="Total Cases" value={stats.totalCases} icon={FileText} description="Available training cases" />
+              <MetricCard title="Active Sessions" value={stats.activeSessions} icon={Activity} description="Currently in progress" />
+              <MetricCard title="Average Score" value={`${stats.averageScore}%`} icon={TrendingUp} description="Across all sessions" />
             </div>
 
             <Card>
@@ -117,21 +156,12 @@ export const Admin = () => {
               <CardContent>
                 <div className="space-y-4">
                   {stats.recentActivity.map((activity, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0"
-                    >
+                    <div key={index} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {activity.action}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          User: {activity.userId}
-                        </p>
+                        <p className="text-sm font-medium text-gray-900">{activity.action}</p>
+                        <p className="text-xs text-gray-500">User: {activity.userId}</p>
                       </div>
-                      <p className="text-xs text-gray-500">
-                        {new Date(activity.timestamp).toLocaleString()}
-                      </p>
+                      <p className="text-xs text-gray-500">{new Date(activity.timestamp).toLocaleString()}</p>
                     </div>
                   ))}
                 </div>
@@ -167,12 +197,12 @@ export const Admin = () => {
                             <td className="py-2">{user.name}</td>
                             <td className="py-2">{user.email}</td>
                             <td className="py-2">
-                              <span className={cn(
-                                'px-2 py-1 rounded-full text-xs font-medium',
-                                user.role === 'admin' 
-                                  ? 'bg-purple-100 text-purple-800' 
-                                  : 'bg-emerald-100 text-emerald-800'
-                              )}>
+                              <span
+                                className={cn(
+                                  'px-2 py-1 rounded-full text-xs font-medium',
+                                  user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-emerald-100 text-emerald-800'
+                                )}
+                              >
                                 {user.role}
                               </span>
                             </td>
@@ -251,10 +281,7 @@ export const Admin = () => {
                               <span className="text-sm">{data.month}</span>
                               <div className="flex items-center gap-2">
                                 <div className="w-20 h-2 bg-gray-200 rounded-full">
-                                  <div 
-                                    className="h-full bg-emerald-500 rounded-full"
-                                    style={{ width: `${data.score}%` }}
-                                  />
+                                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${data.score}%` }} />
                                 </div>
                                 <span className="text-sm font-medium">{data.score}%</span>
                               </div>
@@ -278,10 +305,7 @@ export const Admin = () => {
                             <span className="text-sm capitalize">{data.difficulty}</span>
                             <div className="flex items-center gap-2">
                               <div className="w-16 h-2 bg-gray-200 rounded-full">
-                                <div 
-                                  className="h-full bg-green-500 rounded-full"
-                                  style={{ width: `${data.rate * 100}%` }}
-                                />
+                                <div className="h-full bg-green-500 rounded-full" style={{ width: `${data.rate * 100}%` }} />
                               </div>
                               <span className="text-sm font-medium">{Math.round(data.rate * 100)}%</span>
                             </div>
@@ -317,31 +341,33 @@ export const Admin = () => {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium">Case Management</h3>
-              <Button onClick={handleCreateCase} className="flex items-center gap-2">
+              <Button onClick={onCreateClick} className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 Create New Case
               </Button>
             </div>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Case Management (Placeholder)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500 mb-4">
-                    Case management functionality will be implemented when backend API is ready.
-                  </p>
-                  <div className="space-y-2 text-sm text-gray-600">
-                    <p>• Create and edit virtual patient cases</p>
-                    <p>• Configure SPIKES scenarios</p>
-                    <p>• Set difficulty levels and patient demographics</p>
-                    <p>• Manage case assignments</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+
+            {caseLoading ? (
+              <div className="text-gray-500">Loading cases…</div>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Cases</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CasesTable items={caseItems} onEdit={onEdit} onDelete={onDelete} />
+                </CardContent>
+              </Card>
+            )}
+
+            <CaseForm
+              open={formOpen}
+              onClose={() => setFormOpen(false)}
+              mode={formMode}
+              initial={editing ?? undefined}
+              onSubmit={onSubmitForm}
+              submitting={submitting}
+            />
           </div>
         )
 
@@ -357,33 +383,24 @@ export const Admin = () => {
         <Sidebar />
         <main className="flex-1 md:ml-64">
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-            {/* TODO: FR-7, FR-13, FR-14 - Enhanced admin dashboard with tabs */}
             <nav className="mb-4 text-sm text-gray-500">
               Dashboard / <span className="text-gray-900">Admin</span>
             </nav>
-            
+
             <div className="mb-8">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">
-                    Admin Dashboard
-                  </h1>
-                  <p className="mt-2 text-gray-600">
-                    Manage users, monitor sessions, and analyze platform performance
-                  </p>
+                  <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+                  <p className="mt-2 text-gray-600">Manage users, monitor sessions, and analyze platform performance</p>
                 </div>
-                <Button 
-                  onClick={handleExportData}
-                  variant="outline"
-                  className="flex items-center gap-2"
-                >
+                <Button onClick={handleExportData} variant="outline" className="flex items-center gap-2">
                   <Download className="h-4 w-4" />
                   Export JSON
                 </Button>
               </div>
             </div>
 
-            {/* Tab Navigation */}
+            {/* Tabs */}
             <div className="border-b border-gray-200 mb-8">
               <nav className="flex gap-8">
                 {tabs.map((tab) => {
@@ -407,7 +424,6 @@ export const Admin = () => {
               </nav>
             </div>
 
-            {/* Tab Content */}
             {renderTabContent()}
           </div>
         </main>
@@ -415,4 +431,3 @@ export const Admin = () => {
     </div>
   )
 }
-

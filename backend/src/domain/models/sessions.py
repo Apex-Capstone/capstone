@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class SessionCreate(BaseModel):
@@ -17,7 +17,7 @@ class SessionUpdate(BaseModel):
     
     state: Optional[str] = None
     current_spikes_stage: Optional[str] = None
-    metadata: Optional[str] = None
+    meta: Optional[str] = None
 
 
 class TurnCreate(BaseModel):
@@ -40,8 +40,8 @@ class TurnResponse(BaseModel):
     spikes_stage: Optional[str]
     timestamp: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, extra="ignore")
+
 
 
 class SessionResponse(BaseModel):
@@ -55,10 +55,10 @@ class SessionResponse(BaseModel):
     started_at: datetime
     ended_at: Optional[datetime]
     duration_seconds: int
-    metadata: Optional[str]
+    meta: Optional[str] = Field(default=None, alias="session_metadata")
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, extra="ignore")
+
 
 
 class SessionDetailResponse(SessionResponse):
@@ -92,8 +92,8 @@ class FeedbackResponse(BaseModel):
     detailed_feedback: Optional[str]
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, extra="ignore")
+
 
 
 class WebSocketMessage(BaseModel):
@@ -101,5 +101,5 @@ class WebSocketMessage(BaseModel):
     
     type: str  # user_message, assistant_message, system_message, error
     content: str
-    metadata: Optional[dict] = None
+    meta: Optional[dict] = None
 

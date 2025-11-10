@@ -16,25 +16,25 @@ export const Sidebar = () => {
       name: 'Dashboard',
       href: '/dashboard',
       icon: LayoutDashboard,
-      roles: ['trainee', 'admin'],
+      roles: ['student', 'instructor', 'admin'],
     },
     {
       name: 'Cases',
       href: '/dashboard',
       icon: FileText,
-      roles: ['trainee', 'admin'],
+      roles: ['student', 'instructor', 'admin'],
     },
     {
       name: 'Research',
       href: '/research',
       icon: BarChart3,
-      roles: ['trainee', 'admin'],
+      roles: ['student', 'instructor', 'admin'],
     },
     {
       name: 'Admin',
       href: '/admin',
       icon: Shield,
-      roles: ['admin'],
+      roles: ['admin', 'instructor'],
     },
   ].filter((item) => item.roles.includes(user?.role || 'trainee'))
 

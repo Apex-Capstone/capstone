@@ -1,6 +1,6 @@
 """FastAPI application instance and router mounting."""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from config.logging import setup_logging
@@ -36,11 +36,21 @@ app = FastAPI(
     openapi_url="/v1/openapi.json",
 )
 
-# CORS middleware
+# --- CORS middleware ---
+# If you need credentials (cookies/auth), DO NOT use ["*"].
+# Make sure settings.cors_origins is a LIST, e.g.:
+# ["http://localhost:8000", "http://127.0.0.1:8000", "http://localhost:5173"]
+allow_origins = settings.cors_origins
+allow_credentials = True
+
+# If wildcard is configured, disable credentials to satisfy CORS rules.
+if allow_origins == ["http://localhost:5173"]:
+    allow_credentials = True
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
+    allow_origins=allow_origins,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -51,6 +61,7 @@ app.add_event_handler("shutdown", create_stop_app_handler(app))
 
 # Register error handlers
 app.add_exception_handler(AppError, app_error_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)  # <— wire it
 app.add_exception_handler(Exception, general_exception_handler)
 
 # Register routers with /v1 prefix
@@ -66,7 +77,7 @@ async def root():
     """Root endpoint."""
     return {
         "message": "Medical Case Simulation API",
-        "version": "0.1.0",
+        "version": "1.0.0",
         "docs": "/v1/docs",
         "redoc": "/v1/redoc",
     }
@@ -80,12 +91,11 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    
+    # Use the in-memory app object to avoid import path issues with the reloader
     uvicorn.run(
-        "app:app",
+        app,
         host="0.0.0.0",
         port=8000,
         reload=True,
         log_level="info",
     )
-

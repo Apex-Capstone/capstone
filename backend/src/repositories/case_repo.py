@@ -16,7 +16,37 @@ class CaseRepository:
     def get_by_id(self, case_id: int) -> Optional[Case]:
         """Get case by ID."""
         return self.db.query(Case).filter(Case.id == case_id).first()
-    
+        
+    def _base_query(self, difficulty: Optional[str], category: Optional[str]):
+        q = self.db.query(Case)
+        if difficulty:
+            q = q.filter(Case.difficulty_level == difficulty)
+        if category:
+            q = q.filter(Case.category == category)
+        return q
+
+    def get_all(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        difficulty: Optional[str] = None,
+        category: Optional[str] = None,
+    ) -> list[Case]:
+        q = self._base_query(difficulty, category)
+        return (
+            q.order_by(Case.created_at.desc(), Case.id.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+    def count(
+        self,
+        difficulty: Optional[str] = None,
+        category: Optional[str] = None,
+    ) -> int:
+        return self._base_query(difficulty, category).count()
+
     def get_all(
         self,
         skip: int = 0,
@@ -57,7 +87,3 @@ class CaseRepository:
             return True
         return False
     
-    def count(self) -> int:
-        """Count total cases."""
-        return self.db.query(Case).count()
-
