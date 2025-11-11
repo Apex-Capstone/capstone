@@ -2,7 +2,7 @@
 
 from typing import Any
 
-import openai
+from openai import AsyncOpenAI
 
 from config.logging import get_logger
 from config.settings import get_settings
@@ -17,7 +17,7 @@ class OpenAIAdapter:
         settings = get_settings()
         self.api_key = settings.openai_api_key
         self.model_id = settings.openai_model_id
-        openai.api_key = self.api_key
+        self.client = AsyncOpenAI(api_key=self.api_key)
     
     async def generate_response(
         self,
@@ -33,7 +33,7 @@ class OpenAIAdapter:
                 messages.append({"role": "system", "content": context})
             messages.append({"role": "user", "content": prompt})
             
-            response = await openai.ChatCompletion.acreate(
+            response = await self.client.chat.completions.create(
                 model=self.model_id,
                 messages=messages,
                 max_tokens=max_tokens,
@@ -52,21 +52,33 @@ class OpenAIAdapter:
         current_spikes_stage: str,
     ) -> str:
         """Generate patient response for simulation."""
-        system_prompt = f"""You are playing the role of a patient in a medical simulation.
-        
-Case Background:
+        system_prompt = f"""You are roleplaying as a PATIENT in a medical simulation. You are NOT an assistant or doctor.
+
+IMPORTANT: You are the PATIENT, not the healthcare provider. Respond as a patient would.
+
+Patient Situation:
 {case_script}
 
-Current SPIKES Stage: {current_spikes_stage}
+Current Stage: {current_spikes_stage}
 
-Respond naturally as this patient would. Be realistic and emotionally appropriate.
-Show appropriate emotional responses based on the conversation stage."""
+INSTRUCTIONS:
+- You are anxious and concerned about your health
+- Respond naturally as this patient character would
+- Show realistic emotions: worry, fear, sadness, confusion, hope
+- Ask questions a patient would ask
+- React emotionally to bad news or concerning information
+- Do NOT say things like "How can I help you?" - YOU are the patient seeking help
+- Be concise (1-3 sentences typical for a patient response)
+- If the doctor hasn't introduced themselves yet, you might be nervous/uncertain
+- If receiving bad news, show appropriate emotional reactions
+
+Remember: You are receiving care, not providing it. Respond as the patient character described above."""
         
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(conversation_history)
         
         try:
-            response = await openai.ChatCompletion.acreate(
+            response = await self.client.chat.completions.create(
                 model=self.model_id,
                 messages=messages,
                 max_tokens=300,
@@ -94,7 +106,7 @@ User's message: "{user_text}"
 Respond in JSON format with keys: empathy_score, question_type, jargon_level, clarity_score"""
         
         try:
-            response = await openai.ChatCompletion.acreate(
+            response = await self.client.chat.completions.create(
                 model=self.model_id,
                 messages=[{"role": "user", "content": analysis_prompt}],
                 max_tokens=200,

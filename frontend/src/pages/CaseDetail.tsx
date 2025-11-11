@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getCase } from '@/api/cases.api'
+import { createSession, submitTurn } from '@/api/sessions.api'
 import type { Case as CaseType } from '@/types/case'
-import type { Message } from '@/api/client' // use your Message type
+import type { Message } from '@/types/session'
 
 import { ChatBubble } from '@/components/ChatBubble'
 import { Navbar } from '@/components/Navbar'
@@ -11,8 +12,7 @@ import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Mic, Send, Clock, User, Brain, PhoneOff } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Mic, Send, Clock, PhoneOff } from 'lucide-react'
 
 export const CaseDetail = () => {
   const { caseId } = useParams<{ caseId: string }>()
@@ -25,28 +25,36 @@ export const CaseDetail = () => {
   const [sending, setSending] = useState(false)
   const [sessionElapsed, setSessionElapsed] = useState(0)
   const [startTime, setStartTime] = useState<Date | null>(null)
+  const [sessionId, setSessionId] = useState<number | null>(null)
+  const [currentSpikesStage, setCurrentSpikesStage] = useState<string>('setting')
+  const [error, setError] = useState<string | null>(null)
 
-  // --- Load case from backend ---
+  // --- Load case and create session ---
   useEffect(() => {
-    const loadCase = async () => {
+    const initializeSession = async () => {
       if (!caseId) return
       try {
+        // Load case data
         const data = await getCase(Number(caseId))
         setCaseData(data)
 
-        // 🕒 Mock session start if backend doesn't send one
+        // Create a new session for this case
+        const session = await createSession(Number(caseId))
+        setSessionId(session.id)
+        setCurrentSpikesStage(session.currentSpikesStage || 'setting')
+
+        // Start timer
         const now = new Date()
         setStartTime(now)
-
-        // Initialize timer to 0 (fresh session)
         setSessionElapsed(0)
       } catch (error) {
-        console.error('Failed to fetch case:', error)
+        console.error('Failed to initialize session:', error)
+        setError('Failed to start session. Please try again.')
       } finally {
         setLoading(false)
       }
     }
-    loadCase()
+    initializeSession()
   }, [caseId])
 
   // --- Timer updates every second ---
@@ -62,31 +70,54 @@ export const CaseDetail = () => {
   // --- Message submission ---
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (!inputValue.trim() || sending) return
+    if (!inputValue.trim() || sending || !sessionId) return
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: inputValue,
-      timestamp: new Date().toISOString(),
-    }
-
-    setMessages((prev) => [...prev, newMessage])
+    const userMessageContent = inputValue
     setInputValue('')
     setSending(true)
+    setError(null)
 
-    // Mock AI reply
-    setTimeout(() => {
-      const response: Message = {
-        id: (Date.now() + 1).toString(),
+    // Add user message to UI immediately
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: userMessageContent,
+      timestamp: new Date().toISOString(),
+    }
+    setMessages((prev) => [...prev, userMessage])
+
+    try {
+      // Submit turn to backend and get patient response
+      const response = await submitTurn(sessionId, userMessageContent)
+      
+      // Update SPIKES stage if changed
+      if (response.spikesStage) {
+        setCurrentSpikesStage(response.spikesStage)
+      }
+
+      // Add assistant (patient) response to UI
+      const assistantMessage: Message = {
+        id: `assistant-${response.turn.id}`,
         role: 'assistant',
-        content:
-          'This is a placeholder response. When the backend chat endpoint is ready, this will show the actual AI reply.',
+        content: response.patientReply,
+        timestamp: response.turn.timestamp,
+      }
+      setMessages((prev) => [...prev, assistantMessage])
+    } catch (error: any) {
+      console.error('Failed to submit turn:', error)
+      setError(error.response?.data?.detail || 'Failed to send message. Please try again.')
+      
+      // Add error message to chat
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: 'Sorry, I encountered an error processing your message. Please try again.',
         timestamp: new Date().toISOString(),
       }
-      setMessages((prev) => [...prev, response])
+      setMessages((prev) => [...prev, errorMessage])
+    } finally {
       setSending(false)
-    }, 800)
+    }
   }
 
   const handleVoiceInput = () => {
@@ -94,8 +125,9 @@ export const CaseDetail = () => {
   }
 
   const handleEndSession = () => {
-    const sessionId = `session_${caseId}_${Date.now()}`
-    navigate(`/feedback/${sessionId}`)
+    if (sessionId) {
+      navigate(`/feedback/${sessionId}`)
+    }
   }
 
   const formatTime = (seconds: number) => {
@@ -152,7 +184,7 @@ export const CaseDetail = () => {
             </div>
 
             {/* Timer + metadata cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card className="bg-green-50 border-green-200">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -182,6 +214,15 @@ export const CaseDetail = () => {
                   {caseData.category ?? '—'}
                 </CardContent>
               </Card>
+
+              <Card className="bg-orange-50 border-orange-200">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">SPIKES Stage</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 text-orange-700 font-semibold capitalize">
+                  {currentSpikesStage}
+                </CardContent>
+              </Card>
             </div>
 
             {/* Script */}
@@ -202,13 +243,26 @@ export const CaseDetail = () => {
           {/* Chat area */}
           <div className="flex-1 overflow-y-auto bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-4xl space-y-4">
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                  {error}
+                </div>
+              )}
+              {messages.length === 0 && !sending && (
+                <div className="text-center text-gray-500 py-8">
+                  <p className="text-lg font-medium mb-2">Start the conversation</p>
+                  <p className="text-sm">
+                    Begin by introducing yourself and following the SPIKES framework
+                  </p>
+                </div>
+              )}
               {messages.map((message) => (
                 <ChatBubble key={message.id} message={message} />
               ))}
               {sending && (
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <div className="h-2 w-2 animate-pulse rounded-full bg-gray-400" />
-                  Assistant is typing...
+                  Patient is responding...
                 </div>
               )}
             </div>
@@ -236,13 +290,13 @@ export const CaseDetail = () => {
                 >
                   <Mic className="h-4 w-4" />
                 </Button>
-                <Button type="submit" disabled={sending || !inputValue.trim()}>
+                <Button type="submit" disabled={sending || !inputValue.trim() || !sessionId}>
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
               <div className="mt-2 flex justify-between items-center text-xs text-gray-500">
-                <span>Session time: {formatTime(sessionElapsed)}</span>
-                <span>Last updated: {new Date(caseData.updatedAt).toLocaleString()}</span>
+                <span>Session time: {formatTime(sessionElapsed)} • SPIKES: {currentSpikesStage}</span>
+                {sessionId && <span>Session ID: {sessionId}</span>}
               </div>
             </form>
           </div>

@@ -77,8 +77,16 @@ class DialogueService:
         
         # Generate patient response
         conversation_history = self._get_conversation_history(session_id)
+        
+        # Build patient context from case details
+        patient_context = f"""Patient Background: {case.patient_background or 'General patient'}
+
+Case Scenario: {case.description or case.title}
+
+You are this patient. The trainee doctor will practice communicating with you."""
+        
         patient_response = await self.llm_adapter.generate_patient_response(
-            case_script=case.script,
+            case_script=patient_context,
             conversation_history=conversation_history,
             current_spikes_stage=session.current_spikes_stage or "setting",
         )
