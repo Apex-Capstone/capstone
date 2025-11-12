@@ -1,0 +1,8 @@
+Meeting Notes:
+-Discussed progress and updates on Sprint 2 Build Core MVP.
+-Added additional JIRA tickets and distributed them evenly among members in terms of workload.
+-Reduced the scope for sprint 2 and moved the new additional/remaining items to sprint 3.
+
+Next Steps:
+-Sprint 3 to be completed by Friday, group call will be held to discuss progress and updates.
+-Book meeting with Dr Lahnala sometime next week.
