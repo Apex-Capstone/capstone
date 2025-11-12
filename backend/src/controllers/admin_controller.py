@@ -5,6 +5,7 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
+from sqlalchemy import text  # 👈 added
 from sqlalchemy.orm import Session
 
 from core.deps import get_current_admin, get_db
@@ -40,6 +41,15 @@ class AdminSessionDetail(BaseModel):
     """Admin session detail with transcript and metrics."""
     session: SessionDetailResponse
     metrics_timeline: list[MetricsTimeline]
+
+
+@router.get("/health/db")
+async def db_health(
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Simple DB health check."""
+    db.execute(text("SELECT 1"))
+    return {"db_ok": True}
 
 
 @router.get("/sessions", response_model=AdminSessionListResponse)
@@ -136,4 +146,3 @@ async def create_patient_case(
     """Create patient case (admin only)."""
     case_service = CaseService(db)
     return await case_service.create_case(case_data)
-
