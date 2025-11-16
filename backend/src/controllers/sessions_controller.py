@@ -166,7 +166,11 @@ async def get_session_turns(
     )
 
 
-@router.post("/{session_id}:close", response_model=FeedbackResponse)
+@router.post(
+    "/{session_id}:close",
+    response_model=FeedbackResponse,
+    response_model_exclude_none=True,  # Exclude None values from response
+)
 async def close_session_and_get_feedback(
     session_id: int,
     db: Annotated[Session, Depends(get_db)],
@@ -179,7 +183,9 @@ async def close_session_and_get_feedback(
     
     # Generate and return feedback
     scoring_service = ScoringService(db)
-    return await scoring_service.generate_feedback(session_id)
+    feedback = await scoring_service.generate_feedback(session_id)
+    # Post-process to remove empty values (FastAPI will use model_dump)
+    return feedback
 
 
 @router.get("", response_model=SessionListResponse)

@@ -26,7 +26,6 @@ export interface Feedback {
   conversationMetrics?: {
     empathyScore: number
     openQuestionRatio: number
-    reassuranceCount: number
   }
   dialogueExamples?: {
     strong: Array<{ text: string; context: string }>
@@ -60,7 +59,7 @@ export const fetchFeedback = async (sessionId: string): Promise<Feedback> => {
         setting: 92, perception: 85, invitation: 78,
         knowledge: 88, emotions: 75, strategy: 82,
       },
-      conversationMetrics: { empathyScore: 80, openQuestionRatio: 0.65, reassuranceCount: 4 },
+      conversationMetrics: { empathyScore: 80, openQuestionRatio: 0.65 },
       dialogueExamples: {
         strong: [{ text: 'I can see this is weighing on you.', context: 'Emotions' }],
         weak: [{ text: 'Don’t worry.', context: 'After diagnosis', improvement: 'Acknowledge feelings first.' }],
