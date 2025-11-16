@@ -5,7 +5,7 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import text  # 👈 added
+from sqlalchemy import text  
 from sqlalchemy.orm import Session
 
 from core.deps import get_current_admin, get_db
