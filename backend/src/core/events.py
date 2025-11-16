@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 
 from config.logging import get_logger, setup_logging
-from db.base import engine
+from db.base import engine, init_db
 
 logger = get_logger(__name__)
 
@@ -26,6 +26,10 @@ def create_start_app_handler(app: FastAPI):
         except Exception as e:
             logger.error(f"Database connection failed: {e}")
             raise
+
+        # Ensure tables exist
+        init_db()
+        logger.info("Database tables ensured")
         
         logger.info("Application startup complete")
     
@@ -46,4 +50,3 @@ def create_stop_app_handler(app: FastAPI):
         logger.info("Application shutdown complete")
     
     return stop_app
-
