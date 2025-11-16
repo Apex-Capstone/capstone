@@ -47,15 +47,6 @@ class Feedback(Base):
     # ---- Questioning & style
     question_breakdown = Column(JSONType)       # {"open": int, "closed": int, "eliciting": int, "ratio_open": float}
     
-    # ---- Deprecated metrics (stop computing, leave nullable)
-    interruptions = Column(Integer, nullable=True)  # deprecated
-    reflections_interpretations = Column(JSONType, nullable=True)  # deprecated
-    prohibited_behaviors = Column(JSONType, nullable=True)  # deprecated
-    deescalation_strategies = Column(JSONType, nullable=True)  # deprecated
-
-    # ---- Tone & safety (metadata, separate from AFCE)
-    tone_summary = Column(JSONType)             # {"calm_clear_rate": float, "sample_n": int} - metadata, not part of AFCE scoring
-
     # ---- Fairness & reliability scaffolding
     bias_probe_info = Column(JSONType)          # {"variant_id": "case123_female_55", "score_delta_from_control": {"empathy_score": -0.07}}
     evaluator_meta = Column(JSONType)           # {"rubric_version": "v1.0", "roles": ["nursing_prof", "comm_trainer"], "agreement": {"kappa": 0.82}}
