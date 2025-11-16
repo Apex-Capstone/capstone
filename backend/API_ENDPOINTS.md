@@ -240,6 +240,60 @@ Close session and finalize feedback.
 }
 ```
 
+### GET /v1/sessions/{session_id}/feedback
+Get feedback for a previously closed session.
+
+**Response:**
+```json
+{
+  "id": 789,
+  "session_id": 123,
+  "empathy_score": 8.5,
+  "spikes_completion_score": 9.0,
+  "overall_score": 8.4,
+  "eo_counts_by_dimension": {
+    "Feeling": {"explicit": 3, "implicit": 2},
+    "Judgment": {"explicit": 1, "implicit": 0},
+    "Appreciation": {"explicit": 2, "implicit": 1}
+  },
+  "elicitation_counts_by_type": {
+    "direct": {"Feeling": 2, "Judgment": 1, "Appreciation": 1},
+    "indirect": {"Feeling": 1, "Judgment": 0, "Appreciation": 0}
+  },
+  "response_counts_by_type": {
+    "understanding": 4,
+    "sharing": 2,
+    "acceptance": 3
+  },
+  "spikes_coverage": {
+    "S": true,
+    "P": true,
+    "I": true,
+    "K": true,
+    "E": true,
+    "S": true
+  },
+  "spikes_timestamps": {
+    "S": {"start_ts": "2025-11-03T10:01:00Z", "end_ts": "2025-11-03T10:02:00Z"},
+    "P": {"start_ts": "2025-11-03T10:02:00Z", "end_ts": "2025-11-03T10:03:00Z"}
+  },
+  "question_breakdown": {
+    "open": 8,
+    "closed": 3,
+    "eliciting": 5,
+    "ratio_open": 0.73
+  },
+  "strengths": "Excellent use of empathetic language\nGood use of open-ended questions",
+  "areas_for_improvement": "Consider more pauses for patient responses",
+  "detailed_feedback": "Overall Score: 8.4/10",
+  "created_at": "2025-11-03T10:15:00Z"
+}
+```
+
+**Error Responses:**
+- `404 Not Found`: Session not found or feedback not found (session not closed yet)
+- `403 Forbidden`: User does not own the session
+
 ---
 
 ## Admin
