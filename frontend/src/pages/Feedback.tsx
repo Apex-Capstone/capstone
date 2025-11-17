@@ -197,18 +197,6 @@ export const Feedback = () => {
                               />
                             </div>
                           </div>
-                          
-                          <div className="bg-orange-50 p-4 rounded-lg">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium">Reassurance Count</span>
-                              <span className="text-lg font-bold text-orange-600">
-                                {feedback.conversationMetrics.reassuranceCount}
-                              </span>
-                            </div>
-                            <div className="text-xs text-orange-600 mt-1">
-                              Times patient was reassured
-                            </div>
-                          </div>
                         </div>
                       </div>
                     ) : (

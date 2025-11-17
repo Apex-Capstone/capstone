@@ -1,5 +1,6 @@
 """Sessions controller/router."""
 
+import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
@@ -11,7 +12,10 @@ from adapters.llm.openai_adapter import OpenAIAdapter
 from adapters.nlu.simple_rule_nlu import SimpleRuleNLU
 from adapters.storage.s3_storage import S3StorageAdapter
 from core.deps import get_current_user, get_db
+from core.errors import AuthorizationError, NotFoundError
 from domain.entities.user import User
+from repositories.feedback_repo import FeedbackRepository
+from repositories.session_repo import SessionRepository
 from domain.models.sessions import (
     FeedbackResponse,
     SessionCreate,
@@ -26,6 +30,19 @@ from services.scoring_service import ScoringService
 from services.session_service import SessionService
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+
+
+def _deserialize_json_field(value: str | None) -> dict | list | None:
+    """Deserialize JSON string to dict/list, or return None."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return None
+    # If already dict/list, return as-is (shouldn't happen, but safe)
+    return value if isinstance(value, (dict, list)) else None
 
 
 class TurnResponseWithAudio(BaseModel):
@@ -166,7 +183,11 @@ async def get_session_turns(
     )
 
 
-@router.post("/{session_id}:close", response_model=FeedbackResponse)
+@router.post(
+    "/{session_id}:close",
+    response_model=FeedbackResponse,
+    response_model_exclude_none=True,  # Exclude None values from response
+)
 async def close_session_and_get_feedback(
     session_id: int,
     db: Annotated[Session, Depends(get_db)],
@@ -179,7 +200,62 @@ async def close_session_and_get_feedback(
     
     # Generate and return feedback
     scoring_service = ScoringService(db)
-    return await scoring_service.generate_feedback(session_id)
+    feedback = await scoring_service.generate_feedback(session_id)
+    # Post-process to remove empty values (FastAPI will use model_dump)
+    return feedback
+
+
+@router.get(
+    "/{session_id}/feedback",
+    response_model=FeedbackResponse,
+    response_model_exclude_none=True,  # Exclude None values from response
+)
+async def get_session_feedback(
+    session_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Get feedback for a closed session."""
+    # Get session and verify it exists
+    session_repo = SessionRepository(db)
+    session = session_repo.get_by_id(session_id)
+    if not session:
+        raise NotFoundError(f"Session with ID {session_id} not found")
+    
+    # Verify session ownership
+    if session.user_id != current_user.id:
+        raise AuthorizationError("You do not have permission to access this session's feedback")
+    
+    # Get feedback
+    feedback_repo = FeedbackRepository(db)
+    feedback = feedback_repo.get_by_session(session_id)
+    if not feedback:
+        raise NotFoundError(f"Feedback not found for session {session_id}. Session may not be closed yet.")
+    
+    # Deserialize JSON fields before creating response (matching scoring_service pattern)
+    feedback.eo_counts_by_dimension = _deserialize_json_field(feedback.eo_counts_by_dimension)
+    feedback.elicitation_counts_by_type = _deserialize_json_field(feedback.elicitation_counts_by_type)
+    feedback.response_counts_by_type = _deserialize_json_field(feedback.response_counts_by_type)
+    feedback.linkage_stats = _deserialize_json_field(feedback.linkage_stats)
+    feedback.missed_opportunities_by_dimension = _deserialize_json_field(feedback.missed_opportunities_by_dimension)
+    feedback.eo_to_elicitation_links = _deserialize_json_field(feedback.eo_to_elicitation_links)
+    feedback.eo_to_response_links = _deserialize_json_field(feedback.eo_to_response_links)
+    feedback.missed_opportunities = _deserialize_json_field(feedback.missed_opportunities)
+    feedback.spikes_coverage = _deserialize_json_field(feedback.spikes_coverage)
+    feedback.spikes_timestamps = _deserialize_json_field(feedback.spikes_timestamps)
+    feedback.spikes_strategies = _deserialize_json_field(feedback.spikes_strategies)
+    feedback.question_breakdown = _deserialize_json_field(feedback.question_breakdown)
+    feedback.bias_probe_info = _deserialize_json_field(feedback.bias_probe_info)
+    feedback.evaluator_meta = _deserialize_json_field(feedback.evaluator_meta)
+    
+    # Set span-level fields to None (computed during generation, not stored)
+    feedback.eo_spans = None
+    feedback.elicitation_spans = None
+    feedback.response_spans = None
+    feedback.relations = None
+    
+    # Create response and let exclude_none=True and _remove_empty_values handle cleanup
+    return FeedbackResponse.model_validate(feedback)
 
 
 @router.get("", response_model=SessionListResponse)
