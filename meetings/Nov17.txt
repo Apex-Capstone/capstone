@@ -1,0 +1,40 @@
+Meeting with Dr Lahnahla before POC deadline
+
+
+1. General Feedback
+Outline looks good.
+Front-end direction is strong.
+After dialogue completion, system should show:
+- Full transcript
+- Highlighted empathic opportunities
+- SPIKES moments (emotion-heavy terms, bad news indicators)
+- Summary: # of opportunities detected, # missed, suggestions for improvement
+Include an example dialogue segment + quiz: “Where should empathy be shown?”
+
+2. Empathy Research Links
+BBN-Empathy Repo: https://github.com/caisa-lab/BBN-Empathy
+Filtered Dataset: https://raw.githubusercontent.com/caisa-lab/BBN-Empathy/refs/heads/main/dataset_filtered.json
+Empathy Annotation Paper: https://aclanthology.org/2020.lrec-1.206/
+Adaptive Virtual Patient Paper: https://aclanthology.org/2025.findings-acl.118/
+
+3. Feedback System Notes
+Using LLM-based virtual standardization for the VP.
+Full empathy appraisal model requires larger dataset → not feasible for PoC.
+Current method: keyword-based lexicon for emotional cues + empathy triggers.
+Zhao may provide empathy lexicon; psychologists can help refine keywords.
+
+4. Testing Template
+DATE: 
+Tester: 
+BRIEF EXPLANATION
+PROMPT: 
+EXAMPLE RESULTS: 
+PERSON’S INTERPRETATION/OBSERVATIONS:
+
+5. Case Research Notes
+Consider different patient scenarios (bad news, chronic illness, mental health).
+Include family context and behavioral styles (anxious, emotional, defensive).
+Interaction length affects number of empathy opportunities.
+
+Recommendation:
+Group - They have different people working on different pieces of the project, different weeks will be focused on a different thing, different stages of nlp pipeline, the way feedback has been generated. Who’s in charge of what modules.
