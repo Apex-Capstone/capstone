@@ -2,6 +2,7 @@
 
 from typing import Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from domain.entities.case import Case
@@ -46,6 +47,15 @@ class CaseRepository:
         category: Optional[str] = None,
     ) -> int:
         return self._base_query(difficulty, category).count()
+
+    def count_by_category(self) -> dict[str, int]:
+        """Return case counts grouped by category."""
+        rows = (
+            self.db.query(Case.category, func.count())
+            .group_by(Case.category)
+            .all()
+        )
+        return {category or "uncategorized": count for category, count in rows}
 
     def get_all(
         self,

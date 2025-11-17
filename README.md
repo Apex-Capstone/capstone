@@ -103,6 +103,20 @@ BACKEND_CORS_ORIGINS=http://localhost:5173
 API_V1_PREFIX=/v1
 ```
 
+Set `PYTHONPATH` so the backend imports resolve before running:
+
+PowerShell:
+
+```powershell
+$env:PYTHONPATH = "$PWD\src"
+```
+
+macOS / Linux:
+
+```bash
+export PYTHONPATH="$PWD/src"
+```
+
 Run the FastAPI server:
 
 ```bash
