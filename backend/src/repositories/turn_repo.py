@@ -65,4 +65,12 @@ class TurnRepository:
             .scalar()
         )
         return (max_turn or 0) + 1
+    
+    def get_by_session_and_number(self, session_id: int, turn_number: int) -> Optional[Turn]:
+        """Get turn by session ID and turn number."""
+        return (
+            self.db.query(Turn)
+            .filter(Turn.session_id == session_id, Turn.turn_number == turn_number)
+            .first()
+        )
 

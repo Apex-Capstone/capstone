@@ -19,8 +19,10 @@ class Turn(Base):
     role = Column(String, nullable=False)  # user, assistant (patient)
     text = Column(Text, nullable=False)
     audio_url = Column(String, nullable=True)  # URL to stored audio file
-    metrics_json = Column(Text)  # JSON with turn-level metrics (empathy score, question type, etc.)
-    spikes_stage = Column(String)  # SPIKES stage during this turn
+    metrics_json = Column(Text)  # JSON with turn-level metrics (empathy score, question type, etc.) - kept for backward compatibility
+    spans_json = Column(Text, nullable=True)  # JSON with detected spans (EO, elicitation, response, SPIKES) with character offsets
+    relations_json = Column(Text, nullable=True)  # JSON with span-relation links (will be populated in Part 2)
+    spikes_stage = Column(String)  # SPIKES stage during this turn (single primary stage; multi-stage stored in spans_json)
     timestamp = Column(DateTime, default=datetime.utcnow)
     
     # Relationships

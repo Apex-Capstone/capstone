@@ -1,20 +1,45 @@
-"""Simple rule-based NLU adapter implementation."""
+"""Simple rule-based NLU adapter implementation with AFCE-aligned span detection."""
 
 import re
+import json
 from typing import Any
 
 from config.logging import get_logger
+from adapters.nlu.span_detector import SpanDetector
 
 logger = get_logger(__name__)
 
 
 class SimpleRuleNLU:
-    """Simple rule-based NLU adapter."""
+    """Simple rule-based NLU adapter with AFCE-aligned span detection."""
     
-    # Empathy keywords
+    def __init__(self):
+        """Initialize span detector."""
+        self.span_detector = SpanDetector()
+    
+    # Legacy empathy keywords (kept for backward compatibility)
     EMPATHY_KEYWORDS = [
         "understand", "feel", "difficult", "sorry", "imagine",
         "support", "here for you", "concern", "worry", "comfort",
+    ]
+    
+    # Tone keywords
+    CALM_KEYWORDS = [
+        "calm", "relaxed", "peaceful", "steady", "composed",
+    ]
+    
+    AGITATED_KEYWORDS = [
+        "upset", "frustrated", "angry", "anxious", "worried",
+        "stressed", "overwhelmed", "panicked",
+    ]
+    
+    CLEAR_KEYWORDS = [
+        "clear", "understand", "comprehend", "grasp",
+    ]
+    
+    UNCLEAR_KEYWORDS = [
+        "confused", "unclear", "don't understand", "not sure",
+        "vague", "ambiguous",
     ]
     
     # Open question starters
@@ -97,4 +122,103 @@ class SimpleRuleNLU:
         
         # Default to closed if has question mark but unclear
         return "closed" if "?" in text else "statement"
+    
+    async def detect_empathy_opportunity(
+        self,
+        text: str,
+    ) -> dict[str, Any]:
+        """Detect empathy opportunities in text (legacy method for backward compatibility)."""
+        # Use span detection for AFCE-aligned detection
+        spans = await self.detect_eo_spans(text)
+        
+        # Determine EO type from spans for backward compatibility
+        if not spans:
+            return {
+                "empathy_opportunity_type": None,
+                "empathy_opportunity": False,
+                "missed_opportunity": False,
+            }
+        
+        # Check if any spans are explicit
+        has_explicit = any(s.get("explicit_or_implicit") == "explicit" for s in spans)
+        eo_type = "explicit" if has_explicit else "implicit"
+        
+        return {
+            "empathy_opportunity_type": eo_type,
+            "empathy_opportunity": True,
+            "missed_opportunity": False,  # Will be set by dialogue service based on context
+        }
+    
+    async def detect_eo_spans(
+        self,
+        text: str,
+    ) -> list[dict[str, Any]]:
+        """Detect empathy opportunity spans with AFCE dimensions."""
+        return self.span_detector.detect_eo_spans(text)
+    
+    async def detect_elicitation_spans(
+        self,
+        text: str,
+    ) -> list[dict[str, Any]]:
+        """Detect elicitation spans with AFCE dimensions."""
+        return self.span_detector.detect_elicitation_spans(text)
+    
+    async def classify_empathy_response_type(
+        self,
+        text: str,
+    ) -> str:
+        """Classify type of empathy response (legacy method for backward compatibility)."""
+        # Use span detection for AFCE-aligned detection
+        spans = await self.detect_response_spans(text)
+        
+        if not spans:
+            return "other"
+        
+        # Return the first response type found (prioritized by span detector)
+        return spans[0].get("type", "other")
+    
+    async def detect_response_spans(
+        self,
+        text: str,
+    ) -> list[dict[str, Any]]:
+        """Detect empathic response spans (AFCE taxonomy)."""
+        return self.span_detector.detect_response_spans(text)
+    
+    async def analyze_tone(
+        self,
+        text: str,
+    ) -> dict[str, Any]:
+        """Analyze tone of communication."""
+        text_lower = text.lower()
+        
+        # Check for calm indicators
+        calm_indicators = sum(1 for keyword in self.CALM_KEYWORDS if keyword in text_lower)
+        agitated_indicators = sum(1 for keyword in self.AGITATED_KEYWORDS if keyword in text_lower)
+        
+        # Determine calm/agitated
+        if agitated_indicators > calm_indicators:
+            calm = False
+        elif calm_indicators > 0:
+            calm = True
+        else:
+            # Default to calm if no strong indicators
+            calm = agitated_indicators == 0
+        
+        # Check for clear indicators
+        clear_indicators = sum(1 for keyword in self.CLEAR_KEYWORDS if keyword in text_lower)
+        unclear_indicators = sum(1 for keyword in self.UNCLEAR_KEYWORDS if keyword in text_lower)
+        
+        # Determine clear/unclear
+        if unclear_indicators > clear_indicators:
+            clear = False
+        elif clear_indicators > 0:
+            clear = True
+        else:
+            # Default to clear if no strong indicators
+            clear = unclear_indicators == 0
+        
+        return {
+            "calm": calm,
+            "clear": clear,
+        }
 
