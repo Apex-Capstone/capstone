@@ -31,7 +31,7 @@ def test_user(test_db):
     user = User(
         email="test@example.com",
         hashed_password="hashed_password",
-        role="student",
+        role="trainee",
         full_name="Test User",
     )
     test_db.add(user)

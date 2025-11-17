@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import text  # 👈 added
 from sqlalchemy.orm import Session
 
-from core.deps import get_current_admin, get_db
+from core.deps import get_db, require_admin
 from domain.entities.user import User
 from domain.models.admin import AnalyticsDashboard
 from domain.models.cases import CaseCreate, CaseResponse
@@ -55,7 +55,7 @@ async def db_health(
 @router.get("/sessions", response_model=AdminSessionListResponse)
 async def list_all_sessions(
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_admin)],
+    current_user: Annotated[User, Depends(require_admin)],
     user_id: Optional[int] = Query(None),
     case_id: Optional[int] = Query(None),
     start_date: Optional[datetime] = Query(None),
@@ -96,7 +96,7 @@ async def list_all_sessions(
 async def get_admin_session_detail(
     session_id: int,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_admin)],
+    current_user: Annotated[User, Depends(require_admin)],
 ):
     """Get transcript + metrics timeline for a session (admin only)."""
     session_service = SessionService(db)
@@ -130,7 +130,7 @@ async def get_admin_session_detail(
 @router.get("/aggregates", response_model=AnalyticsDashboard)
 async def get_aggregates(
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_admin)],
+    current_user: Annotated[User, Depends(require_admin)],
 ):
     """Get cohort/case aggregates (admin only)."""
     analytics_service = AnalyticsService(db)
@@ -141,7 +141,7 @@ async def get_aggregates(
 async def create_patient_case(
     case_data: CaseCreate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_admin)],
+    current_user: Annotated[User, Depends(require_admin)],
 ):
     """Create patient case (admin only)."""
     case_service = CaseService(db)

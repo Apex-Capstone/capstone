@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from db.base import Base
-from core.deps import get_db, get_current_user, get_current_instructor
+from core.deps import get_db, get_current_user, require_admin
 from types import SimpleNamespace
 
 # --- thread-safe in-memory SQLite for async tests ---
@@ -30,7 +30,7 @@ def _overrides():
             db.close()
     app.dependency_overrides[get_db] = _get_db
 
-    # Auth overrides: act as admin/instructor
+    # Auth overrides: act as admin
     dummy_admin = SimpleNamespace(
         id=1,
         email="admin@test.local",
@@ -41,11 +41,11 @@ def _overrides():
     async def _as_user():
         return dummy_admin
 
-    async def _as_instructor():
+    async def _as_admin():
         return dummy_admin
 
     app.dependency_overrides[get_current_user] = _as_user
-    app.dependency_overrides[get_current_instructor] = _as_instructor
+    app.dependency_overrides[require_admin] = _as_admin
 
     yield
     app.dependency_overrides.clear()
@@ -54,7 +54,7 @@ def _overrides():
 async def test_cases_api_smoke():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        # CREATE (requires instructor/admin)
+        # CREATE (requires admin)
         r = await ac.post("/v1/cases", json={"title": "T1", "script": "S1"})
         assert r.status_code == 201, r.text
         cid = r.json()["id"]
@@ -69,12 +69,12 @@ async def test_cases_api_smoke():
         r = await ac.get(f"/v1/cases/{cid}")
         assert r.status_code == 200, r.text
 
-        # PATCH (requires instructor/admin)
+        # PATCH (requires admin)
         r = await ac.patch(f"/v1/cases/{cid}", json={"title": "T1-updated"})
         assert r.status_code == 200, r.text
         assert r.json()["title"] == "T1-updated"
 
-        # DELETE (requires instructor/admin)
+        # DELETE (requires admin)
         r = await ac.delete(f"/v1/cases/{cid}")
         assert r.status_code == 204, r.text
 
