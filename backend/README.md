@@ -55,6 +55,21 @@ poetry run alembic upgrade head
 ```
 
 4. Run the application:
+
+Set `PYTHONPATH` so the backend imports resolve before starting:
+
+PowerShell:
+
+```powershell
+$env:PYTHONPATH = "$PWD\src"
+```
+
+macOS / Linux:
+
+```bash
+export PYTHONPATH="$PWD/src"
+```
+
 ```bash
 poetry run python src/app.py
 ```
@@ -114,8 +129,18 @@ Automated scoring based on:
 ## Testing
 
 Run tests:
-```bash
+
+PowerShell:
+
+```powershell
 $env:PYTHONPATH = "$PWD\src"
+poetry run pytest
+```
+
+macOS / Linux:
+
+```bash
+export PYTHONPATH="$PWD/src"
 poetry run pytest
 ```
 

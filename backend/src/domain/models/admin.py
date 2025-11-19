@@ -33,12 +33,20 @@ class PerformanceStats(BaseModel):
     average_overall_score: float
 
 
+class CaseStats(BaseModel):
+    """Case statistics summary."""
+
+    total_cases: int
+    cases_by_category: dict[str, int]
+
+
 class AnalyticsDashboard(BaseModel):
     """Analytics dashboard schema."""
-    
+
     user_stats: UserStats
     session_stats: SessionStats
     performance_stats: PerformanceStats
+    case_stats: CaseStats
     generated_at: datetime
 
 
