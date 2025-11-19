@@ -1,13 +1,11 @@
 """Core module for security, errors, dependencies, and events."""
 
 from core.deps import (
-    get_current_admin,
-    get_current_instructor,
-    get_current_researcher,
-    get_current_student,
     get_current_user,
     get_db,
     require_role,
+    require_trainee,
+    require_admin,
 )
 from core.errors import (
     AppError,
@@ -34,10 +32,8 @@ __all__ = [
     # Dependencies
     "get_db",
     "get_current_user",
-    "get_current_student",
-    "get_current_instructor",
-    "get_current_admin",
-    "get_current_researcher",
+    "require_trainee",
+    "require_admin",
     "require_role",
     # Errors
     "AppError",

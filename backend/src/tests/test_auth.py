@@ -31,13 +31,13 @@ async def test_register_user(test_db):
         email="newuser@example.com",
         password="password123",
         full_name="New User",
-        role="student",
+        role="trainee",
     )
     
     user = await auth_service.register_user(user_data)
     
     assert user.email == "newuser@example.com"
-    assert user.role == "student"
+    assert user.role == "trainee"
     assert user.id is not None
 
 
@@ -48,7 +48,7 @@ async def test_register_duplicate_user(test_db):
     user_data = UserCreate(
         email="duplicate@example.com",
         password="password123",
-        role="student",
+        role="trainee",
     )
     
     # First registration
@@ -68,7 +68,7 @@ async def test_login_success(test_db):
     user_data = UserCreate(
         email="login@example.com",
         password="password123",
-        role="student",
+        role="trainee",
     )
     await auth_service.register_user(user_data)
     
@@ -92,7 +92,7 @@ async def test_login_invalid_password(test_db):
     user_data = UserCreate(
         email="test@example.com",
         password="correctpassword",
-        role="student",
+        role="trainee",
     )
     await auth_service.register_user(user_data)
     

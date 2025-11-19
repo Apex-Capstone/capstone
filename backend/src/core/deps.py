@@ -69,28 +69,16 @@ def require_role(required_role: str):
 
 
 # Convenience role dependencies
-def get_current_student(current_user: Annotated[User, Depends(get_current_user)]) -> User:
-    """Get current user (must be at least student role)."""
-    return current_user
-
-
-def get_current_instructor(
-    current_user: Annotated[User, Depends(require_role(RoleScopes.INSTRUCTOR))]
+def require_trainee(
+    current_user: Annotated[User, Depends(require_role(RoleScopes.TRAINEE))]
 ) -> User:
-    """Get current user (must be at least instructor role)."""
+    """Ensure current user has at least trainee permissions."""
     return current_user
 
 
-def get_current_admin(
+def require_admin(
     current_user: Annotated[User, Depends(require_role(RoleScopes.ADMIN))]
 ) -> User:
-    """Get current user (must be admin role)."""
-    return current_user
-
-
-def get_current_researcher(
-    current_user: Annotated[User, Depends(require_role(RoleScopes.RESEARCHER))]
-) -> User:
-    """Get current user (must be researcher role)."""
+    """Ensure current user is an admin."""
     return current_user
 

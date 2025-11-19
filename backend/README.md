@@ -66,11 +66,11 @@ poetry run uvicorn src.app:app --reload --host 0.0.0.0 --port 8000
 
 ### Seeding Dev Data
 
-Create admin, instructor, several students, and example cases:
+Create admin accounts plus several trainee users with example cases:
 
-- Admin:      admin@example.com / admin123
-- Instructor: instructor@example.com / instructor123
-- Students:   alice.trainee@example.com / changeme, etc.
+- Admin:           admin@example.com / admin123
+- Additional Admin: admin2@example.com / admin123
+- Trainees:        alice.trainee@example.com / changeme, etc.
 
 Run:
 

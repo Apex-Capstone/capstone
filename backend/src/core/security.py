@@ -80,23 +80,19 @@ def decode_access_token(token: str) -> Optional[dict[str, Any]]:
 class RoleScopes:
     """Define role-based access scopes."""
 
-    STUDENT = "student"
-    INSTRUCTOR = "instructor"
+    TRAINEE = "trainee"
     ADMIN = "admin"
-    RESEARCHER = "researcher"
 
     @classmethod
     def get_all_scopes(cls) -> list[str]:
         """Get all available role scopes."""
-        return [cls.STUDENT, cls.INSTRUCTOR, cls.ADMIN, cls.RESEARCHER]
+        return [cls.TRAINEE, cls.ADMIN]
 
     @classmethod
     def has_permission(cls, user_role: str, required_role: str) -> bool:
         """Check if user role has permission for required role."""
         role_hierarchy = {
-            cls.ADMIN: [cls.ADMIN, cls.INSTRUCTOR, cls.RESEARCHER, cls.STUDENT],
-            cls.INSTRUCTOR: [cls.INSTRUCTOR, cls.STUDENT],
-            cls.RESEARCHER: [cls.RESEARCHER],
-            cls.STUDENT: [cls.STUDENT],
+            cls.ADMIN: [cls.ADMIN, cls.TRAINEE],
+            cls.TRAINEE: [cls.TRAINEE],
         }
         return required_role in role_hierarchy.get(user_role, [])

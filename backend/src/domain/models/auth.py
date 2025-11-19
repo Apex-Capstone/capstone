@@ -11,7 +11,7 @@ class UserBase(BaseModel):
     
     email: EmailStr
     full_name: Optional[str] = None
-    role: str = "student"
+    role: str = "trainee"
 
 
 class UserCreate(UserBase):

@@ -23,7 +23,7 @@ Login with email/password and receive JWT tokens.
   "user": {
     "id": 1,
     "email": "user@example.com",
-    "role": "student",
+    "role": "trainee",
     "full_name": "John Doe"
   }
 }
@@ -352,8 +352,7 @@ Get cohort/case aggregates (admin only).
   "user_stats": {
     "total_users": 150,
     "users_by_role": {
-      "student": 120,
-      "instructor": 25,
+      "trainee": 145,
       "admin": 5
     },
     "active_users_last_30_days": 85

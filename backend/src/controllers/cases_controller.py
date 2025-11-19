@@ -5,7 +5,7 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from core.deps import get_current_instructor, get_current_user, get_db
+from core.deps import get_current_user, get_db, require_admin
 from domain.entities.user import User
 from domain.models.cases import (
     CaseCreate,
@@ -47,9 +47,9 @@ async def get_case(
 async def create_case(
     case_data: CaseCreate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_instructor)],
+    current_user: Annotated[User, Depends(require_admin)],
 ):
-    """Create a new case (instructor/admin only)."""
+    """Create a new case (admin only)."""
     case_service = CaseService(db)
     return await case_service.create_case(case_data)
 
@@ -59,9 +59,9 @@ async def update_case(
     case_id: int,
     case_data: CaseUpdate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_instructor)],
+    current_user: Annotated[User, Depends(require_admin)],
 ):
-    """Update a case (instructor/admin only)."""
+    """Update a case (admin only)."""
     case_service = CaseService(db)
     return await case_service.update_case(case_id, case_data)
 
@@ -70,9 +70,9 @@ async def update_case(
 async def delete_case(
     case_id: int,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_instructor)],
+    current_user: Annotated[User, Depends(require_admin)],
 ):
-    """Delete a case (instructor/admin only)."""
+    """Delete a case (admin only)."""
     case_service = CaseService(db)
     await case_service.delete_case(case_id)
 

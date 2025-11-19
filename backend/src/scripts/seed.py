@@ -1,5 +1,5 @@
 """
-Seed dev data: users (admin/instructor/students) + cases.
+Seed dev data: users (admins/trainees) + cases.
 
 Usage:
   uvicorn app:app --reload   # run your app normally
@@ -25,10 +25,10 @@ from domain.models.cases import CaseCreate
 ADMIN_EMAIL = "admin@example.com"
 ADMIN_PASS = "admin123"
 
-INSTRUCTOR_EMAIL = "instructor@example.com"
-INSTRUCTOR_PASS = "instructor123"
+SECOND_ADMIN_EMAIL = "admin2@example.com"
+SECOND_ADMIN_PASS = "admin123"
 
-STUDENTS = [
+TRAINEES = [
     ("alice.trainee@example.com", "changeme"),
     ("bob.trainee@example.com", "changeme"),
     ("charlie.trainee@example.com", "changeme"),
@@ -118,9 +118,9 @@ async def seed(db: Session, do_reset: bool = False) -> None:
             return None
 
     await ensure_user(ADMIN_EMAIL, ADMIN_PASS, role="admin", full_name="Admin User")
-    await ensure_user(INSTRUCTOR_EMAIL, INSTRUCTOR_PASS, role="instructor", full_name="Instructor User")
-    for email, pwd in STUDENTS:
-        await ensure_user(email, pwd, role="student")
+    await ensure_user(SECOND_ADMIN_EMAIL, SECOND_ADMIN_PASS, role="admin", full_name="Second Admin")
+    for email, pwd in TRAINEES:
+        await ensure_user(email, pwd, role="trainee")
 
     # ---- Cases ----
     async def ensure_case(c: CaseCreate):
