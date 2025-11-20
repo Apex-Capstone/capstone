@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { fetchAdminStats, type AdminStats } from '@/api/admin.api'
 import { MetricCard } from '@/components/MetricCard'
 import { Navbar } from '@/components/Navbar'
@@ -26,6 +26,20 @@ export const Admin = () => {
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create')
   const [editing, setEditing] = useState<Case | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [activeCases, setActiveCases] = useState<number | null>(null)
+
+  const refreshCases = useCallback(async () => {
+    setCaseLoading(true)
+    try {
+      const { items } = await listCases()
+      setCaseItems(items)
+      setActiveCases(items.length)
+    } catch (e) {
+      console.error('Failed to fetch cases:', e)
+    } finally {
+      setCaseLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     const loadStats = async () => {
@@ -41,24 +55,15 @@ export const Admin = () => {
     loadStats()
   }, [])
 
-  // ---- NEW: fetch cases when switching to the Cases tab ----
-  const refreshCases = async () => {
-    setCaseLoading(true)
-    try {
-      const { items } = await listCases()
-      setCaseItems(items)
-    } catch (e) {
-      console.error('Failed to fetch cases:', e)
-    } finally {
-      setCaseLoading(false)
-    }
-  }
+  useEffect(() => {
+    void refreshCases()
+  }, [refreshCases])
 
   useEffect(() => {
     if (activeTab === 'cases') {
       void refreshCases()
     }
-  }, [activeTab])
+  }, [activeTab, refreshCases])
 
   const handleExportData = () => {
     const dataToExport = {
@@ -145,7 +150,12 @@ export const Admin = () => {
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               <MetricCard title="Total Users" value={stats.totalUsers} icon={Users} description="Registered trainees" />
               <MetricCard title="Total Cases" value={stats.totalCases} icon={FileText} description="Available training cases" />
-              <MetricCard title="Active Sessions" value={stats.activeSessions} icon={Activity} description="Currently in progress" />
+              <MetricCard
+                title="Active Cases"
+                value={activeCases ?? '—'}
+                icon={Activity}
+                description="Live count pulled from the case service"
+              />
               <MetricCard title="Average Score" value={`${stats.averageScore}%`} icon={TrendingUp} description="Across all sessions" />
             </div>
 

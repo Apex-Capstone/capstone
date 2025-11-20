@@ -82,6 +82,19 @@ project-root/
    ```bash
    git clone https://github.com/AsherHaroon/capstone.git
    cd capstone
+   ```
+
+### Makefile helpers
+
+Execute common workflows from the root with a single `make` command; the project ships with:
+
+```
+make backend      # installs backend deps, sets PYTHONPATH, and starts uvicorn
+make frontend     # installs frontend deps and launches the dev server
+make seed         # sets PYTHONPATH and runs the backend reset-and-seed script
+```
+
+Each target already configures `PYTHONPATH` for PowerShell so you can skip the manual export within the backend folder.
 
 ### 1. Backend Setup
 

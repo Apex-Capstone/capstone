@@ -1,6 +1,4 @@
 // src/api/admin.api.ts
-import api from '@/api/client'
-
 export interface AdminStats {
   totalUsers: number
   totalCases: number
@@ -36,82 +34,97 @@ export interface AdminStats {
   }
 }
 
-interface AggregatesResponse {
-  user_stats: {
-    total_users: number
-    users_by_role: Record<string, number>
-    active_users_last_30_days: number
-  }
-  session_stats: {
-    total_sessions: number
-    completed_sessions: number
-    active_sessions: number
-    average_duration_seconds: number
-    sessions_by_case: Record<string, number>
-  }
-  performance_stats: {
-    average_empathy_score: number
-    average_communication_score: number
-    average_spikes_completion: number
-    average_overall_score: number
-  }
-  case_stats: {
-    total_cases: number
-    cases_by_category: Record<string, number>
-  }
+export const fetchAdminStats = async (): Promise<AdminStats> => {
+  await new Promise((resolve) => setTimeout(resolve, 150))
+  return STATIC_STATS
 }
 
-// If your backend path is protected and versioned:
-const BASE = '/v1/admin'
-
-export const fetchAdminStats = async (): Promise<AdminStats> => {
-  const { data } = await api.get<AggregatesResponse>(`${BASE}/aggregates`)
-
-  // --- dev fallback (previously used) ---
-  // await new Promise((r) => setTimeout(r, 300))
-  // return {
-  //   totalUsers: 150,
-  //   totalCases: 342,
-  //   activeSessions: 23,
-  //   averageScore: 82.5,
-  //   recentActivity: [
-  //     { userId: 'trainee_001', action: 'Completed "Delivering a Difficult Diagnosis" case', timestamp: '2024-01-15T15:30:00Z' },
-  //     { userId: 'trainee_023', action: 'Started "Responding to Patient Distress" case', timestamp: '2024-01-15T15:25:00Z' },
-  //     { userId: 'trainee_045', action: 'Viewed SPIKES feedback for session_789', timestamp: '2024-01-15T15:20:00Z' },
-  //   ],
-  //   userOverview: [
-  //     { id: 'trainee_001', name: 'Dr. Sarah Johnson', email: 'sarah.johnson@medical.edu', role: 'trainee', averageScore: 87.2, completedCases: 12, lastActive: '2024-01-15T15:30:00Z' },
-  //     { id: 'trainee_023', name: 'Dr. Michael Chen', email: 'michael.chen@medical.edu', role: 'trainee', averageScore: 79.5, completedCases: 8, lastActive: '2024-01-15T15:25:00Z' },
-  //     { id: 'trainee_045', name: 'Dr. Emma Williams', email: 'emma.williams@medical.edu', role: 'trainee', averageScore: 91.3, completedCases: 15, lastActive: '2024-01-15T15:20:00Z' },
-  //   ],
-  //   sessionLogs: [
-  //     { id: 'session_789', userId: 'trainee_001', caseId: '1', startTime: '2024-01-15T14:00:00Z', endTime: '2024-01-15T14:35:00Z', score: 85, transcript: 'Session focused on SPIKES framework...' },
-  //     { id: 'session_788', userId: 'trainee_023', caseId: '2', startTime: '2024-01-15T13:30:00Z', endTime: '2024-01-15T14:10:00Z', score: 78, transcript: 'Practice session on managing distress...' },
-  //   ],
-  //   analyticsData: {
-  //     averageScoreByMonth: [
-  //       { month: 'Oct 2024', score: 82.5 },
-  //       { month: 'Nov 2024', score: 84.1 },
-  //       { month: 'Dec 2024', score: 83.8 },
-  //     ],
-  //     completionRates: [
-  //       { difficulty: 'beginner', rate: 0.95 },
-  //       { difficulty: 'intermediate', rate: 0.87 },
-  //       { difficulty: 'advanced', rate: 0.72 },
-  //     ],
-  //     commonChallenges: [
-  //       { challenge: 'SPIKES: Emotions stage', frequency: 45 },
-  //       { challenge: 'Patient reassurance techniques', frequency: 32 },
-  //       { challenge: 'Breaking bad news timing', frequency: 28 },
-  //     ],
-  //   },
-  // }
-
-  return {
-    totalUsers: data.user_stats.total_users,
-    totalCases: data.case_stats.total_cases,
-    activeSessions: data.session_stats.active_sessions,
-    averageScore: data.performance_stats.average_overall_score,
-    recentActivity: [],
-  }
+const STATIC_STATS: AdminStats = {
+  totalUsers: 132,
+  totalCases: 58,
+  activeSessions: 9,
+  averageScore: 84.2,
+  recentActivity: [
+    {
+      userId: 'trainee_001',
+      action: 'Completed "Delivering a Difficult Diagnosis"',
+      timestamp: '2025-10-25T14:20:00Z',
+    },
+    {
+      userId: 'trainee_017',
+      action: 'Reviewed feedback for session_1024',
+      timestamp: '2025-10-25T14:05:00Z',
+    },
+    {
+      userId: 'trainee_022',
+      action: 'Started "Responding to Patient Distress"',
+      timestamp: '2025-10-25T13:45:00Z',
+    },
+  ],
+  userOverview: [
+    {
+      id: 'trainee_001',
+      name: 'Dr. Sarah Johnson',
+      email: 'sarah.johnson@medical.edu',
+      role: 'trainee',
+      averageScore: 87.2,
+      completedCases: 12,
+      lastActive: '2025-10-25T14:20:00Z',
+    },
+    {
+      id: 'trainee_017',
+      name: 'Dr. Alex Brooks',
+      email: 'alex.brooks@medical.edu',
+      role: 'trainee',
+      averageScore: 82.1,
+      completedCases: 9,
+      lastActive: '2025-10-25T14:05:00Z',
+    },
+    {
+      id: 'admin_003',
+      name: 'Dr. Priya Kapoor',
+      email: 'priya.kapoor@medical.edu',
+      role: 'admin',
+      averageScore: 92.7,
+      completedCases: 24,
+      lastActive: '2025-10-25T13:50:00Z',
+    },
+  ],
+  sessionLogs: [
+    {
+      id: 'session_1024',
+      userId: 'trainee_001',
+      caseId: '7',
+      startTime: '2025-10-25T13:10:00Z',
+      endTime: '2025-10-25T13:45:00Z',
+      score: 90,
+      transcript: 'Focused on sharing difficult diagnoses with empathy...',
+    },
+    {
+      id: 'session_1023',
+      userId: 'trainee_017',
+      caseId: '12',
+      startTime: '2025-10-25T12:30:00Z',
+      endTime: '2025-10-25T12:55:00Z',
+      score: 81,
+      transcript: 'Worked on handling patient distress while closing the conversation.',
+    },
+  ],
+  analyticsData: {
+    averageScoreByMonth: [
+      { month: 'Aug 2025', score: 83.3 },
+      { month: 'Sep 2025', score: 85.0 },
+      { month: 'Oct 2025', score: 84.2 },
+    ],
+    completionRates: [
+      { difficulty: 'beginner', rate: 0.96 },
+      { difficulty: 'intermediate', rate: 0.88 },
+      { difficulty: 'advanced', rate: 0.74 },
+    ],
+    commonChallenges: [
+      { challenge: 'Opening difficult conversations', frequency: 32 },
+      { challenge: 'SPIKES: Emotion handling', frequency: 27 },
+      { challenge: 'Concluding with clarity', frequency: 18 },
+    ],
+  },
 }

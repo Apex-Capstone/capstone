@@ -225,19 +225,6 @@ export const CaseDetail = () => {
               </Card>
             </div>
 
-            {/* Script */}
-            <div className="mt-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Script</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <pre className="whitespace-pre-wrap text-sm text-gray-800">
-                    {caseData.script}
-                  </pre>
-                </CardContent>
-              </Card>
-            </div>
           </div>
 
           {/* Chat area */}
