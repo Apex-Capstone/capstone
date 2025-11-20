@@ -16,19 +16,19 @@ export const Sidebar = () => {
       name: 'Dashboard',
       href: '/dashboard',
       icon: LayoutDashboard,
-      roles: ['student', 'instructor', 'admin'],
+      roles: ['trainee', 'admin'],
     },
     {
       name: 'Cases',
       href: '/dashboard',
       icon: FileText,
-      roles: ['student', 'instructor', 'admin'],
+      roles: ['trainee', 'admin'],
     },
     {
       name: 'Research',
       href: '/research',
       icon: BarChart3,
-      roles: ['student', 'instructor', 'admin'],
+      roles: ['trainee', 'admin'],
     },
     {
       name: 'Admin',
