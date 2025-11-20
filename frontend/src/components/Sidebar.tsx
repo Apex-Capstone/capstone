@@ -28,13 +28,13 @@ export const Sidebar = () => {
       name: 'Research',
       href: '/research',
       icon: BarChart3,
-      roles: ['trainee', 'admin'],
+      roles: ['admin'],
     },
     {
       name: 'Admin',
       href: '/admin',
       icon: Shield,
-      roles: ['admin', 'instructor'],
+      roles: ['admin'],
     },
   ].filter((item) => item.roles.includes(user?.role || 'trainee'))
 
