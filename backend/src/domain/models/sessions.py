@@ -10,6 +10,7 @@ class SessionCreate(BaseModel):
     """Session creation schema."""
     
     case_id: int
+    force_new: bool = Field(default=False)
 
 
 class SessionUpdate(BaseModel):
@@ -56,6 +57,7 @@ class SessionResponse(BaseModel):
     ended_at: Optional[datetime]
     duration_seconds: int
     meta: Optional[str] = Field(default=None, alias="session_metadata")
+    case_title: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True, extra="ignore")
 

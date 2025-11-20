@@ -1,25 +1,34 @@
 import api from '@/api/client'
 import type {
+  Session,
   SessionDTO,
-  TurnResponseWithAudioDTO,
+  SessionDetail,
   SessionDetailDTO,
+  SessionListResponse,
+  SessionListResponseDTO,
+  TurnResponseWithAudio,
+  TurnResponseWithAudioDTO,
 } from '@/types/session'
 import {
   sessionFromDTO,
   turnResponseWithAudioFromDTO,
   sessionDetailFromDTO,
+  sessionListFromDTO,
   toSessionCreatePayload,
   toTurnCreatePayload,
 } from '@/adapters/session.adapter'
-import type { Session, TurnResponseWithAudio, SessionDetail } from '@/types/session'
 
 const BASE = '/v1/sessions'
 
 /**
  * Create a new session for a case
  */
-export const createSession = async (caseId: number): Promise<Session> => {
-  const res = await api.post<SessionDTO>(BASE, toSessionCreatePayload(caseId))
+export const createSession = async (
+  caseId: number,
+  opts?: { forceNew?: boolean }
+): Promise<Session> => {
+  const { forceNew = false } = opts ?? {}
+  const res = await api.post<SessionDTO>(BASE, toSessionCreatePayload(caseId, forceNew))
   return sessionFromDTO(res.data)
 }
 
@@ -44,6 +53,20 @@ export const submitTurn = async (
 export const getSession = async (sessionId: number): Promise<SessionDetail> => {
   const res = await api.get<SessionDetailDTO>(`${BASE}/${sessionId}`)
   return sessionDetailFromDTO(res.data)
+}
+
+/**
+ * List sessions for the current user
+ */
+export const listUserSessions = async (opts?: {
+  skip?: number
+  limit?: number
+}): Promise<SessionListResponse> => {
+  const { skip = 0, limit = 10 } = opts ?? {}
+  const res = await api.get<SessionListResponseDTO>(BASE, {
+    params: { skip, limit },
+  })
+  return sessionListFromDTO(res.data)
 }
 
 /**

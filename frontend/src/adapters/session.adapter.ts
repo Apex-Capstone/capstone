@@ -1,12 +1,14 @@
 import type {
   Session,
   SessionDTO,
+  SessionDetail,
+  SessionDetailDTO,
   Turn,
   TurnDTO,
   TurnResponseWithAudio,
   TurnResponseWithAudioDTO,
-  SessionDetail,
-  SessionDetailDTO,
+  SessionListResponse,
+  SessionListResponseDTO,
 } from '@/types/session'
 
 // Convert backend DTO to frontend model
@@ -21,6 +23,7 @@ export function sessionFromDTO(dto: SessionDTO): Session {
     endedAt: dto.ended_at ?? undefined,
     durationSeconds: dto.duration_seconds,
     meta: dto.meta ?? undefined,
+    caseTitle: dto.case_title ?? undefined,
   }
 }
 
@@ -54,10 +57,18 @@ export function sessionDetailFromDTO(dto: SessionDetailDTO): SessionDetail {
   }
 }
 
+export function sessionListFromDTO(dto: SessionListResponseDTO): SessionListResponse {
+  return {
+    sessions: dto.sessions.map(sessionFromDTO),
+    total: dto.total,
+  }
+}
+
 // Convert frontend model to backend create payload
-export function toSessionCreatePayload(caseId: number) {
+export function toSessionCreatePayload(caseId: number, forceNew?: boolean) {
   return {
     case_id: caseId,
+    force_new: forceNew ?? false,
   }
 }
 

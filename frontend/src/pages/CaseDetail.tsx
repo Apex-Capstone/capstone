@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { getCase } from '@/api/cases.api'
-import { createSession, submitTurn } from '@/api/sessions.api'
+import { createSession, submitTurn, closeSession, getSession } from '@/api/sessions.api'
 import type { Case as CaseType } from '@/types/case'
 import type { Message } from '@/types/session'
 
@@ -17,6 +17,7 @@ import { Mic, Send, Clock, PhoneOff } from 'lucide-react'
 export const CaseDetail = () => {
   const { caseId } = useParams<{ caseId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   const [caseData, setCaseData] = useState<CaseType | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -28,25 +29,65 @@ export const CaseDetail = () => {
   const [sessionId, setSessionId] = useState<number | null>(null)
   const [currentSpikesStage, setCurrentSpikesStage] = useState<string>('setting')
   const [error, setError] = useState<string | null>(null)
+  const createdSessionForCase = useRef<number | null>(null)
+
+  const sessionParam = searchParams.get('sessionId')
 
   // --- Load case and create session ---
   useEffect(() => {
     const initializeSession = async () => {
       if (!caseId) return
+
+      const numericCaseId = Number(caseId)
+      const resumeSessionId = sessionParam ? Number(sessionParam) : null
+      const shouldResume =
+        resumeSessionId !== null && !Number.isNaN(resumeSessionId)
+
+      if (!shouldResume && createdSessionForCase.current === numericCaseId) {
+        return
+      }
+
       try {
         // Load case data
-        const data = await getCase(Number(caseId))
+        const data = await getCase(numericCaseId)
         setCaseData(data)
 
-        // Create a new session for this case
-        const session = await createSession(Number(caseId))
-        setSessionId(session.id)
-        setCurrentSpikesStage(session.currentSpikesStage || 'setting')
+        if (shouldResume) {
+          const existingSession = await getSession(resumeSessionId as number)
+          if (existingSession.caseId !== numericCaseId) {
+            throw new Error('Session case mismatch')
+          }
+          setSessionId(existingSession.id)
+          setCurrentSpikesStage(existingSession.currentSpikesStage || 'setting')
+          const startedAt = new Date(existingSession.startedAt)
+          const now = Date.now()
+          const rawElapsed = Math.floor((now - startedAt.getTime()) / 1000)
+          const clampedElapsed = Math.max(rawElapsed, 0)
+          setSessionElapsed(clampedElapsed)
+          setStartTime(new Date(now - clampedElapsed * 1000))
+          const restoredMessages: Message[] = existingSession.turns.map((turn) => ({
+            id: `turn-${turn.id}`,
+            role: turn.role as 'user' | 'assistant',
+            content: turn.text,
+            timestamp: turn.timestamp,
+          }))
+          setMessages(restoredMessages)
+        } else {
+          createdSessionForCase.current = numericCaseId
+          try {
+            const session = await createSession(numericCaseId)
+            setSessionId(session.id)
+            setCurrentSpikesStage(session.currentSpikesStage || 'setting')
 
-        // Start timer
-        const now = new Date()
-        setStartTime(now)
-        setSessionElapsed(0)
+            // Start timer
+            const now = new Date()
+            setStartTime(now)
+            setSessionElapsed(0)
+          } catch (creationError) {
+            createdSessionForCase.current = null
+            throw creationError
+          }
+        }
       } catch (error) {
         console.error('Failed to initialize session:', error)
         setError('Failed to start session. Please try again.')
@@ -55,7 +96,7 @@ export const CaseDetail = () => {
       }
     }
     initializeSession()
-  }, [caseId])
+  }, [caseId, sessionParam])
 
   // --- Timer updates every second ---
   useEffect(() => {
@@ -124,10 +165,18 @@ export const CaseDetail = () => {
     alert('Voice input will be implemented when ASR backend is ready')
   }
 
-  const handleEndSession = () => {
-    if (sessionId) {
-      navigate(`/feedback/${sessionId}`)
+  const handleEndSession = async () => {
+    if (!sessionId) return
+
+    try {
+      await closeSession(sessionId)
+    } catch (error) {
+      console.error('Failed to close session:', error)
+      setError('Unable to close session. Please try again.')
+      return
     }
+
+    navigate(`/feedback/${sessionId}`)
   }
 
   const formatTime = (seconds: number) => {

@@ -50,6 +50,19 @@ class SessionRepository:
             .limit(limit)
             .all()
         )
+
+    def get_active_for_user_case(self, user_id: int, case_id: int) -> Optional[SessionEntity]:
+        """Get the most recent non-completed session for a user/case."""
+        return (
+            self.db.query(SessionEntity)
+            .filter(
+                SessionEntity.user_id == user_id,
+                SessionEntity.case_id == case_id,
+                SessionEntity.state != "completed",
+            )
+            .order_by(SessionEntity.started_at.desc())
+            .first()
+        )
     
     def get_all(self, skip: int = 0, limit: int = 100) -> list[SessionEntity]:
         """Get all sessions with pagination."""
