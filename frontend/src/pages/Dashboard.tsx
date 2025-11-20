@@ -149,7 +149,7 @@ export const Dashboard = () => {
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {sessions.map((session) => {
                         const isCompleted = session.state === 'completed'
-                        const badgeText = isCompleted ? 'Closed' : 'Continue'
+                        const badgeText = isCompleted ? 'Closed' : 'Active'
                         const badgeStyles = isCompleted
                           ? 'bg-gray-100 border border-gray-200 text-gray-600'
                           : 'bg-emerald-50 border border-emerald-200 text-emerald-700'
@@ -191,6 +191,15 @@ export const Dashboard = () => {
                                   Continue
                                 </Button>
                               )}
+                              {isCompleted && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => navigate(`/feedback/${session.id}`)}
+                                >
+                                  View Feedback
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -199,15 +208,6 @@ export const Dashboard = () => {
                               >
                                 Start new session
                               </Button>
-                              {isCompleted && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => navigate(`/feedback/${session.id}`)}
-                                >
-                                  View Feedback
-                                </Button>
-                              )}
                             </div>
                           </div>
                         )
