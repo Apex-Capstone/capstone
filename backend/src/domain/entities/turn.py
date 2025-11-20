@@ -14,7 +14,8 @@ class Turn(Base):
     __tablename__ = "turns"
     
     id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(Integer, ForeignKey("sessions.id"), nullable=False)
+    session_id = Column(Integer, ForeignKey("core.sessions.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("core.users.id"), nullable=True)
     turn_number = Column(Integer, nullable=False)
     role = Column(String, nullable=False)  # user, assistant (patient)
     text = Column(Text, nullable=False)

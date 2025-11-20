@@ -14,8 +14,8 @@ class Session(Base):
     __tablename__ = "sessions"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    case_id = Column(Integer, ForeignKey("cases.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("core.users.id"), nullable=False)
+    case_id = Column(Integer, ForeignKey("core.cases.id"), nullable=False)
     state = Column(String, nullable=False)  # active, paused, completed, abandoned
     current_spikes_stage = Column(String)  # setting, perception, invitation, knowledge, empathy, summary
     started_at = Column(DateTime, default=datetime.utcnow)
