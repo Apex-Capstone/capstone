@@ -8,6 +8,7 @@ Usage:
 """
 import argparse
 import asyncio
+from datetime import datetime
 from typing import Sequence
 
 from sqlalchemy import text
@@ -18,8 +19,15 @@ from core.errors import ConflictError
 from db.base import SessionLocal  # adjust if your session factory lives elsewhere
 from services.auth_service import AuthService
 from services.case_service import CaseService
+from services.session_service import SessionService
+from repositories.session_repo import SessionRepository
+from repositories.turn_repo import TurnRepository
+from domain.entities.case import Case
+from domain.entities.turn import Turn
+from domain.entities.user import User
 from domain.models.auth import UserCreate
 from domain.models.cases import CaseCreate
+from domain.models.sessions import SessionCreate
 
 # ---- Defaults (you can tweak) ----
 ADMIN_EMAIL = "admin@example.com"
@@ -203,6 +211,117 @@ async def seed(db: Session, do_reset: bool = False) -> None:
 
     for c in CASES:
         await ensure_case(c)
+
+    async def seed_sessions():
+        session_service = SessionService(db)
+        session_repo = SessionRepository(db)
+        turn_repo = TurnRepository(db)
+
+        def strong_user(email: str) -> User | None:
+            return db.query(User).filter(User.email == email).first()
+
+        def case_by_title(title: str) -> Case | None:
+            return db.query(Case).filter(Case.title == title).first()
+
+        def already_has_session(user_id: int, case_id: int, must_be_completed: bool) -> bool:
+            existing = session_repo.get_by_user(user_id)
+            for session in existing:
+                if session.case_id == case_id:
+                    if must_be_completed and session.state == "completed":
+                        return True
+                    if not must_be_completed and session.state != "completed":
+                        return True
+            return False
+
+        async def create_demo_session(
+            user: User,
+            case_title: str,
+            dialogue: list[tuple[str, str]],
+            close_after: bool,
+            force_new: bool = False,
+        ):
+            case = case_by_title(case_title)
+            if not case:
+                print(f"[seed] missing case for session {case_title}")
+                return
+            if already_has_session(user.id, case.id, must_be_completed=close_after):
+                return
+            session_data = SessionCreate(case_id=case.id, force_new=force_new)
+            session = await session_service.create_session(user.id, session_data)
+            for idx, (role, text) in enumerate(dialogue, start=1):
+                turn = Turn(
+                    session_id=session.id,
+                    user_id=user.id if role == "user" else None,
+                    turn_number=idx,
+                    role=role,
+                    text=text,
+                    audio_url=None,
+                    metrics_json=None,
+                    spikes_stage=None,
+                    timestamp=datetime.utcnow(),
+                )
+                turn_repo.create(turn)
+            if close_after:
+                await session_service.close_session(session.id)
+            status = "closed" if close_after else "open"
+            print(f"[seed] session -> {user.email} | {case.title} | {status} | id={session.id}")
+
+        trainee = strong_user(TRAINEES[0][0])
+        admin = strong_user(ADMIN_EMAIL)
+        if not trainee or not admin:
+            return
+
+        await create_demo_session(
+            trainee,
+            "Delivering a Difficult Diagnosis",
+            [
+                ("user", "I want to be honest but keep the tone gentle; can you tell me what you're most afraid of hearing?"),
+                ("assistant", "I appreciate the calm room. Please just tell me what the biopsy showed—I'm anxious but ready for the truth."),
+                ("user", "That makes sense. If you ask how bad it is, I'll say early stage while acknowledging fear."),
+                ("assistant", "Hearing 'early stage' helps, but I need you to say cancer so I don't keep guessing."),
+            ],
+            close_after=False,
+        )
+
+        await create_demo_session(
+            trainee,
+            "Responding to Patient Distress",
+            [
+                ("user", "I'm hearing that you feel I’m pushing surgery—tell me what you’ve heard so far."),
+                ("assistant", "I'm scared of losing independence, and surgery feels final."),
+                ("user", "Let me reflect that and correct anything you've been told so we can decide together."),
+                ("assistant", "Once you hear my concerns, I can relax and we can decide together."),
+            ],
+            close_after=True,
+            force_new=True,
+        )
+
+        await create_demo_session(
+            admin,
+            "Breaking Bad News to Family",
+            [
+                ("user", "I want to give you clarity while honoring what matters most to your family."),
+                ("assistant", "We're bracing for a difficult prognosis. Be direct but tell us how this aligns with Mom’s values."),
+                ("user", "I will gently acknowledge your grief and check in before we discuss next steps."),
+                ("assistant", "That makes me feel seen; now share the plan so we can make decisions together."),
+            ],
+            close_after=False,
+        )
+
+        await create_demo_session(
+            admin,
+            "Delivering a Difficult Diagnosis",
+            [
+                ("user", "I need to ensure you hear the diagnosis while also understanding the support plan."),
+                ("assistant", "I already feel the weight of it. Tell me what you found and how we can handle it."),
+                ("user", "I’ll highlight your emotions, then summarize the treatment path and referrals."),
+                ("assistant", "Knowing the support people and follow-up keeps me grounded."),
+            ],
+            close_after=True,
+            force_new=True,
+        )
+
+    await seed_sessions()
 
 
 async def amain(reset: bool):

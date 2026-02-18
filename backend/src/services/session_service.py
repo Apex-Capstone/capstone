@@ -31,6 +31,13 @@ class SessionService:
     def _row_to_dict(row) -> dict:
         # Only map real table columns -> values, avoiding SA's `.metadata`
         return {col.key: getattr(row, col.key) for col in row.__table__.columns}
+
+    def _session_to_response(self, session: SessionEntity, case_title: str | None = None) -> SessionResponse:
+        data = self._row_to_dict(session)
+        derived_title = case_title or (session.case.title if getattr(session, "case", None) else None)
+        if derived_title:
+            data["case_title"] = derived_title
+        return SessionResponse.model_validate(data)
     
     async def create_session(
         self,
@@ -42,6 +49,11 @@ class SessionService:
         case = self.case_repo.get_by_id(session_data.case_id)
         if not case:
             raise NotFoundError(f"Case with ID {session_data.case_id} not found")
+        # Reuse any existing open session for this case/user
+        if not session_data.force_new:
+            existing_session = self.session_repo.get_active_for_user_case(user_id, session_data.case_id)
+            if existing_session:
+                return self._session_to_response(existing_session, case_title=case.title)
         
         # Create session entity
         session = SessionEntity(
@@ -52,7 +64,7 @@ class SessionService:
         )
         
         created_session = self.session_repo.create(session)
-        return SessionResponse.model_validate(self._row_to_dict(created_session))
+        return self._session_to_response(created_session, case_title=case.title)
     
     async def get_session(self, session_id: int) -> SessionDetailResponse:
         """Get session with turns."""
@@ -62,8 +74,9 @@ class SessionService:
         
         turns = self.turn_repo.get_by_session(session_id)
         
+        session_response = self._session_to_response(session)
         return SessionDetailResponse(
-            **SessionResponse.model_validate(self._row_to_dict(session)).model_dump(),
+            **session_response.model_dump(),
             turns=[TurnResponse.model_validate(self._row_to_dict(turn)) for turn in turns],
         )
     
@@ -78,7 +91,7 @@ class SessionService:
         total = len(sessions)
         
         return SessionListResponse(
-            sessions=[SessionResponse.model_validate(self._row_to_dict(s)) for s in sessions],
+            sessions=[self._session_to_response(s) for s in sessions],
             total=total,
         )
     
@@ -96,5 +109,5 @@ class SessionService:
             session.duration_seconds = int(duration)
         
         updated_session = self.session_repo.update(session)
-        return SessionResponse.model_validate(self._row_to_dict(updated_session))
+        return self._session_to_response(updated_session)
 

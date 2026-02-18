@@ -17,6 +17,7 @@ export interface SessionDTO {
   ended_at?: string | null
   duration_seconds: number
   meta?: string | null
+  case_title?: string | null
 }
 
 export interface TurnDTO {
@@ -53,6 +54,7 @@ export interface Session {
   endedAt?: string
   durationSeconds: number
   meta?: string
+  caseTitle?: string
 }
 
 export interface Turn {
@@ -76,5 +78,15 @@ export interface TurnResponseWithAudio {
 
 export interface SessionDetail extends Session {
   turns: Turn[]
+}
+
+export interface SessionListResponseDTO {
+  sessions: SessionDTO[]
+  total: number
+}
+
+export interface SessionListResponse {
+  sessions: Session[]
+  total: number
 }
 
