@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type Role = 'trainee' | 'instructor' | 'admin'
+export type Role = 'trainee' | 'admin'
 
 export interface User {
   id?: number            // optional: backend usually returns this

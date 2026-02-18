@@ -15,7 +15,7 @@ export interface AdminStats {
     id: string
     name: string
     email: string
-    role: 'student' | 'admin' | 'instructor'
+    role: 'trainee' | 'admin'
     averageScore: number
     completedCases: number
     lastActive: string

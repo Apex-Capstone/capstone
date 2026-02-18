@@ -4,12 +4,12 @@ import type { ReactNode } from 'react'
 
 interface ProtectedRouteProps {
   children: ReactNode
-  requiredRole?: 'admin' | 'trainee'
+  allowedRoles?: ('admin' | 'trainee')[]
 }
 
 export const ProtectedRoute = ({
   children,
-  requiredRole,
+  allowedRoles,
 }: ProtectedRouteProps) => {
   const { isAuthenticated, user } = useAuthStore()
 
@@ -17,7 +17,7 @@ export const ProtectedRoute = ({
     return <Navigate to="/login" replace />
   }
 
-  if (requiredRole && user?.role !== requiredRole) {
+  if (allowedRoles && allowedRoles.length > 0 && user?.role && !allowedRoles.includes(user.role)) {
     return <Navigate to="/dashboard" replace />
   }
 
