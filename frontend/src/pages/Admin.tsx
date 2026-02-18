@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react'
-import { fetchAdminStats, type AdminStats } from '@/api/admin.api'
+import {
+  fetchAdminStats,
+  fetchAdminSessions,
+  fetchAdminSessionDetail,
+  type AdminStats,
+  type AdminSessionListResponse,
+  type AdminSessionDetailResponse,
+} from '@/api/admin.api'
 import { MetricCard } from '@/components/MetricCard'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
@@ -7,6 +14,101 @@ import { Button } from '@/components/ui/button'
 import { Users, FileText, Activity, TrendingUp, Download, Plus, BarChart3, MessageSquare } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+
+// ---- Session detail panel ----
+function SessionDetailPanel({
+  detail,
+  onClose,
+}: {
+  detail: AdminSessionDetailResponse
+  onClose: () => void
+}) {
+  const { session, feedback, metrics_timeline } = detail
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>Session {session.id} – Transcript & Feedback</CardTitle>
+        <Button variant="outline" size="sm" onClick={onClose}>
+          Close
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Transcript */}
+        <section>
+          <h4 className="font-medium mb-3">Transcript</h4>
+          <div className="space-y-2 max-h-64 overflow-y-auto border rounded-lg p-3 bg-gray-50">
+            {session.turns.length === 0 ? (
+              <p className="text-gray-500 text-sm">No turns</p>
+            ) : (
+              session.turns.map((t) => (
+                <div key={t.id} className="text-sm">
+                  <span className="font-medium text-gray-700">
+                    Turn {t.turn_number} ({t.role})
+                  </span>
+                  <span className="text-gray-500 ml-2 text-xs">
+                    {new Date(t.timestamp).toLocaleString()}
+                  </span>
+                  <p className="mt-1 text-gray-900">{t.text}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* Feedback summary */}
+        <section>
+          <h4 className="font-medium mb-3">Feedback Summary</h4>
+          {feedback ? (
+            <div className="space-y-2 border rounded-lg p-3 bg-gray-50">
+              <div>
+                <span className="text-sm font-medium">Empathy score: </span>
+                <span>{feedback.empathy_score.toFixed(1)}</span>
+              </div>
+              <div>
+                <span className="text-sm font-medium">Overall score: </span>
+                <span>{feedback.overall_score.toFixed(1)}</span>
+              </div>
+              {feedback.strengths && (
+                <div>
+                  <span className="text-sm font-medium">Strengths: </span>
+                  <p className="text-sm text-gray-700 mt-1">{feedback.strengths}</p>
+                </div>
+              )}
+              {feedback.areas_for_improvement && (
+                <div>
+                  <span className="text-sm font-medium">Areas for improvement: </span>
+                  <p className="text-sm text-gray-700 mt-1">{feedback.areas_for_improvement}</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-sm">No feedback generated yet.</p>
+          )}
+        </section>
+
+        {/* Metrics timeline */}
+        <section>
+          <h4 className="font-medium mb-3">Metrics Timeline</h4>
+          {metrics_timeline.length === 0 ? (
+            <p className="text-gray-500 text-sm">No metrics timeline</p>
+          ) : (
+            <ul className="space-y-2 border rounded-lg p-3 bg-gray-50 max-h-48 overflow-y-auto">
+              {metrics_timeline.map((m, i) => (
+                <li key={i} className="text-sm flex justify-between gap-4">
+                  <span>Turn {m.turn_number}</span>
+                  <span>{new Date(m.timestamp).toLocaleString()}</span>
+                  <span>Empathy: {m.empathy_score.toFixed(1)}</span>
+                  <span>{m.question_type}</span>
+                  <span>{m.spikes_stage}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </CardContent>
+    </Card>
+  )
+}
 
 // ---- NEW: cases CRUD imports ----
 import { CasesTable } from '@/components/admin/CasesTable'
@@ -26,6 +128,14 @@ export const Admin = () => {
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create')
   const [editing, setEditing] = useState<Case | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  // ---- Session logs state ----
+  const [sessionsData, setSessionsData] = useState<AdminSessionListResponse | null>(null)
+  const [sessionsLoading, setSessionsLoading] = useState(false)
+  const [sessionsError, setSessionsError] = useState<string | null>(null)
+  const [selectedDetail, setSelectedDetail] = useState<AdminSessionDetailResponse | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
 
   useEffect(() => {
     const loadStats = async () => {
@@ -59,6 +169,46 @@ export const Admin = () => {
       void refreshCases()
     }
   }, [activeTab])
+
+  const refreshSessions = async () => {
+    setSessionsLoading(true)
+    setSessionsError(null)
+    try {
+      const data = await fetchAdminSessions(0, 50)
+      setSessionsData(data)
+    } catch (e) {
+      console.error('Failed to fetch sessions:', e)
+      setSessionsError('Failed to load session logs')
+    } finally {
+      setSessionsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'sessions') {
+      void refreshSessions()
+    }
+  }, [activeTab])
+
+  const handleSessionRowClick = async (sessionId: number) => {
+    setSelectedDetail(null)
+    setDetailError(null)
+    setDetailLoading(true)
+    try {
+      const detail = await fetchAdminSessionDetail(String(sessionId))
+      setSelectedDetail(detail)
+    } catch (e) {
+      console.error('Failed to fetch session detail:', e)
+      setDetailError('Failed to load session detail')
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  const clearSelectedSession = () => {
+    setSelectedDetail(null)
+    setDetailError(null)
+  }
 
   const handleExportData = () => {
     const dataToExport = {
@@ -228,37 +378,74 @@ export const Admin = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Session Logs</CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Click a row to view transcript and feedback
+                </p>
               </CardHeader>
               <CardContent>
-                {stats.sessionLogs ? (
-                  <div className="space-y-4">
-                    {stats.sessionLogs.map((session) => (
-                      <div key={session.id} className="bg-gray-50 p-4 rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="font-medium">Session {session.id}</div>
-                          <div className="text-sm text-gray-500">
-                            {session.score && <span className="font-medium">Score: {session.score}%</span>}
-                          </div>
-                        </div>
-                        <div className="text-sm text-gray-600 grid grid-cols-2 gap-4">
-                          <div>User: {session.userId}</div>
-                          <div>Case: {session.caseId}</div>
-                          <div>Start: {new Date(session.startTime).toLocaleString()}</div>
-                          <div>End: {session.endTime ? new Date(session.endTime).toLocaleString() : 'In progress'}</div>
-                        </div>
-                        {session.transcript && (
-                          <div className="mt-2 p-2 bg-white rounded border text-xs">
-                            <strong>Transcript Preview:</strong> {session.transcript.substring(0, 100)}...
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                {sessionsLoading ? (
+                  <p className="text-gray-500 py-8 text-center">Loading sessions…</p>
+                ) : sessionsError ? (
+                  <p className="text-red-600 py-8 text-center">{sessionsError}</p>
+                ) : !sessionsData || sessionsData.sessions.length === 0 ? (
+                  <p className="text-gray-500 py-8 text-center">No sessions found</p>
                 ) : (
-                  <p className="text-gray-500">Session logs not available</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2 font-medium">Session ID</th>
+                          <th className="text-left py-2 font-medium">User ID</th>
+                          <th className="text-left py-2 font-medium">Case ID</th>
+                          <th className="text-left py-2 font-medium">Started</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sessionsData.sessions.map((s) => (
+                          <tr
+                            key={s.id}
+                            onClick={() => handleSessionRowClick(s.id)}
+                            className={cn(
+                              'border-b cursor-pointer transition-colors',
+                              selectedDetail?.session.id === s.id
+                                ? 'bg-emerald-50'
+                                : 'hover:bg-gray-50'
+                            )}
+                          >
+                            <td className="py-2">{s.id}</td>
+                            <td className="py-2">{s.user_id}</td>
+                            <td className="py-2">{s.case_id}</td>
+                            <td className="py-2">{new Date(s.started_at).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </CardContent>
             </Card>
+
+            {/* Session detail panel */}
+            {selectedDetail && (
+              <SessionDetailPanel
+                detail={selectedDetail}
+                onClose={clearSelectedSession}
+              />
+            )}
+            {detailLoading && (
+              <Card>
+                <CardContent className="py-12 text-center text-gray-500">
+                  Loading session detail…
+                </CardContent>
+              </Card>
+            )}
+            {detailError && !detailLoading && (
+              <Card>
+                <CardContent className="py-8 text-center text-red-600">
+                  {detailError}
+                </CardContent>
+              </Card>
+            )}
           </div>
         )
 
