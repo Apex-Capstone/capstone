@@ -6,6 +6,7 @@ from core.deps import (
     require_role,
     require_trainee,
     require_admin,
+    verify_session_access,
 )
 from core.errors import (
     AppError,
@@ -35,6 +36,7 @@ __all__ = [
     "require_trainee",
     "require_admin",
     "require_role",
+    "verify_session_access",
     # Errors
     "AppError",
     "AuthenticationError",

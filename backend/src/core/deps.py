@@ -82,3 +82,17 @@ def require_admin(
     """Ensure current user is an admin."""
     return current_user
 
+
+def verify_session_access(session, current_user: User) -> None:
+    """
+    Verify the current user has access to the session.
+    - Admin: allow access to any session.
+    - Trainee: only allow if session.user_id == current_user.id.
+    - Otherwise: raise AuthorizationError (403).
+    """
+    if current_user.role == "admin":
+        return
+    if current_user.role == "trainee" and getattr(session, "user_id", None) == current_user.id:
+        return
+    raise AuthorizationError("Not authorized to access this session")
+
