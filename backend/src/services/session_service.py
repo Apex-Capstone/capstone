@@ -37,6 +37,7 @@ class SessionService:
         derived_title = case_title or (session.case.title if getattr(session, "case", None) else None)
         if derived_title:
             data["case_title"] = derived_title
+        data["status"] = "closed" if data.get("ended_at") else "active"
         return SessionResponse.model_validate(data)
     
     async def create_session(

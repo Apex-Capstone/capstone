@@ -63,6 +63,9 @@ export const Dashboard = () => {
     }
   }
 
+  const activeSessions = sessions.filter((s) => s.status === 'active')
+  const closedSessions = sessions.filter((s) => s.status === 'closed')
+
   // derive soft status counts (since BE Case has no status)
   const statusCounts = cases.reduce(
     (acc, c) => {
@@ -71,6 +74,76 @@ export const Dashboard = () => {
       return acc
     },
     {} as Record<'completed' | 'in_progress' | 'pending' | string, number>
+  )
+
+  const sessionCardGrid = (sessionList: Session[]) => (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {sessionList.map((session) => {
+        const isClosed = session.status === 'closed'
+        const badgeText = isClosed ? 'Closed' : 'Active'
+        const badgeStyles = isClosed
+          ? 'bg-gray-100 border border-gray-200 text-gray-600'
+          : 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+        return (
+          <div key={session.id} className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Session {session.id}
+                </p>
+                <p className="text-base font-semibold text-gray-900">
+                  {session.caseTitle ?? `Case #${session.caseId}`}
+                </p>
+                <p className="text-xs text-gray-500">
+                  Started {new Date(session.startedAt).toLocaleString()}
+                </p>
+              </div>
+              <span
+                className={`px-3 py-1 text-[10px] font-semibold uppercase rounded-full ${badgeStyles}`}
+              >
+                {badgeText}
+              </span>
+            </div>
+            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+              <span className="capitalize">{session.state.replace('_', ' ')}</span>
+              {session.endedAt ? (
+                <span>Duration: {formatDurationLabel(session.durationSeconds)}</span>
+              ) : (
+                <span>Live</span>
+              )}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {!isClosed && (
+                <Button
+                  size="sm"
+                  variant="success"
+                  onClick={() => navigate(`/case/${session.caseId}?sessionId=${session.id}`)}
+                >
+                  Continue
+                </Button>
+              )}
+              {isClosed && (
+                <Button
+                  size="sm"
+                  variant="success"
+                  onClick={() => navigate(`/feedback/${session.id}`)}
+                >
+                  View Feedback
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="neutral"
+                onClick={() => handleStartNewSession(session.caseId)}
+                disabled={creatingSessionForCase === session.caseId}
+              >
+                Start new session
+              </Button>
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 
   return (
@@ -127,92 +200,51 @@ export const Dashboard = () => {
               </div>
             ) : (
               <div>
+                {/* Active Practice Sessions */}
                 <div className="mb-8">
-                  <div className="flex items-start justify-between gap-6">
+                  <div className="flex items-start justify-between gap-6 mb-4">
                     <div>
                       <h2 className="text-xl font-semibold text-gray-900 mb-1">Active Practice Sessions</h2>
                       <p className="text-sm text-gray-600">
-                        Track your recent simulation runs and see whether they are closed or still in progress.
+                        Sessions in progress. Continue where you left off or start a new one.
                       </p>
                     </div>
-                    {sessions.length > 0 && (
+                    {activeSessions.length > 0 && (
                       <span className="text-sm font-medium text-gray-500">
-                        {sessions.length} {sessions.length === 1 ? 'session' : 'sessions'}
+                        {activeSessions.length} {activeSessions.length === 1 ? 'session' : 'sessions'}
                       </span>
                     )}
                   </div>
-                  {sessions.length === 0 ? (
+                  {activeSessions.length === 0 ? (
                     <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-                      No recent sessions. Start a virtual case to begin tracking your progress.
+                      No active sessions. Start a new one.
                     </div>
                   ) : (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {sessions.map((session) => {
-                        const isCompleted = session.state === 'completed'
-                        const badgeText = isCompleted ? 'Closed' : 'Active'
-                        const badgeStyles = isCompleted
-                          ? 'bg-gray-100 border border-gray-200 text-gray-600'
-                          : 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                        return (
-                          <div key={session.id} className="rounded-lg border border-gray-200 bg-white p-4">
-                            <div className="flex items-start justify-between gap-4">
-                              <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                  Session {session.id}
-                                </p>
-                                <p className="text-base font-semibold text-gray-900">
-                                  {session.caseTitle ?? `Case #${session.caseId}`}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  Started {new Date(session.startedAt).toLocaleString()}
-                                </p>
-                              </div>
-                              <span
-                                className={`px-3 py-1 text-[10px] font-semibold uppercase rounded-full ${badgeStyles}`}
-                              >
-                                {badgeText}
-                              </span>
-                            </div>
-                            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                              <span className="capitalize">{session.state.replace('_', ' ')}</span>
-                              {session.endedAt ? (
-                                <span>Duration: {formatDurationLabel(session.durationSeconds)}</span>
-                              ) : (
-                                <span>Live</span>
-                              )}
-                            </div>
-                            <div className="mt-4 flex flex-wrap gap-2">
-                              {!isCompleted && (
-                                <Button
-                                  size="sm"
-                                  variant="default"
-                                  onClick={() => navigate(`/case/${session.caseId}?sessionId=${session.id}`)}
-                                >
-                                  Continue
-                                </Button>
-                              )}
-                              {isCompleted && (
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => navigate(`/feedback/${session.id}`)}
-                                >
-                                  View Feedback
-                                </Button>
-                              )}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleStartNewSession(session.caseId)}
-                                disabled={creatingSessionForCase === session.caseId}
-                              >
-                                Start new session
-                              </Button>
-                            </div>
-                          </div>
-                        )
-                      })}
+                    sessionCardGrid(activeSessions)
+                  )}
+                </div>
+
+                {/* Closed Sessions */}
+                <div className="mb-8">
+                  <div className="flex items-start justify-between gap-6 mb-4">
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900 mb-1">Closed Sessions</h2>
+                      <p className="text-sm text-gray-600">
+                        Completed simulation runs. Review feedback to improve your practice.
+                      </p>
                     </div>
+                    {closedSessions.length > 0 && (
+                      <span className="text-sm font-medium text-gray-500">
+                        {closedSessions.length} {closedSessions.length === 1 ? 'session' : 'sessions'}
+                      </span>
+                    )}
+                  </div>
+                  {closedSessions.length === 0 ? (
+                    <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+                      No closed sessions yet.
+                    </div>
+                  ) : (
+                    sessionCardGrid(closedSessions)
                   )}
                 </div>
 

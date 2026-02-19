@@ -1,7 +1,7 @@
 """Session and turn request/response schemas."""
 
 from datetime import datetime
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -58,6 +58,8 @@ class SessionResponse(BaseModel):
     duration_seconds: int
     meta: Optional[str] = Field(default=None, alias="session_metadata")
     case_title: Optional[str] = None
+    # Computed: "closed" when ended_at is set, else "active"
+    status: Literal["active", "closed"]
     
     model_config = ConfigDict(from_attributes=True, extra="ignore")
 

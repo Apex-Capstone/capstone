@@ -24,6 +24,7 @@ export function sessionFromDTO(dto: SessionDTO): Session {
     durationSeconds: dto.duration_seconds,
     meta: dto.meta ?? undefined,
     caseTitle: dto.case_title ?? undefined,
+    status: dto.status,
   }
 }
 

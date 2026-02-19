@@ -18,6 +18,8 @@ export interface SessionDTO {
   duration_seconds: number
   meta?: string | null
   case_title?: string | null
+  /** Computed by API: "active" | "closed" (closed when ended_at is set) */
+  status: 'active' | 'closed'
 }
 
 export interface TurnDTO {
@@ -55,6 +57,8 @@ export interface Session {
   durationSeconds: number
   meta?: string
   caseTitle?: string
+  /** From API: "active" | "closed" */
+  status: 'active' | 'closed'
 }
 
 export interface Turn {
