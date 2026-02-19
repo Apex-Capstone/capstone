@@ -1,13 +1,97 @@
 import { useEffect, useState } from 'react'
 import { fetchResearchData, type ResearchData } from '@/api/research.api'
+import { useAuthStore } from '@/store/authStore'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertTriangle, Database, Shield, BarChart3 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { AlertTriangle, Database, Download, Shield, BarChart3 } from 'lucide-react'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export const Research = () => {
+  const { user } = useAuthStore()
   const [data, setData] = useState<ResearchData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [exportingMetrics, setExportingMetrics] = useState(false)
+  const [exportingTranscripts, setExportingTranscripts] = useState(false)
+  const [exportingSessionId, setExportingSessionId] = useState<string | null>(null)
+
+  const getToken = (): string | null => {
+    try {
+      const raw = localStorage.getItem('auth-storage')
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      return parsed?.state?.token ?? parsed?.token ?? null
+    } catch {
+      return null
+    }
+  }
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
+
+  const handleDownloadMetricsCsv = async () => {
+    const token = getToken()
+    if (!token) return
+    setExportingMetrics(true)
+    try {
+      const response = await fetch(`${API_URL}/v1/research/export/metrics.csv`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error('Metrics export failed')
+      const blob = await response.blob()
+      downloadBlob(blob, 'session_metrics.csv')
+    } catch (err) {
+      console.error('Failed to download metrics CSV:', err)
+    } finally {
+      setExportingMetrics(false)
+    }
+  }
+
+  const handleDownloadTranscriptsCsv = async () => {
+    const token = getToken()
+    if (!token) return
+    setExportingTranscripts(true)
+    try {
+      const response = await fetch(`${API_URL}/v1/research/export/transcripts.csv`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error('Transcripts export failed')
+      const blob = await response.blob()
+      downloadBlob(blob, 'all_transcripts.csv')
+    } catch (err) {
+      console.error('Failed to download transcripts CSV:', err)
+    } finally {
+      setExportingTranscripts(false)
+    }
+  }
+
+  const handleExportSessionTranscript = async (anonSessionId: string) => {
+    const token = getToken()
+    if (!token) return
+    setExportingSessionId(anonSessionId)
+    try {
+      const response = await fetch(
+        `${API_URL}/v1/research/export/session/${encodeURIComponent(anonSessionId)}.csv`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (!response.ok) throw new Error('Session export failed')
+      const blob = await response.blob()
+      const safe = anonSessionId.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 32)
+      downloadBlob(blob, `session_${safe}.csv`)
+    } catch (err) {
+      console.error('Failed to export session transcript:', err)
+    } finally {
+      setExportingSessionId(null)
+    }
+  }
 
   useEffect(() => {
     const loadData = async () => {
@@ -77,9 +161,33 @@ export const Research = () => {
             </nav>
             
             <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">
-                Research Analytics Dashboard
-              </h1>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <h1 className="text-3xl font-bold text-gray-900">
+                  Research Analytics Dashboard
+                </h1>
+                {user?.role === 'admin' && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadMetricsCsv}
+                      disabled={exportingMetrics}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {exportingMetrics ? 'Downloading…' : 'Download Metrics CSV'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadTranscriptsCsv}
+                      disabled={exportingTranscripts}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {exportingTranscripts ? 'Downloading…' : 'Download All Transcripts CSV'}
+                    </Button>
+                  </div>
+                )}
+              </div>
               <p className="mt-2 text-gray-600">
                 Read-only analytics endpoint for research use • Anonymized session data and fairness metrics
               </p>
@@ -221,6 +329,9 @@ export const Research = () => {
                           <th className="text-left py-2">Communication</th>
                           <th className="text-left py-2">Clinical Score</th>
                           <th className="text-left py-2">Timestamp</th>
+                          {user?.role === 'admin' && (
+                            <th className="text-left py-2">Actions</th>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
@@ -265,6 +376,18 @@ export const Research = () => {
                             <td className="py-2 text-xs text-gray-500">
                               {new Date(session.timestamp).toLocaleDateString()}
                             </td>
+                            {user?.role === 'admin' && (
+                              <td className="py-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleExportSessionTranscript(session.sessionId)}
+                                  disabled={exportingSessionId === session.sessionId}
+                                >
+                                  {exportingSessionId === session.sessionId ? 'Exporting…' : 'Export Transcript'}
+                                </Button>
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>

@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     tts_provider: str = Field(default="generic")
     asr_provider: str = Field(default="whisper")
 
+    # Research export anonymization (deterministic session IDs)
+    research_anon_salt: str = Field(default="research-anon-salt-change-in-production")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
