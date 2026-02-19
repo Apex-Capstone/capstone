@@ -52,6 +52,34 @@ class ResearchService:
             record_count=len(export_data),
         )
     
+    def get_all_sessions(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Return list of anonymized sessions (no PII)."""
+        sessions = self.session_repo.get_all(skip=skip, limit=limit)
+        request = ResearchExportRequest(anonymize=True, include_turns=False, include_feedback=False)
+        return [self._anonymize_session(s, request) for s in sessions]
+
+    def get_session(self, session_id: int) -> dict[str, Any]:
+        """Return anonymized session details (no PII). Raises ValueError if not found."""
+        session = self.session_repo.get_by_id(session_id)
+        if not session:
+            raise ValueError(f"Session {session_id} not found")
+        request = ResearchExportRequest(anonymize=True, include_turns=True, include_feedback=True)
+        return self._anonymize_session(session, request)
+
+    def get_export_json_content(
+        self,
+        export_request: ResearchExportRequest | None = None,
+    ) -> str:
+        """Return JSON string of anonymized export data for download."""
+        request = export_request or ResearchExportRequest(anonymize=True)
+        sessions = self._get_filtered_sessions(request)
+        export_data = [self._anonymize_session(s, request) for s in sessions]
+        return json.dumps(export_data, indent=2, default=str)
+
     def _get_filtered_sessions(
         self,
         export_request: ResearchExportRequest,
