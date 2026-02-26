@@ -1,3 +1,8 @@
 .vscode/
 .idea/
 .DS_Store
+
+# Local strategy / internal planning docs
+ARCHITECTURAL_ALIGNMENT_AND_DEPTH_REVIEW.md
+SUBSYSTEM_AUDIT.md
+presentation/feb-27-meeting.md
