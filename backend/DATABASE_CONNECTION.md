@@ -1,6 +1,6 @@
-# MedLLM Backend – Database Connection Guide
+# APEX Backend – Database Connection Guide
 
-This guide explains how to configure and connect the MedLLM backend to a PostgreSQL database, load environment variables, and automatically create all tables using SQLAlchemy.  
+This guide explains how to configure and connect the APEX backend to a PostgreSQL database, load environment variables, and automatically create all tables using SQLAlchemy.  
 This version includes additional details specifically for **Supabase-hosted PostgreSQL**, the recommended database for collaborative development.
 
 ---
@@ -186,5 +186,5 @@ Once `DATABASE_URL` is correctly set in `.env`, the backend can:
 - Run seeding scripts  
 - Work for every teammate without needing local Postgres  
 
-This setup makes the MedLLM backend fully cloud-ready and team-friendly.
+This setup makes the APEX backend fully cloud-ready and team-friendly.
 

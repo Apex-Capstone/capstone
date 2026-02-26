@@ -1,8 +1,8 @@
-# MedLLM Interface - Frontend
+# APEX (AI Patient Experience Simulator) - Frontend
 
-A modern React + TypeScript frontend for the MedLLM Interface project, built with Vite, TailwindCSS, and React Router.
+A modern React + TypeScript frontend for the APEX (AI Patient Experience Simulator) project, built with Vite, TailwindCSS, and React Router.
 
-**✅ Aligned with SRS v0.1 (Oct 2025)** - This frontend implementation fully supports the Software Requirements Specification for the MedLLM Interface project, including SPIKES framework integration, role-based access control, and comprehensive feedback systems.
+**✅ Aligned with SRS v0.1 (Oct 2025)** - This frontend implementation fully supports the Software Requirements Specification for the APEX (AI Patient Experience Simulator) project, including SPIKES framework integration, role-based access control, and comprehensive feedback systems.
 
 ## 🚀 Tech Stack
 

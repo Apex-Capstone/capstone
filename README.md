@@ -1,14 +1,14 @@
-# MedLLM Interface – Capstone Project
+# APEX (AI Patient Experience Simulator) – Capstone Project
 
-Welcome to the MedLLM Interface Capstone Project.
+Welcome to the APEX (AI Patient Experience Simulator) Capstone Project.
 
 ## 📘 Overview
 
-The MedLLM Interface is an AI-powered empathy-training platform designed for medical trainees.
+The APEX (AI Patient Experience Simulator) platform is an AI-powered empathy-training platform designed for medical trainees.
 It allows learners to engage in simulated patient conversations and receive structured feedback aligned with the **SPIKES communication framework**.
 The system integrates an interactive frontend built with React and a FastAPI backend with modular services, data persistence, and authentication.
 
-Leveraging large language models (LLMs) and structured empathy frameworks such as **SPIKES** and the **Appraisal Framework for Clinical Empathy**, MedLLM provides measurable, data-driven feedback on communication quality and empathy performance.  
+Leveraging large language models (LLMs) and structured empathy frameworks such as **SPIKES** and the **Appraisal Framework for Clinical Empathy**, APEX provides measurable, data-driven feedback on communication quality and empathy performance.  
 
 * **Role-based authentication** (Trainee, Instructor, Admin)
 * **Virtual patient cases** with structured scripts and difficulty levels
