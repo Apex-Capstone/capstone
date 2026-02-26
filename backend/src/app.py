@@ -29,8 +29,8 @@ setup_logging()
 
 # Create FastAPI app
 app = FastAPI(
-    title="Medical Case Simulation API",
-    description="AI-powered medical case simulation with SPIKES protocol",
+    title="APEX API",
+    description="AI Patient Experience Simulator backend service",
     version="1.0.0",
     docs_url="/v1/docs",
     redoc_url="/v1/redoc",
