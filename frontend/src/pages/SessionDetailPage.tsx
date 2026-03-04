@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { getSession } from '@/api/sessions.api'
 import { getCase } from '@/api/cases.api'
 import { fetchFeedback } from '@/api/feedback.api'
@@ -172,22 +172,24 @@ export const SessionDetailPage = () => {
         <main className="flex-1 md:ml-64">
           <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
             {/* Breadcrumb */}
-            <nav className="mb-4 flex items-center gap-1 text-sm text-gray-500">
-              <span
-                className="cursor-pointer hover:text-gray-700"
-                onClick={() => navigate('/dashboard')}
+            <nav className="mb-4 flex items-center gap-1 text-sm text-gray-500" aria-label="Breadcrumb">
+              <Link
+                to="/dashboard"
+                className="cursor-pointer hover:text-gray-700 no-underline text-inherit"
               >
                 Dashboard
-              </span>
-              <ChevronRight className="h-3.5 w-3.5" />
-              <span
-                className="cursor-pointer hover:text-gray-700"
-                onClick={() => navigate('/sessions')}
+              </Link>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <Link
+                to="/sessions"
+                className="cursor-pointer hover:text-gray-700 no-underline text-inherit"
               >
                 My Sessions
+              </Link>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span className="text-gray-900" aria-current="page">
+                Session #{session.id}
               </span>
-              <ChevronRight className="h-3.5 w-3.5" />
-              <span className="text-gray-900">Session #{session.id}</span>
             </nav>
 
             {/* Header card */}

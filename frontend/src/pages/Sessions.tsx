@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { listSessions } from '@/api/sessions.api'
-import { listCases } from '@/api/cases.api'
+import { getCase } from '@/api/cases.api'
 import type { Session } from '@/types/session'
 import type { Case } from '@/types/case'
 import { Navbar } from '@/components/Navbar'
@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 type FilterState = 'all' | 'active' | 'completed'
 
 function formatDuration(seconds: number): string {
-  if (seconds <= 0) return 'In progress'
+  if (seconds <= 0) return '0s'
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   if (m === 0) return `${s}s`
@@ -51,10 +51,17 @@ export const Sessions = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [sessionData, caseData] = await Promise.all([listSessions(), listCases()])
+        const sessionData = await listSessions()
         setSessions(sessionData.sessions)
+
+        const caseIds = [...new Set(sessionData.sessions.map((s) => s.caseId))]
+        const cases = await Promise.all(
+          caseIds.map((id) => getCase(id).catch(() => null))
+        )
         const map: Record<number, Case> = {}
-        for (const c of caseData.items) map[c.id] = c
+        cases.forEach((c) => {
+          if (c) map[c.id] = c
+        })
         setCaseMap(map)
       } catch (err) {
         console.error('Failed to load sessions:', err)
@@ -191,10 +198,10 @@ export const Sessions = () => {
                       : null
 
                     return (
-                      <div
+                      <Link
                         key={session.id}
-                        onClick={() => navigate(`/sessions/${session.id}`)}
-                        className="group flex cursor-pointer items-center justify-between rounded-lg border bg-white p-5 transition-shadow hover:shadow-md hover:border-emerald-300"
+                        to={`/sessions/${session.id}`}
+                        className="group flex cursor-pointer items-center justify-between rounded-lg border bg-white p-5 transition-shadow hover:shadow-md hover:border-emerald-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 no-underline text-inherit block"
                       >
                         <div className="flex items-start gap-4">
                           <div
@@ -247,7 +254,7 @@ export const Sessions = () => {
                         </div>
 
                         <ChevronRight className="h-5 w-5 text-gray-300 transition-colors group-hover:text-emerald-500" />
-                      </div>
+                      </Link>
                     )
                   })}
               </div>
