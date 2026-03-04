@@ -1,17 +1,19 @@
 import api from '@/api/client'
 import type {
   SessionDTO,
+  SessionListDTO,
   TurnResponseWithAudioDTO,
   SessionDetailDTO,
 } from '@/types/session'
 import {
   sessionFromDTO,
+  sessionListFromDTO,
   turnResponseWithAudioFromDTO,
   sessionDetailFromDTO,
   toSessionCreatePayload,
   toTurnCreatePayload,
 } from '@/adapters/session.adapter'
-import type { Session, TurnResponseWithAudio, SessionDetail } from '@/types/session'
+import type { Session, SessionList, TurnResponseWithAudio, SessionDetail } from '@/types/session'
 
 const BASE = '/v1/sessions'
 
@@ -52,6 +54,14 @@ export const getSession = async (sessionId: number): Promise<SessionDetail> => {
 export const closeSession = async (sessionId: number): Promise<any> => {
   const res = await api.post(`${BASE}/${sessionId}:close`)
   return res.data
+}
+
+/**
+ * List all sessions for the current user
+ */
+export const listSessions = async (skip = 0, limit = 100): Promise<SessionList> => {
+  const res = await api.get<SessionListDTO>(BASE, { params: { skip, limit } })
+  return sessionListFromDTO(res.data)
 }
 
 /**

@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
-import { LayoutDashboard, FileText, Shield, BarChart3, Menu } from 'lucide-react'
+import { LayoutDashboard, FileText, Shield, BarChart3, Menu, ClipboardList } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -16,19 +16,25 @@ export const Sidebar = () => {
       name: 'Dashboard',
       href: '/dashboard',
       icon: LayoutDashboard,
-      roles: ['student', 'instructor', 'admin'],
+      roles: ['trainee', 'instructor', 'admin'],
+    },
+    {
+      name: 'My Sessions',
+      href: '/sessions',
+      icon: ClipboardList,
+      roles: ['trainee', 'instructor', 'admin'],
     },
     {
       name: 'Cases',
       href: '/dashboard',
       icon: FileText,
-      roles: ['student', 'instructor', 'admin'],
+      roles: ['trainee', 'instructor', 'admin'],
     },
     {
       name: 'Research',
       href: '/research',
       icon: BarChart3,
-      roles: ['student', 'instructor', 'admin'],
+      roles: ['instructor', 'admin'],
     },
     {
       name: 'Admin',

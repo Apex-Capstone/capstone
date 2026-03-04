@@ -1,6 +1,8 @@
 import type {
   Session,
   SessionDTO,
+  SessionList,
+  SessionListDTO,
   Turn,
   TurnDTO,
   TurnResponseWithAudio,
@@ -51,6 +53,13 @@ export function sessionDetailFromDTO(dto: SessionDetailDTO): SessionDetail {
   return {
     ...sessionFromDTO(dto),
     turns: dto.turns.map(turnFromDTO),
+  }
+}
+
+export function sessionListFromDTO(dto: SessionListDTO): SessionList {
+  return {
+    sessions: dto.sessions.map(sessionFromDTO),
+    total: dto.total,
   }
 }
 
