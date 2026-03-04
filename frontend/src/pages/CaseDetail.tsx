@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getCase } from '@/api/cases.api'
-import { createSession, submitTurn } from '@/api/sessions.api'
+import { createSession, submitTurn, closeSession } from '@/api/sessions.api'
 import type { Case as CaseType } from '@/types/case'
 import type { Message } from '@/types/session'
 
@@ -28,6 +28,7 @@ export const CaseDetail = () => {
   const [sessionId, setSessionId] = useState<number | null>(null)
   const [currentSpikesStage, setCurrentSpikesStage] = useState<string>('setting')
   const [error, setError] = useState<string | null>(null)
+  const [closing, setClosing] = useState(false)
 
   // --- Load case and create session ---
   useEffect(() => {
@@ -124,9 +125,17 @@ export const CaseDetail = () => {
     alert('Voice input will be implemented when ASR backend is ready')
   }
 
-  const handleEndSession = () => {
-    if (sessionId) {
+  const handleEndSession = async () => {
+    if (!sessionId) return
+    setClosing(true)
+    setError(null)
+    try {
+      await closeSession(sessionId)
       navigate(`/feedback/${sessionId}`)
+    } catch (err: any) {
+      console.error('Failed to close session:', err)
+      setError(err.response?.data?.detail || 'Failed to end session. Please try again.')
+      setClosing(false)
     }
   }
 
@@ -176,10 +185,11 @@ export const CaseDetail = () => {
                 variant="destructive"
                 size="sm"
                 onClick={handleEndSession}
+                disabled={closing}
                 className="flex items-center gap-2"
               >
                 <PhoneOff className="h-4 w-4" />
-                End Session
+                {closing ? 'Generating Feedback...' : 'End Session'}
               </Button>
             </div>
 
@@ -290,7 +300,7 @@ export const CaseDetail = () => {
                 >
                   <Mic className="h-4 w-4" />
                 </Button>
-                <Button type="submit" disabled={sending || !inputValue.trim() || !sessionId}>
+                <Button type="submit" disabled={sending || closing || !inputValue.trim() || !sessionId}>
                   <Send className="h-4 w-4" />
                 </Button>
               </div>

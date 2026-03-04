@@ -1,69 +1,89 @@
 import api from '@/api/client'
 
-// If you already have a shared type, import it instead of redeclaring.
 export interface Feedback {
-  sessionId: string
-  caseId: string
+  id: number
+  sessionId: number
+
+  empathyScore: number
+  spikesCompletionScore: number
   overallScore: number
-  strengths: string[]
-  areasForImprovement: string[]
-  recommendations: string[]
-  metrics: {
-    communication: number
-    clinicalReasoning: number
-    empathy: number
-    professionalism: number
+
+  eoCountsByDimension?: {
+    Feeling: { explicit: number; implicit: number }
+    Judgment: { explicit: number; implicit: number }
+    Appreciation: { explicit: number; implicit: number }
   }
+  elicitationCountsByType?: {
+    direct: { Feeling: number; Judgment: number; Appreciation: number }
+    indirect: { Feeling: number; Judgment: number; Appreciation: number }
+  }
+  responseCountsByType?: {
+    understanding: number
+    sharing: number
+    acceptance: number
+  }
+
+  linkageStats?: {
+    total_eos: number
+    addressed_count: number
+    missed_count: number
+    addressed_rate: number
+    missed_rate: number
+  }
+  missedOpportunitiesByDimension?: {
+    Feeling: number
+    Judgment: number
+    Appreciation: number
+  }
+
+  spikesCoverage?: {
+    covered: string[]
+    percent: number
+  }
+  spikesTimestamps?: Record<string, { start_ts: string; end_ts: string }>
+  spikesStrategies?: Record<string, Array<{ strategy: string; turn: number }>>
+
+  questionBreakdown?: {
+    open: number
+    closed: number
+    eliciting: number
+    ratio_open: number
+  }
+
+  latencyMsAvg: number
+
+  strengths?: string | null
+  areasForImprovement?: string | null
+  detailedFeedback?: string | null
+
   createdAt: string
-  spikesMetrics?: {
-    setting: number
-    perception: number
-    invitation: number
-    knowledge: number
-    emotions: number
-    strategy: number
-  }
-  conversationMetrics?: {
-    empathyScore: number
-    openQuestionRatio: number
-  }
-  dialogueExamples?: {
-    strong: Array<{ text: string; context: string }>
-    weak: Array<{ text: string; context: string; improvement: string }>
+}
+
+function mapSnakeToCamel(data: Record<string, any>): Feedback {
+  return {
+    id: data.id,
+    sessionId: data.session_id,
+    empathyScore: data.empathy_score ?? 0,
+    spikesCompletionScore: data.spikes_completion_score ?? 0,
+    overallScore: data.overall_score ?? 0,
+    eoCountsByDimension: data.eo_counts_by_dimension ?? undefined,
+    elicitationCountsByType: data.elicitation_counts_by_type ?? undefined,
+    responseCountsByType: data.response_counts_by_type ?? undefined,
+    linkageStats: data.linkage_stats ?? undefined,
+    missedOpportunitiesByDimension: data.missed_opportunities_by_dimension ?? undefined,
+    spikesCoverage: data.spikes_coverage ?? undefined,
+    spikesTimestamps: data.spikes_timestamps ?? undefined,
+    spikesStrategies: data.spikes_strategies ?? undefined,
+    questionBreakdown: data.question_breakdown ?? undefined,
+    latencyMsAvg: data.latency_ms_avg ?? 0,
+    strengths: data.strengths ?? null,
+    areasForImprovement: data.areas_for_improvement ?? null,
+    detailedFeedback: data.detailed_feedback ?? null,
+    createdAt: data.created_at,
   }
 }
 
-// Real endpoint (adjust path if your BE differs)
 export const fetchFeedback = async (sessionId: string): Promise<Feedback> => {
-  try {
-    const { data } = await api.get(`/v1/feedback/${sessionId}`)
-    return data
-  } catch (e) {
-    // Optional: dev fallback if BE isn’t implemented yet
-    console.warn('[fetchFeedback] falling back to mock:', e)
-    return {
-      sessionId,
-      caseId: '1',
-      overallScore: 85,
-      strengths: ['Excellent use of empathetic language'],
-      areasForImprovement: ['Could have explored emotions more deeply'],
-      recommendations: ['Practice Ask–Tell–Ask'],
-      metrics: {
-        communication: 88,
-        clinicalReasoning: 82,
-        empathy: 80,
-        professionalism: 90,
-      },
-      createdAt: new Date().toISOString(),
-      spikesMetrics: {
-        setting: 92, perception: 85, invitation: 78,
-        knowledge: 88, emotions: 75, strategy: 82,
-      },
-      conversationMetrics: { empathyScore: 80, openQuestionRatio: 0.65 },
-      dialogueExamples: {
-        strong: [{ text: 'I can see this is weighing on you.', context: 'Emotions' }],
-        weak: [{ text: 'Don’t worry.', context: 'After diagnosis', improvement: 'Acknowledge feelings first.' }],
-      },
-    }
-  }
+  const { data } = await api.get(`/v1/sessions/${sessionId}/feedback`)
+  return mapSnakeToCamel(data)
 }
