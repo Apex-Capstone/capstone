@@ -8,23 +8,36 @@ import { Sidebar } from '@/components/Sidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
-const SPIKES_LABELS: Record<string, string> = {
-  S: 'Setting',
-  P: 'Perception',
-  I: 'Invitation',
-  K: 'Knowledge',
-  E: 'Empathy',
-  S2: 'Strategy',
-  setting: 'Setting',
-  perception: 'Perception',
-  invitation: 'Invitation',
-  knowledge: 'Knowledge',
-  empathy: 'Empathy',
-  strategy: 'Strategy',
-  summary: 'Strategy',
+// Canonical SPIKES stage order using the word-form values the backend records
+// in turn.spikes_stage (e.g. "setting", "perception", "summary").
+// The `key` is what the backend stores; `label` is what the UI shows.
+const SPIKES_STAGE_ORDER: Array<{ key: string; label: string }> = [
+  { key: 'setting',    label: 'Setting' },
+  { key: 'perception', label: 'Perception' },
+  { key: 'invitation', label: 'Invitation' },
+  { key: 'knowledge',  label: 'Knowledge' },
+  { key: 'empathy',    label: 'Empathy' },
+  { key: 'strategy',   label: 'Strategy' },
+]
+
+// Normalise any value from spikesCoverage.covered to the canonical word form
+// so that letter codes ("S", "P", "S2", …) returned by older backend versions
+// are handled as well.
+const LETTER_TO_WORD: Record<string, string> = {
+  S:  'setting',
+  P:  'perception',
+  I:  'invitation',
+  K:  'knowledge',
+  E:  'empathy',
+  S2: 'strategy',
+  summary: 'strategy',  // alias used in some backend versions
 }
 
-const ALL_SPIKES_STAGES = ['S', 'P', 'I', 'K', 'E', 'S2']
+function normaliseSpikesCovered(covered: string[]): Set<string> {
+  return new Set(
+    covered.map((s) => LETTER_TO_WORD[s] ?? s.toLowerCase())
+  )
+}
 
 function splitLines(text: string | null | undefined): string[] {
   if (!text) return []
@@ -116,7 +129,7 @@ export const Feedback = () => {
 
   const overallPercent = scoreToPercent(feedback.overallScore)
   const empathyPercent = scoreToPercent(feedback.empathyScore)
-  const coveredStages = feedback.spikesCoverage?.covered ?? []
+  const coveredStages = normaliseSpikesCovered(feedback.spikesCoverage?.covered ?? [])
   const coveragePercent = feedback.spikesCoverage
     ? Math.round(feedback.spikesCoverage.percent * 100)
     : 0
@@ -183,13 +196,11 @@ export const Feedback = () => {
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
-                        {ALL_SPIKES_STAGES.map((stage) => {
-                          const reached = coveredStages.includes(stage)
+                        {SPIKES_STAGE_ORDER.map(({ key, label }) => {
+                          const reached = coveredStages.has(key)
                           return (
-                            <div key={stage} className="flex items-center justify-between">
-                              <span className="text-sm font-medium">
-                                {SPIKES_LABELS[stage] ?? stage}
-                              </span>
+                            <div key={key} className="flex items-center justify-between">
+                              <span className="text-sm font-medium">{label}</span>
                               <span
                                 className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                                   reached
