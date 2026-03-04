@@ -5,6 +5,8 @@ import { Login } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
 import { CaseDetail } from './pages/CaseDetail'
 import { Feedback } from './pages/Feedback'
+import { Sessions } from './pages/Sessions'
+import { SessionDetailPage } from './pages/SessionDetailPage'
 import { Admin } from './pages/Admin'
 import { Research } from './pages/Research'
 import { ProtectedRoute } from './components/ProtectedRoute'
@@ -49,6 +51,22 @@ function App() {
           element={
             <ProtectedRoute>
               <Feedback />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/sessions"
+          element={
+            <ProtectedRoute>
+              <Sessions />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/sessions/:sessionId"
+          element={
+            <ProtectedRoute>
+              <SessionDetailPage />
             </ProtectedRoute>
           }
         />

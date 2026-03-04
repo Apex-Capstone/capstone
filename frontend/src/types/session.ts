@@ -78,3 +78,15 @@ export interface SessionDetail extends Session {
   turns: Turn[]
 }
 
+// Wire type for the list endpoint
+export interface SessionListDTO {
+  sessions: SessionDTO[]
+  total: number
+}
+
+// UI type for the session list
+export interface SessionList {
+  sessions: Session[]
+  total: number
+}
+
