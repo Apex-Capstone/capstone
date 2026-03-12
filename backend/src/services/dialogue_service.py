@@ -14,6 +14,7 @@ from domain.models.sessions import TurnCreate, TurnResponse
 from repositories.case_repo import CaseRepository
 from repositories.session_repo import SessionRepository
 from repositories.turn_repo import TurnRepository
+from services.stage_tracker import StageTracker
 
 logger = get_logger(__name__)
 
@@ -43,6 +44,7 @@ class DialogueService:
         self.session_repo = SessionRepository(db)
         self.case_repo = CaseRepository(db)
         self.turn_repo = TurnRepository(db)
+        self.stage_tracker = StageTracker(self.session_repo)
     
     async def process_user_turn(
         self,
@@ -64,24 +66,11 @@ class DialogueService:
         
         # Analyze user input (elicitations and responses)
         user_metrics, user_spans = await self._analyze_user_input(turn_data.text)
-        
-        # Detect SPIKES stage from content
-        elicitation_spans = await self.nlu_adapter.detect_elicitation_spans(turn_data.text)
-        response_spans = await self.nlu_adapter.detect_response_spans(turn_data.text)
-        from adapters.nlu.span_detector import SpanDetector
-        span_detector = SpanDetector()
-        detected_stage = span_detector.detect_spikes_stage(
-            turn_data.text,
-            has_elicitations=len(elicitation_spans) > 0,
-            has_responses=len(response_spans) > 0,
-        )
-        if detected_stage:
-            # Update SPIKES stage before LLM generation so the patient response
-            # reflects the correct conversation stage.
-            session.current_spikes_stage = detected_stage
-            self.session_repo.update(session)
-        # Use detected stage if available, otherwise use session stage
-        turn_spikes_stage = detected_stage if detected_stage else session.current_spikes_stage
+
+        # Detect and update SPIKES stage via StageTracker before LLM generation
+        stage = self.stage_tracker.detect_stage(turn_data.text, session)
+        self.stage_tracker.update_session_stage(session, stage)
+        turn_spikes_stage = stage
         
         # Create user turn
         user_turn = Turn(
@@ -134,10 +123,6 @@ You are this patient. The trainee doctor will practice communicating with you.""
             spikes_stage=session.current_spikes_stage,
         )
         created_turn = self.turn_repo.create(assistant_turn)
-        
-        # Fallback SPIKES stage update if no stage was detected from content
-        if not detected_stage:
-            await self._update_spikes_stage(session, conversation_history)
         
         return TurnResponse.model_validate(created_turn)
     
