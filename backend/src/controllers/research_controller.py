@@ -11,13 +11,14 @@ from sqlalchemy.orm import Session
 from config.logging import get_logger
 from core.deps import get_db, require_admin
 from domain.entities.user import User
+from domain.models.admin import ResearchSessionsEnvelope
 from services.research_service import ResearchService
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/research", tags=["research"])
 
 
-@router.get("/sessions")
+@router.get("/sessions", response_model=ResearchSessionsEnvelope)
 async def get_sessions(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_admin)],

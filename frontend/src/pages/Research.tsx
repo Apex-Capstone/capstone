@@ -9,6 +9,18 @@ import { AlertTriangle, Database, Download, Shield, BarChart3 } from 'lucide-rea
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+const safePercent = (value: number | null | undefined) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(100, value))
+}
+
+const formatTimestamp = (value: string | null | undefined) => {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString()
+}
+
 export const Research = () => {
   const { user } = useAuthStore()
   const [data, setData] = useState<ResearchData | null>(null)
@@ -231,7 +243,7 @@ export const Research = () => {
                         <div className="text-2xl font-bold text-purple-700 mb-1">
                           {(data.fairnessMetrics.biasProbeConsistency * 100).toFixed(1)}%
                         </div>
-                        <div className="w-full h-2 bg-purple-200 rounded-full">
+                        <div className="w-full h-2 bg-gray-200 rounded-full">
                           <div 
                             className="h-full bg-purple-600 rounded-full"
                             style={{ width: `${data.fairnessMetrics.biasProbeConsistency * 100}%` }}
@@ -256,7 +268,7 @@ export const Research = () => {
                         <div className="text-2xl font-bold text-green-700 mb-1">
                           {(data.fairnessMetrics.demographicParity * 100).toFixed(1)}%
                         </div>
-                        <div className="w-full h-2 bg-green-200 rounded-full">
+                        <div className="w-full h-2 bg-gray-200 rounded-full">
                           <div 
                             className="h-full bg-green-600 rounded-full"
                             style={{ width: `${data.fairnessMetrics.demographicParity * 100}%` }}
@@ -281,7 +293,7 @@ export const Research = () => {
                         <div className="text-2xl font-bold text-emerald-700 mb-1">
                           {(data.fairnessMetrics.equalizedOdds * 100).toFixed(1)}%
                         </div>
-                        <div className="w-full h-2 bg-emerald-200 rounded-full">
+                        <div className="w-full h-2 bg-gray-200 rounded-full">
                           <div 
                             className="h-full bg-emerald-600 rounded-full"
                             style={{ width: `${data.fairnessMetrics.equalizedOdds * 100}%` }}
@@ -343,43 +355,49 @@ export const Research = () => {
                             <td className="py-2">
                               <div className="flex items-center gap-2">
                                 <div className="w-12 h-2 bg-gray-200 rounded-full">
-                                  <div 
+                                  <div
                                     className="h-full bg-emerald-500 rounded-full"
-                                    style={{ width: `${session.scores.empathy}%` }}
+                                    style={{ width: `${safePercent(session.scores.empathy)}%` }}
                                   />
                                 </div>
-                                <span className="font-medium">{session.scores.empathy}%</span>
+                                <span className="font-medium">
+                                  {(session.scores.empathy ?? 0).toFixed(0)}%
+                                </span>
                               </div>
                             </td>
                             <td className="py-2">
                               <div className="flex items-center gap-2">
                                 <div className="w-12 h-2 bg-gray-200 rounded-full">
-                                  <div 
-                                    className="h-full bg-green-500 rounded-full"
-                                    style={{ width: `${session.scores.communication}%` }}
+                                  <div
+                                    className="h-full bg-sky-500 rounded-full"
+                                    style={{ width: `${safePercent(session.scores.communication)}%` }}
                                   />
                                 </div>
-                                <span className="font-medium">{session.scores.communication}%</span>
+                                <span className="font-medium">
+                                  {(session.scores.communication ?? 0).toFixed(0)}%
+                                </span>
                               </div>
                             </td>
                             <td className="py-2">
                               <div className="flex items-center gap-2">
                                 <div className="w-12 h-2 bg-gray-200 rounded-full">
-                                  <div 
-                                    className="h-full bg-purple-500 rounded-full"
-                                    style={{ width: `${session.scores.clinical}%` }}
+                                  <div
+                                    className="h-full bg-indigo-500 rounded-full"
+                                    style={{ width: `${safePercent(session.scores.clinical)}%` }}
                                   />
                                 </div>
-                                <span className="font-medium">{session.scores.clinical}%</span>
+                                <span className="font-medium">
+                                  {(session.scores.clinical ?? 0).toFixed(0)}%
+                                </span>
                               </div>
                             </td>
                             <td className="py-2 text-xs text-gray-500">
-                              {new Date(session.timestamp).toLocaleDateString()}
+                              {formatTimestamp(session.timestamp)}
                             </td>
                             {user?.role === 'admin' && (
                               <td className="py-2">
                                 <Button
-                                  variant="ghost"
+                                  variant="secondary"
                                   size="sm"
                                   onClick={() => handleExportSessionTranscript(session.sessionId)}
                                   disabled={exportingSessionId === session.sessionId}
@@ -421,7 +439,17 @@ export const Research = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {Math.round(data.anonymizedSessions.reduce((sum, s) => sum + s.scores.empathy, 0) / data.anonymizedSessions.length)}%
+                      {(() => {
+                        const scored = data.anonymizedSessions.filter(
+                          (s) => s.scores.empathy !== null && s.scores.empathy !== undefined
+                        )
+                        if (scored.length === 0) return '0%'
+                        const total = scored.reduce(
+                          (sum, s) => sum + (s.scores.empathy ?? 0),
+                          0
+                        )
+                        return `${Math.round(total / scored.length)}%`
+                      })()}
                     </div>
                     <p className="text-xs text-gray-500 mt-1">Across all sessions</p>
                   </CardContent>

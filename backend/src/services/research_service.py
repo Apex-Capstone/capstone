@@ -87,10 +87,52 @@ class ResearchService:
         skip: int = 0,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
-        """Return list of anonymized sessions (no PII)."""
+        """Return list of anonymized sessions (no PII), including aggregate feedback metrics when available."""
         sessions = self.session_repo.get_all(skip=skip, limit=limit)
-        request = ResearchExportRequest(anonymize=True, include_turns=False, include_feedback=False)
-        return [self._anonymize_session(s, request) for s in sessions]
+        request = ResearchExportRequest(
+            anonymize=True,
+            include_turns=False,
+            include_feedback=True,
+        )
+        results: list[dict[str, Any]] = []
+        for session in sessions:
+            base = self._anonymize_session(session, request)
+            feedback = (base.get("feedback") or {}) if isinstance(base, dict) else {}
+
+            empathy = feedback.get("empathy_score")
+            communication = feedback.get("communication_score")
+            spikes_completion = feedback.get("spikes_completion_score")
+            overall = feedback.get("overall_score")
+
+            # clinical_score is represented by overall_score in our analytics CSV
+            clinical = overall
+
+            # If communication_score is missing, fall back to overall_score
+            if communication is None and overall is not None:
+                communication = overall
+
+            timestamp: str | None
+            if getattr(session, "started_at", None):
+                timestamp = session.started_at.isoformat()
+            else:
+                timestamp = None
+
+            # Flatten metrics into the top-level payload; preserve anonymized session_id
+            base.update(
+                {
+                    "empathy_score": empathy,
+                    "communication_score": communication,
+                    "clinical_score": clinical,
+                    "spikes_completion_score": spikes_completion,
+                    "timestamp": timestamp,
+                }
+            )
+
+            # Remove nested feedback blob to keep response lightweight
+            base.pop("feedback", None)
+            results.append(base)
+
+        return results
 
     def get_session_by_anon(self, anon_session_id: str) -> dict[str, Any]:
         """Return anonymized session details by anon_session_id (no PII). Raises ValueError if not found."""

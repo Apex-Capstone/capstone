@@ -11,6 +11,10 @@ export interface ResearchSessionDTO {
   duration_seconds: number
   state: string
   spikes_stage?: string | null
+  empathy_score?: number | null
+  communication_score?: number | null
+  clinical_score?: number | null
+  timestamp?: string | null
 }
 
 export interface ResearchSessionsResponse {
@@ -25,7 +29,7 @@ export interface ResearchData {
   anonymizedSessions: Array<{
     sessionId: string
     demographics: { ageGroup: string; gender: string }
-    scores: { empathy: number; communication: number; clinical: number }
+    scores: { empathy: number | null; communication: number | null; clinical: number | null }
     timestamp: string
     duration_seconds?: number
     state?: string
@@ -98,15 +102,26 @@ export async function fetchResearchExport(): Promise<void> {
  */
 export async function fetchResearchData(): Promise<ResearchData> {
   const res = await fetchResearchSessions(0, 500)
-  const anonymizedSessions = res.sessions.map((s) => ({
-    sessionId: String(s.session_id),
-    demographics: { ageGroup: '—', gender: '—' } as const,
-    scores: { empathy: 0, communication: 0, clinical: 0 } as const,
-    timestamp: '',
-    duration_seconds: s.duration_seconds,
-    state: s.state,
-    spikes_stage: s.spikes_stage ?? null,
-  }))
+  const clampOrNull = (value: number | null | undefined): number | null => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return null
+    return Math.max(0, Math.min(100, value))
+  }
+
+  const anonymizedSessions = res.sessions.map((s) => {
+    const empathy = clampOrNull(s.empathy_score)
+    const communication = clampOrNull(s.communication_score)
+    const clinical = clampOrNull(s.clinical_score)
+
+    return {
+      sessionId: String(s.session_id),
+      demographics: { ageGroup: '—', gender: '—' } as const,
+      scores: { empathy, communication, clinical } as const,
+      timestamp: s.timestamp ?? '',
+      duration_seconds: s.duration_seconds,
+      state: s.state,
+      spikes_stage: s.spikes_stage ?? null,
+    }
+  })
   return {
     anonymizedSessions,
     // Backend does not provide fairness metrics; omit so UI hides that section
