@@ -17,6 +17,7 @@ from repositories.turn_repo import TurnRepository
 from services.stage_tracker import StageTracker
 from services.nlu_pipeline import NLUPipeline
 from services.dialogue_state import DialogueState
+from services.patient_prompt_builder import PatientPromptBuilder
 
 logger = get_logger(__name__)
 
@@ -54,6 +55,7 @@ class DialogueService:
             question_classifier=self.nlu_adapter,
             tone_analyzer=self.nlu_adapter,
         )
+        self.patient_prompt_builder = PatientPromptBuilder()
     
     async def process_user_turn(
         self,
@@ -107,14 +109,13 @@ class DialogueService:
         
         # Generate patient response with latency tracking
         conversation_history = self._get_conversation_history(session_id)
-        
-        # Build patient context from case details
-        patient_context = f"""Patient Background: {case.patient_background or 'General patient'}
 
-Case Scenario: {case.description or case.title}
+        # Build patient prompt from case metadata and current SPIKES stage
+        patient_context = self.patient_prompt_builder.build_prompt(
+            case=case,
+            stage=session.current_spikes_stage,
+        )
 
-You are this patient. The trainee doctor will practice communicating with you."""
-        
         # Track latency for LLM call
         start_time = time.time()
         patient_response = await self.llm_adapter.generate_patient_response(
