@@ -75,6 +75,11 @@ class DialogueService:
             has_elicitations=len(elicitation_spans) > 0,
             has_responses=len(response_spans) > 0,
         )
+        if detected_stage:
+            # Update SPIKES stage before LLM generation so the patient response
+            # reflects the correct conversation stage.
+            session.current_spikes_stage = detected_stage
+            self.session_repo.update(session)
         # Use detected stage if available, otherwise use session stage
         turn_spikes_stage = detected_stage if detected_stage else session.current_spikes_stage
         
@@ -130,12 +135,9 @@ You are this patient. The trainee doctor will practice communicating with you.""
         )
         created_turn = self.turn_repo.create(assistant_turn)
         
-        # Update SPIKES stage if needed (and update turn's spikes_stage if detected stage differs)
-        await self._update_spikes_stage(session, conversation_history)
-        # If detected stage differs from what we set, update the turn
-        if detected_stage and detected_stage != turn_spikes_stage:
-            user_turn.spikes_stage = detected_stage
-            self.turn_repo.update(user_turn)
+        # Fallback SPIKES stage update if no stage was detected from content
+        if not detected_stage:
+            await self._update_spikes_stage(session, conversation_history)
         
         return TurnResponse.model_validate(created_turn)
     
