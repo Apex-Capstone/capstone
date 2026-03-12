@@ -16,6 +16,7 @@ from repositories.session_repo import SessionRepository
 from repositories.turn_repo import TurnRepository
 from services.stage_tracker import StageTracker
 from services.nlu_pipeline import NLUPipeline
+from services.dialogue_state import DialogueState
 
 logger = get_logger(__name__)
 
@@ -71,9 +72,20 @@ class DialogueService:
         
         # Get turn number
         turn_number = self.turn_repo.get_next_turn_number(session_id)
-        
-        # Analyze user input (elicitations and responses)
-        user_metrics, user_spans = await self._analyze_user_input(turn_data.text)
+
+        # Initialize in-memory dialogue state for this turn
+        state = DialogueState(session)
+
+        # Run NLU analysis through the unified pipeline
+        analysis = await self.nlu_pipeline.analyze(turn_data.text)
+
+        # Track question type and emotion spans in state
+        state.add_question_type(analysis["question_type"])
+        if analysis.get("emotion_spans"):
+            state.add_emotion_spans(analysis["emotion_spans"])
+
+        # Build legacy-compatible metrics and spans from analysis
+        user_metrics, user_spans = await self._analyze_user_input(turn_data.text, analysis)
 
         # Detect and update SPIKES stage via StageTracker before LLM generation
         stage = self.stage_tracker.detect_stage(turn_data.text, session)
@@ -134,14 +146,12 @@ You are this patient. The trainee doctor will practice communicating with you.""
         
         return TurnResponse.model_validate(created_turn)
     
-    async def _analyze_user_input(self, text: str) -> tuple[dict, list]:
+    async def _analyze_user_input(self, text: str, analysis: dict) -> tuple[dict, list]:
         """Analyze user input for metrics and spans.
         
         Returns:
             Tuple of (metrics_dict, spans_list) where spans_list contains elicitation and response spans.
         """
-        analysis = await self.nlu_pipeline.analyze(text)
-
         empathy = analysis["empathy"]
         question_type = analysis["question_type"]
         tone = analysis["tone"]
