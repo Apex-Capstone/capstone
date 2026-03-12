@@ -15,6 +15,7 @@ from repositories.case_repo import CaseRepository
 from repositories.session_repo import SessionRepository
 from repositories.turn_repo import TurnRepository
 from services.stage_tracker import StageTracker
+from services.nlu_pipeline import NLUPipeline
 
 logger = get_logger(__name__)
 
@@ -45,6 +46,13 @@ class DialogueService:
         self.case_repo = CaseRepository(db)
         self.turn_repo = TurnRepository(db)
         self.stage_tracker = StageTracker(self.session_repo)
+        # Consolidated NLU pipeline for dialogue analysis
+        self.nlu_pipeline = NLUPipeline(
+            span_detector=self.nlu_adapter,
+            empathy_detector=self.nlu_adapter,
+            question_classifier=self.nlu_adapter,
+            tone_analyzer=self.nlu_adapter,
+        )
     
     async def process_user_turn(
         self,
@@ -130,30 +138,25 @@ You are this patient. The trainee doctor will practice communicating with you.""
         """Analyze user input for metrics and spans.
         
         Returns:
-            Tuple of (metrics_dict, spans_list) where spans_list contains elicitation and response spans
+            Tuple of (metrics_dict, spans_list) where spans_list contains elicitation and response spans.
         """
-        # Legacy metrics for backward compatibility
-        empathy = await self.nlu_adapter.detect_empathy_cues(text)
-        question_type = await self.nlu_adapter.classify_question_type(text)
-        tone = await self.nlu_adapter.analyze_tone(text)
-        
-        # AFCE-aligned span detection
-        elicitation_spans = await self.nlu_adapter.detect_elicitation_spans(text)
-        response_spans = await self.nlu_adapter.detect_response_spans(text)
-        
-        # Combine all spans
-        all_spans = []
-        for span in elicitation_spans:
+        analysis = await self.nlu_pipeline.analyze(text)
+
+        empathy = analysis["empathy"]
+        question_type = analysis["question_type"]
+        tone = analysis["tone"]
+        empathy_response = empathy.get("has_empathy", False)
+        empathy_response_type = analysis["empathy_response_type"]
+
+        # Combine elicitation and response spans for backward compatibility
+        all_spans: list[dict] = []
+        for span in analysis.get("elicitation_spans", []):
             span["span_type"] = "elicitation"
             all_spans.append(span)
-        for span in response_spans:
+        for span in analysis.get("response_spans", []):
             span["span_type"] = "response"
             all_spans.append(span)
-        
-        # Legacy metrics for backward compatibility
-        empathy_response = empathy.get("has_empathy", False)
-        empathy_response_type = await self.nlu_adapter.classify_empathy_response_type(text)
-        
+
         metrics = {
             "empathy": empathy,
             "question_type": question_type,
@@ -161,7 +164,7 @@ You are this patient. The trainee doctor will practice communicating with you.""
             "empathy_response": empathy_response,
             "empathy_response_type": empathy_response_type,
         }
-        
+
         return metrics, all_spans
     
     async def _analyze_assistant_response(
