@@ -1,13 +1,13 @@
 """Scoring service for empathy, communication, and SPIKES metrics."""
 
 import json
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy.orm import Session
 
 from core.errors import NotFoundError
 from domain.entities.feedback import Feedback
-from domain.models.sessions import FeedbackResponse
+from domain.models.sessions import FeedbackResponse, SuggestedResponse, TimelineEvent
 from repositories.feedback_repo import FeedbackRepository
 from repositories.session_repo import SessionRepository
 from repositories.turn_repo import TurnRepository
@@ -49,6 +49,10 @@ class ScoringService:
         # If already dict/list, return as-is (shouldn't happen, but safe)
         return value if isinstance(value, (dict, list)) else None
 
+    def _clamp_score(self, score: float) -> float:
+        """Clamp score to [0, 100]."""
+        return max(0.0, min(100.0, score))
+
     async def generate_feedback(self, session_id: int) -> FeedbackResponse:
         """Generate comprehensive feedback for a session."""
         session = self.session_repo.get_by_id(session_id)
@@ -65,17 +69,7 @@ class ScoringService:
         elicitation_counts_by_type = self._calculate_elicitation_counts_by_type(all_spans)
         response_counts_by_type = self._calculate_response_counts_by_type(all_spans)
         
-        # Calculate scores
-        empathy_score = self._calculate_empathy_score_from_afce(
-            eo_counts_by_dimension, 
-            response_counts_by_type,
-            all_spans,
-            turns
-        )
-        spikes_score = self._calculate_spikes_completion(session, turns, all_spans)
-        overall_score = round((empathy_score + spikes_score) / 2.0, 2)  # Simple average, rounded
-        
-        # Calculate SPIKES metrics (will update to exclude Setting in Part 2)
+        # Calculate AFCE / SPIKES-based components
         spikes_coverage = self._analyze_spikes_coverage(turns)
         spikes_timestamps = self._calculate_spikes_timestamps(turns)
         spikes_strategies = self._identify_spikes_strategies(turns)
@@ -83,17 +77,8 @@ class ScoringService:
         # Calculate questioning metrics
         question_breakdown = self._calculate_question_breakdown(turns)
         
-        # Calculate performance metrics
-        latency_ms_avg = self._calculate_latency_ms_avg(turns)
-        
-        # Placeholder fields for fairness/reliability (only include if populated)
-        bias_probe_info = None  # Would be populated by bias testing framework
-        evaluator_meta = None  # Would be populated by evaluation system
-        
-        # Collect span lists for feedback generation
+        # EO→response linking (for UI empathy + coverage metrics)
         eo_spans, elicitation_spans, response_spans = self._collect_span_lists(all_spans)
-        
-        # Implement linking logic (Part 2)
         eo_to_response_links, missed_opportunities, linkage_stats = self._compute_eo_linking(
             eo_spans, response_spans, elicitation_spans, turns
         )
@@ -103,15 +88,101 @@ class ScoringService:
         missed_opportunities_by_dimension = self._compute_missed_opportunities_by_dimension(
             missed_opportunities, eo_spans
         )
+
+        # Calculate performance metrics
+        latency_ms_avg = self._calculate_latency_ms_avg(turns)
+
+        # ---- UI-facing composite scores (0-100)
+
+        # Empathy score: EO coverage + empathy response frequency
+        total_eos = linkage_stats.get("total_eos", 0) if linkage_stats else 0
+        addressed_count = linkage_stats.get("addressed_count", 0) if linkage_stats else 0
+        empathy_response_count = sum(response_counts_by_type.values()) if response_counts_by_type else 0
+        total_clinician_turns = sum(1 for t in turns if t.role == "user")
+        eo_coverage = (addressed_count / total_eos) if total_eos > 0 else 0.0
+        empathy_frequency = (empathy_response_count / total_clinician_turns) if total_clinician_turns > 0 else 0.0
+        empathy_score = (0.7 * eo_coverage + 0.3 * empathy_frequency) * 100.0
+
+        # Communication score: SPIKES coverage + open-question ratio (with safety handling)
+        spikes_coverage_percent = 0.0
+        if spikes_coverage and isinstance(spikes_coverage, dict):
+            spikes_coverage_percent = float(spikes_coverage.get("percent", 0.0)) * 100.0
+        ratio_open = 0.0
+        if question_breakdown and isinstance(question_breakdown, dict):
+            ratio_open = float(question_breakdown.get("ratio_open", 0.0)) * 100.0
+        communication_score = (0.7 * spikes_coverage_percent) + (0.3 * ratio_open)
+
+        # Clinical reasoning score: knowledge + strategy + perception partial credit
+        stages_reached = set()
+        for turn in turns:
+            if turn.spikes_stage:
+                stage = str(turn.spikes_stage).lower()
+                if stage in ["knowledge", "k"]:
+                    stages_reached.add("knowledge")
+                if stage in ["strategy", "summary", "s2"]:
+                    stages_reached.add("strategy")
+                if stage in ["perception", "p"]:
+                    stages_reached.add("perception")
+
+        knowledge_detected = 1.0 if "knowledge" in stages_reached else 0.0
+        strategy_detected = 1.0 if "strategy" in stages_reached else 0.0
+        perception_detected = 1.0 if "perception" in stages_reached else 0.0
+        clinical_reasoning_score = ((knowledge_detected + strategy_detected) / 2.0) * 100.0 + (perception_detected * 10.0)
+
+        # Professionalism score: calm clinician turns, penalty for unclear tone
+        total_tone_turns = 0
+        calm_turns = 0
+        unclear_turns = 0
+        for turn in turns:
+            if turn.role != "user" or not turn.metrics_json:
+                continue
+            metrics = self._parse_metrics_json(turn.metrics_json)
+            if not metrics:
+                continue
+            total_tone_turns += 1
+            tone = metrics.get("tone") or {}
+            if tone.get("calm"):
+                calm_turns += 1
+            if tone.get("clear") is False:
+                unclear_turns += 1
+        base_prof = (calm_turns / total_tone_turns) * 100.0 if total_tone_turns > 0 else 0.0
+        professionalism_score = base_prof - (unclear_turns * 5.0)
+
+        # Overall score: weighted combination
+        overall_score = (
+            0.35 * communication_score
+            + 0.35 * empathy_score
+            + 0.20 * clinical_reasoning_score
+            + 0.10 * professionalism_score
+        )
+
+        # Clamp all scores to [0, 100]
+        empathy_score = self._clamp_score(empathy_score)
+        communication_score = self._clamp_score(communication_score)
+        clinical_reasoning_score = self._clamp_score(clinical_reasoning_score)
+        professionalism_score = self._clamp_score(professionalism_score)
+        overall_score = self._clamp_score(round(overall_score, 2))
+
+        # SPIKES completion score (0-10)
+        spikes_score = self._calculate_spikes_completion(session, turns, all_spans)
+        
+        # Placeholder fields for fairness/reliability (only include if populated)
+        bias_probe_info = None  # Would be populated by bias testing framework
+        evaluator_meta = None  # Would be populated by evaluation system
         
         # Generate textual feedback
         strengths, improvements = self._generate_textual_feedback(
             empathy_score,
-            None,  # communication_score deprecated
-            spikes_score,
-            question_breakdown,
+            communication_score,
+            clinical_reasoning_score,
             eo_spans,
         )
+
+        # Generate timeline events and suggested responses
+        timeline_events = self._build_timeline_events(
+            eo_spans, missed_opportunities, response_spans, turns
+        )
+        suggested_responses = self._build_suggested_responses(missed_opportunities, turns)
         
         # Create or update feedback
         existing_feedback = self.feedback_repo.get_by_session(session_id)
@@ -122,6 +193,9 @@ class ScoringService:
         
         # Set aggregate scores
         feedback.empathy_score = empathy_score
+        feedback.communication_score = communication_score
+        feedback.clinical_reasoning_score = clinical_reasoning_score
+        feedback.professionalism_score = professionalism_score
         feedback.spikes_completion_score = spikes_score
         feedback.overall_score = overall_score
         
@@ -153,7 +227,7 @@ class ScoringService:
         # Set textual feedback (only if data exists)
         feedback.strengths = strengths if strengths and strengths.strip() else None
         feedback.areas_for_improvement = improvements if improvements and improvements.strip() else None
-        feedback.detailed_feedback = f"Overall Score: {overall_score:.1f}/10" if overall_score >= 0 else None
+        feedback.detailed_feedback = f"Overall Score: {overall_score:.1f}/100" if overall_score >= 0 else None
         
         if existing_feedback:
             saved_feedback = self.feedback_repo.update(feedback)
@@ -184,9 +258,14 @@ class ScoringService:
         # Add relations placeholder (will be populated in Part 2)
         saved_feedback.relations = None  # Will be computed from relations_json in Part 2
 
-        # Create response and let exclude_none=True and _remove_empty_values handle cleanup
+        # Create response with timeline and suggestions
         response = FeedbackResponse.model_validate(saved_feedback)
-        return response
+        return response.model_copy(
+            update={
+                "timeline_events": timeline_events or None,
+                "suggested_responses": suggested_responses or None,
+            }
+        )
     
     # AFCE span-based metric calculation methods
     
@@ -259,7 +338,10 @@ class ScoringService:
         response_spans: list[dict],
         turns: list,
     ) -> dict[int, list[dict]]:
-        """Link EOs to responses within the next 2 clinician turns.
+        """Link EOs to responses within [eo_turn - 1, eo_turn + 2].
+        
+        Includes proactive empathy (clinician response before patient EO)
+        and responses in the next 1-2 clinician turns after the EO.
         
         Returns:
             dict mapping EO turn_number to list of linked response spans
@@ -276,7 +358,7 @@ class ScoringService:
                     responses_by_turn[turn_num] = []
                 responses_by_turn[turn_num].append(response_span)
         
-        # For each EO, find responses in next 2 clinician turns
+        # For each EO, find responses in [eo_turn - 1, eo_turn + 2]
         eo_to_responses = {}
         
         for eo_span in eo_spans:
@@ -295,23 +377,18 @@ class ScoringService:
             
             linked_responses = []
             
-            # Look ahead at next 2 clinician turns (user role)
-            clinician_turns_checked = 0
-            current_turn_num = eo_turn_num + 1
+            # Check clinician turns in [eo_turn - 1, eo_turn + 2] (inclusive)
+            for turn_num in range(eo_turn_num - 1, eo_turn_num + 3):
+                if turn_num < 1:
+                    continue
+                if turn_num not in turn_map:
+                    continue
+                candidate_turn = turn_map[turn_num]
+                if candidate_turn.role != "user":
+                    continue
+                if turn_num in responses_by_turn:
+                    linked_responses.extend(responses_by_turn[turn_num])
             
-            while clinician_turns_checked < 2 and current_turn_num in turn_map:
-                candidate_turn = turn_map[current_turn_num]
-                
-                # Only check clinician turns (user role)
-                if candidate_turn.role == "user":
-                    clinician_turns_checked += 1
-                    # Add any response spans from this turn
-                    if current_turn_num in responses_by_turn:
-                        linked_responses.extend(responses_by_turn[current_turn_num])
-                
-                current_turn_num += 1
-            
-            # Store linked responses (can be empty list)
             eo_to_responses[eo_turn_num] = linked_responses
         
         return eo_to_responses
@@ -916,39 +993,119 @@ class ScoringService:
     def _generate_textual_feedback(
         self,
         empathy_score: float,
-        communication_score: float | None,
-        spikes_score: float,
-        question_breakdown: dict,
-        eo_spans: list = None,
+        communication_score: float,
+        clinical_reasoning_score: float,
+        eo_spans: list | None = None,
     ) -> tuple[str, str]:
-        """Generate strengths and improvement areas."""
+        """Generate strengths and improvement areas (scores are 0-100)."""
         strengths = []
         improvements = []
-        
-        # Check if no EOs were detected
+
         if eo_spans is None:
             eo_spans = []
-        
-        if not eo_spans:
-            improvements.append("No AFCE empathy opportunities were detected in this session")
-        elif empathy_score >= 7:
+
+        # Strengths if score > 70
+        if empathy_score > 70:
             strengths.append("Excellent use of empathetic language")
-        elif empathy_score > 0:
-            improvements.append("Consider using more empathetic phrases")
-        else:
+        if communication_score > 70:
+            strengths.append("Strong communication and SPIKES coverage")
+        if clinical_reasoning_score > 70:
+            strengths.append("Good clinical reasoning and protocol adherence")
+
+        # Improvements if score < 50
+        if empathy_score < 50:
             improvements.append("Work on responding to empathy opportunities")
-        
-        if question_breakdown.get("ratio_open", 0) > 0.6:
-            strengths.append("Good use of open-ended questions")
-        else:
-            improvements.append("Try asking more open-ended questions")
-        
-        if spikes_score >= 8:
-            strengths.append("Comprehensive coverage of SPIKES protocol")
-        else:
-            improvements.append("Work on covering all SPIKES protocol stages")
-        
+        elif not eo_spans and empathy_score < 70:
+            improvements.append("Consider using more empathetic phrases")
+        if communication_score < 50:
+            improvements.append("Try asking more open-ended questions and covering SPIKES stages")
+        if clinical_reasoning_score < 50:
+            improvements.append("Work on covering SPIKES protocol stages (perception, knowledge, strategy)")
+
         return "\n".join(strengths), "\n".join(improvements)
+
+    def _build_timeline_events(
+        self,
+        eo_spans: list,
+        missed_opportunities: list,
+        response_spans: list,
+        turns: list,
+    ) -> list[TimelineEvent]:
+        """Build timeline events from EOs, responses, missed opportunities, and SPIKES stages."""
+        events: list[TimelineEvent] = []
+        seen: set[tuple[int, str]] = set()
+
+        def add_event(turn_number: int, event_type: Literal["eo", "response", "missed", "spikes"], label: str) -> None:
+            key = (turn_number, event_type)
+            if key not in seen:
+                seen.add(key)
+                events.append(TimelineEvent(turn_number=turn_number, type=event_type, label=label))
+
+        for eo in eo_spans or []:
+            tn = eo.get("turn_number")
+            if tn is not None:
+                add_event(tn, "eo", "Empathy Opportunity")
+
+        for resp in response_spans or []:
+            tn = resp.get("turn_number")
+            if tn is not None:
+                add_event(tn, "response", "Empathy Response")
+
+        for missed in missed_opportunities or []:
+            tn = missed.get("turn_number")
+            if tn is not None:
+                add_event(tn, "missed", "Missed Opportunity")
+
+        for turn in turns:
+            if turn.spikes_stage:
+                stage = str(turn.spikes_stage).strip()
+                label_map = {
+                    "setting": "SPIKES Setting",
+                    "s": "SPIKES Setting",
+                    "perception": "SPIKES Perception",
+                    "p": "SPIKES Perception",
+                    "invitation": "SPIKES Invitation",
+                    "i": "SPIKES Invitation",
+                    "knowledge": "SPIKES Knowledge",
+                    "k": "SPIKES Knowledge",
+                    "emotion": "SPIKES Emotion",
+                    "empathy": "SPIKES Emotion",
+                    "e": "SPIKES Emotion",
+                    "strategy": "SPIKES Strategy",
+                    "summary": "SPIKES Strategy",
+                    "s2": "SPIKES Strategy",
+                }
+                label = label_map.get(stage.lower(), f"SPIKES {stage}")
+                add_event(turn.turn_number, "spikes", label)
+
+        events.sort(key=lambda e: (e.turn_number, e.type))
+        return events
+
+    def _build_suggested_responses(
+        self,
+        missed_opportunities: list,
+        turns: list,
+    ) -> list[SuggestedResponse]:
+        """Build suggested empathetic responses for missed opportunities."""
+        template = "I can see this is really difficult. Thank you for sharing that with me."
+        suggestions: list[SuggestedResponse] = []
+        turn_map = {t.turn_number: t for t in turns}
+
+        for missed in missed_opportunities or []:
+            tn = missed.get("turn_number")
+            patient_text = missed.get("text", "")[:200] or "patient expressed emotion"
+            if tn is not None:
+                turn = turn_map.get(tn)
+                if turn and turn.text:
+                    patient_text = turn.text[:200]
+                suggestions.append(
+                    SuggestedResponse(
+                        turn_number=tn,
+                        patient_text=patient_text,
+                        suggestion=template,
+                    )
+                )
+        return suggestions
     
     # SPIKES metrics
     def _calculate_spikes_timestamps(self, turns: list) -> dict[str, Any]:

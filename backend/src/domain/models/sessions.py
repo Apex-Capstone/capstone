@@ -6,6 +6,20 @@ from typing import Literal, Optional, Union
 from pydantic import BaseModel, Field, ConfigDict
 
 
+class TimelineEvent(BaseModel):
+    """Single event for conversation feedback timeline."""
+    turn_number: int
+    type: Literal["eo", "response", "missed", "spikes"]
+    label: str
+
+
+class SuggestedResponse(BaseModel):
+    """Suggested empathetic response for a missed opportunity."""
+    turn_number: int
+    patient_text: str
+    suggestion: str
+
+
 class SessionCreate(BaseModel):
     """Session creation schema."""
     
@@ -85,6 +99,9 @@ class FeedbackResponse(BaseModel):
     id: int
     session_id: int
     empathy_score: float
+    communication_score: float | None = None
+    clinical_reasoning_score: float | None = None
+    professionalism_score: float | None = None
     spikes_completion_score: float
     overall_score: float
     
@@ -123,6 +140,10 @@ class FeedbackResponse(BaseModel):
     strengths: Optional[str] = None
     areas_for_improvement: Optional[str] = None
     detailed_feedback: Optional[str] = None
+
+    # Conversation feedback timeline
+    timeline_events: Optional[list[TimelineEvent]] = None
+    suggested_responses: Optional[list[SuggestedResponse]] = None
     
     created_at: datetime
     

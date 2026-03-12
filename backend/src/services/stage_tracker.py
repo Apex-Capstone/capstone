@@ -39,17 +39,39 @@ class StageTracker:
         ):
             detected_stage = "setting"
 
-        # perception: questions about patient's understanding
+        # perception: questions about patient's understanding and perspective
         elif any(
             phrase in text_lower
-            for phrase in ["understand", "what do you know", "what do you think", "how much do you know"]
+            for phrase in [
+                "understand",
+                "what do you know",
+                "what do you think",
+                "how much do you know",
+                # additional perception / understanding probes
+                "what have you been thinking",
+                "what have you been thinking about",
+                "what have you heard so far",
+                "what have you been told",
+                "how are you feeling about",
+            ]
         ):
             detected_stage = "perception"
 
         # invitation: asking permission to explain
         elif any(
             phrase in text_lower
-            for phrase in ["would you like", "should i explain", "is it ok if i explain", "can i tell you more"]
+            for phrase in [
+                "would you like",
+                "should i explain",
+                "is it ok if i explain",
+                "can i tell you more",
+                # additional invitation cues
+                "would it be alright if i explain",
+                "would it be all right if i explain",
+                "would it be okay if i explain",
+                "would you like me to explain",
+                "would you like more details",
+            ]
         ):
             detected_stage = "invitation"
 
@@ -63,7 +85,17 @@ class StageTracker:
         # emotion: empathy statements
         elif any(
             phrase in text_lower
-            for phrase in ["sorry", "i understand", "that must be difficult", "i can imagine this is hard"]
+            for phrase in [
+                "sorry",
+                "i understand",
+                "that must be difficult",
+                "i can imagine this is hard",
+                # additional emotion / empathy cues
+                "i can see this is difficult",
+                "this must be overwhelming",
+                "i understand this is hard",
+                "i know this is difficult",
+            ]
         ):
             detected_stage = "emotion"
 

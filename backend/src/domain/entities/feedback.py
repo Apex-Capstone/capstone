@@ -17,11 +17,13 @@ class Feedback(Base):
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("sessions.id"), nullable=False, unique=True)
 
-    # Aggregate scores
-    empathy_score = Column(Float, default=0.0)              # composite empathy (from AFCE metrics)
-    communication_score = Column(Float, nullable=True)      # deprecated - stop computing, leave nullable
-    spikes_completion_score = Column(Float, default=0.0)    # % SPIKES stages hit
-    overall_score = Column(Float, default=0.0)              # weighted blend
+    # Aggregate scores (UI-facing, 0-100 unless noted)
+    empathy_score = Column(Float, default=0.0)              # UI empathy score (0-100)
+    communication_score = Column(Float, nullable=True)      # UI communication score (0-100)
+    clinical_reasoning_score = Column(Float, nullable=True) # UI clinical reasoning score (0-100)
+    professionalism_score = Column(Float, nullable=True)    # UI professionalism score (0-100)
+    spikes_completion_score = Column(Float, default=0.0)    # SPIKES completion metric (0-10)
+    overall_score = Column(Float, default=0.0)              # weighted blend (0-100)
 
     # ---- AFCE-structured empathy metrics
     eo_counts_by_dimension = Column(JSONType, nullable=True)  # {"Feeling": {"explicit": int, "implicit": int}, "Judgment": {...}, "Appreciation": {...}}
