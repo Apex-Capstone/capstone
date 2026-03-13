@@ -32,85 +32,86 @@ class StageTracker:
         current_stage = session.current_spikes_stage if session else None
         detected_stage: Optional[str] = None
 
-        # setting: greetings or introductions
-        if any(
-            phrase in text_lower
-            for phrase in ["hello", "hi ", "hi,", "good morning", "good afternoon", "i'm dr", "i am dr"]
-        ):
-            detected_stage = "setting"
+        # Define phrase buckets per stage
+        setting_cues = [
+            "hello", "hi ", "hi,", "good morning", "good afternoon",
+            "i'm dr", "i am dr",
+            "is this still a good time", "is this a good time",
+            "a good time to talk",
+            "comfortable here", "would you prefer a quieter room", "can we talk here",
+        ]
+        perception_cues = [
+            "what do you know", "what do you think", "how much do you know",
+            "what have you been thinking", "what have you been thinking about",
+            "what have you heard so far", "what have you been told",
+            "how are you feeling about",
+            "can you tell me what has been getting worse",
+            "can you tell me what part feels the hardest",
+            "can you tell me what", "tell me what symptoms",
+        ]
+        invitation_cues = [
+            "would you like", "would you like more details",
+            "would you like me to explain",
+            "should i explain",
+            "is it ok if i explain", "is it okay if i explain",
+            "would it be alright if i explain", "would it be all right if i explain",
+            "before we move on, is there anything else",
+            "anything else you're hoping to understand",
+            "anything important you haven't shared",
+            "do you have any other questions",
+        ]
+        knowledge_cues = [
+            "diagnosis", "results show", "the results show", "the scan shows",
+            "let me walk through what we know so far",
+            "let me walk through what we know",
+            "i'll explain what tests can help",
+            "i'll explain what tests", "what tests can help us understand",
+        ]
+        emotion_cues = [
+            "i hear you",
+            "i understand", "i understand how", "i understand that",
+            "that sounds difficult",
+            "it makes sense you'd feel", "it makes sense that you'd feel",
+            "it makes sense that", "anyone would feel",
+            "i'm sorry", "sorry that", "sorry it's been stressful",
+        ]
+        strategy_cues = [
+            "here's our plan", "here is our plan",
+            "next steps", "from here on", "going forward",
+            "we'll check", "we will check",
+            "we'll review", "we will review",
+            "we'll support you", "i'll support you",
+            "let's schedule", "let us schedule",
+        ]
 
-        # perception: questions about patient's understanding and perspective
-        elif any(
-            phrase in text_lower
-            for phrase in [
-                "understand",
-                "what do you know",
-                "what do you think",
-                "how much do you know",
-                # additional perception / understanding probes
-                "what have you been thinking",
-                "what have you been thinking about",
-                "what have you heard so far",
-                "what have you been told",
-                "how are you feeling about",
-            ]
-        ):
-            detected_stage = "perception"
+        # Collect all candidate stages with simple matching
+        candidates: set[str] = set()
+        if any(p in text_lower for p in setting_cues):
+            candidates.add("setting")
+        if any(p in text_lower for p in perception_cues):
+            candidates.add("perception")
+        if any(p in text_lower for p in invitation_cues):
+            candidates.add("invitation")
+        if any(p in text_lower for p in knowledge_cues):
+            candidates.add("knowledge")
+        if any(p in text_lower for p in emotion_cues):
+            candidates.add("emotion")
+        if any(p in text_lower for p in strategy_cues):
+            candidates.add("strategy")
 
-        # invitation: asking permission to explain
-        elif any(
-            phrase in text_lower
-            for phrase in [
-                "would you like",
-                "should i explain",
-                "is it ok if i explain",
-                "can i tell you more",
-                # additional invitation cues
-                "would it be alright if i explain",
-                "would it be all right if i explain",
-                "would it be okay if i explain",
-                "would you like me to explain",
-                "would you like more details",
-            ]
-        ):
-            detected_stage = "invitation"
+        # If we found any candidates, select one using precedence:
+        # strategy > knowledge > invitation > emotion > perception > setting
+        precedence = ["strategy", "knowledge", "invitation", "emotion", "perception", "setting"]
+        for stage in precedence:
+            if stage in candidates:
+                detected_stage = stage
+                break
 
-        # knowledge: explanation statements
-        elif any(
-            phrase in text_lower
-            for phrase in ["diagnosis", "results show", "the results show", "the scan shows"]
-        ):
-            detected_stage = "knowledge"
-
-        # emotion: empathy statements
-        elif any(
-            phrase in text_lower
-            for phrase in [
-                "sorry",
-                "i understand",
-                "that must be difficult",
-                "i can imagine this is hard",
-                # additional emotion / empathy cues
-                "i can see this is difficult",
-                "this must be overwhelming",
-                "i understand this is hard",
-                "i know this is difficult",
-            ]
-        ):
-            detected_stage = "emotion"
-
-        # strategy: treatment planning
-        elif any(
-            phrase in text_lower
-            for phrase in ["next steps", "treatment plan", "from here on", "going forward"]
-        ):
-            detected_stage = "strategy"
-
-        # If no explicit detection, default to current or initial stage
+        # If no explicit detection, fall back to current stage (if any), else None.
         if not detected_stage:
-            detected_stage = current_stage or "setting"
+            detected_stage = current_stage
 
-        new_stage = self.enforce_progression(current_stage, detected_stage)
+        new_stage = self.enforce_progression(current_stage, detected_stage) if detected_stage else detected_stage
         logger.info(f"SPIKES stage detected: {new_stage}")
         return new_stage
 
