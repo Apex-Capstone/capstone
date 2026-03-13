@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { fetchFeedback } from '@/api/feedback.api'
 import type { Feedback as FeedbackType } from '@/api/feedback.api'
+import { getSession } from '@/api/sessions.api'
+import type { SessionDetail } from '@/types/session'
 import { FeedbackChart } from '@/components/FeedbackChart'
+import { FeedbackConversationTimeline } from '@/components/FeedbackConversationTimeline'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 export const Feedback = () => {
   const { sessionId } = useParams<{ sessionId: string }>()
   const [feedback, setFeedback] = useState<FeedbackType | null>(null)
+  const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -17,10 +21,14 @@ export const Feedback = () => {
       if (!sessionId) return
 
       try {
-        const data = await fetchFeedback(sessionId)
-        setFeedback(data)
+        const [feedbackData, sessionData] = await Promise.all([
+          fetchFeedback(sessionId),
+          getSession(Number(sessionId)),
+        ])
+        setFeedback(feedbackData)
+        setSessionDetail(sessionData)
       } catch (error) {
-        console.error('Failed to fetch feedback:', error)
+        console.error('Failed to fetch feedback or session detail:', error)
       } finally {
         setLoading(false)
       }
@@ -207,6 +215,11 @@ export const Feedback = () => {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Conversation Timeline */}
+              {sessionDetail && sessionDetail.turns && sessionDetail.turns.length > 0 && (
+                <FeedbackConversationTimeline turns={sessionDetail.turns} />
+              )}
 
               {/* Original metrics chart */}
               <div className="grid gap-6 lg:grid-cols-2">

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Mic, Send, Clock, PhoneOff } from 'lucide-react'
+import { SpikesProgressBar } from '@/components/SpikesProgressBar'
 
 export const CaseDetail = () => {
   const { caseId } = useParams<{ caseId: string }>()
@@ -266,10 +267,10 @@ export const CaseDetail = () => {
 
               <Card className="bg-orange-50 border-orange-200">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">SPIKES Stage</CardTitle>
+                  <CardTitle className="text-sm font-medium">SPIKES</CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0 text-orange-700 font-semibold capitalize">
-                  {currentSpikesStage}
+                <CardContent className="pt-0">
+                  <SpikesProgressBar currentStage={currentSpikesStage} />
                 </CardContent>
               </Card>
             </div>
@@ -329,7 +330,7 @@ export const CaseDetail = () => {
                 </Button>
               </div>
               <div className="mt-2 flex justify-between items-center text-xs text-gray-500">
-                <span>Session time: {formatTime(sessionElapsed)} • SPIKES: {currentSpikesStage}</span>
+                <span>Session time: {formatTime(sessionElapsed)}</span>
                 {sessionId && <span>Session ID: {sessionId}</span>}
               </div>
             </form>

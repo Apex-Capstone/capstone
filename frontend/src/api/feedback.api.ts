@@ -1,6 +1,5 @@
 import api from '@/api/client'
 
-// If you already have a shared type, import it instead of redeclaring.
 export interface Feedback {
   sessionId: string
   caseId: string
@@ -33,37 +32,48 @@ export interface Feedback {
   }
 }
 
-// Real endpoint (adjust path if your BE differs)
 export const fetchFeedback = async (sessionId: string): Promise<Feedback> => {
-  try {
-    const { data } = await api.get(`/v1/feedback/${sessionId}`)
-    return data
-  } catch (e) {
-    // Optional: dev fallback if BE isn’t implemented yet
-    console.warn('[fetchFeedback] falling back to mock:', e)
-    return {
-      sessionId,
-      caseId: '1',
-      overallScore: 85,
-      strengths: ['Excellent use of empathetic language'],
-      areasForImprovement: ['Could have explored emotions more deeply'],
-      recommendations: ['Practice Ask–Tell–Ask'],
-      metrics: {
-        communication: 88,
-        clinicalReasoning: 82,
-        empathy: 80,
-        professionalism: 90,
-      },
-      createdAt: new Date().toISOString(),
-      spikesMetrics: {
-        setting: 92, perception: 85, invitation: 78,
-        knowledge: 88, emotions: 75, strategy: 82,
-      },
-      conversationMetrics: { empathyScore: 80, openQuestionRatio: 0.65 },
-      dialogueExamples: {
-        strong: [{ text: 'I can see this is weighing on you.', context: 'Emotions' }],
-        weak: [{ text: 'Don’t worry.', context: 'After diagnosis', improvement: 'Acknowledge feelings first.' }],
-      },
-    }
+  const { data } = await api.get(`/v1/sessions/${sessionId}/feedback`)
+
+  return {
+    sessionId: String(data.session_id),
+    caseId: data.case_id != null ? String(data.case_id) : '',
+    overallScore: data.overall_score ?? 0,
+    strengths: data.strengths
+      ? typeof data.strengths === 'string'
+        ? data.strengths.split('\n')
+        : [data.strengths]
+      : [],
+    areasForImprovement: data.areas_for_improvement
+      ? typeof data.areas_for_improvement === 'string'
+        ? data.areas_for_improvement.split('\n')
+        : [data.areas_for_improvement]
+      : [],
+    recommendations: [],
+    metrics: {
+      communication: data.communication_score ?? 0,
+      clinicalReasoning: data.clinical_reasoning_score ?? 0,
+      empathy: data.empathy_score ?? 0,
+      professionalism: data.professionalism_score ?? 0,
+    },
+    createdAt: data.created_at ?? new Date().toISOString(),
+    spikesMetrics: data.spikes_coverage
+      ? {
+          setting: 0,
+          perception: 0,
+          invitation: 0,
+          knowledge: 0,
+          emotions: 0,
+          strategy: 0,
+        }
+      : undefined,
+    conversationMetrics:
+      data.question_breakdown != null
+        ? {
+            empathyScore: data.empathy_score ?? 0,
+            openQuestionRatio: data.question_breakdown.ratio_open ?? 0,
+          }
+        : undefined,
+    dialogueExamples: undefined,
   }
 }

@@ -339,6 +339,7 @@ export const Research = () => {
                           <th className="text-left py-2">Gender</th>
                           <th className="text-left py-2">Empathy Score</th>
                           <th className="text-left py-2">Communication</th>
+                          <th className="text-left py-2">SPIKES Stage</th>
                           <th className="text-left py-2">Clinical Score</th>
                           <th className="text-left py-2">Timestamp</th>
                           {user?.role === 'admin' && (
@@ -364,6 +365,9 @@ export const Research = () => {
                                   {(session.scores.empathy ?? 0).toFixed(0)}%
                                 </span>
                               </div>
+                            </td>
+                            <td className="py-2 capitalize">
+                              {session.spikes_stage ?? '—'}
                             </td>
                             <td className="py-2">
                               <div className="flex items-center gap-2">
