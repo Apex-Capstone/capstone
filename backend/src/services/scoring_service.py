@@ -50,7 +50,8 @@ class ScoringService:
         return value if isinstance(value, (dict, list)) else None
 
     def _clamp_score(self, score: float) -> float:
-        """Clamp score to [0, 100]."""
+        """Round to 2 decimals and clamp score to [0, 100]."""
+        score = round(float(score), 2)
         return max(0.0, min(100.0, score))
 
     async def generate_feedback(self, session_id: int) -> FeedbackResponse:
@@ -93,7 +94,7 @@ class ScoringService:
         latency_ms_avg = self._calculate_latency_ms_avg(turns)
 
         # ---- UI-facing composite scores (0-100)
-
+        
         # Empathy score: EO coverage + empathy response frequency
         total_eos = linkage_stats.get("total_eos", 0) if linkage_stats else 0
         addressed_count = linkage_stats.get("addressed_count", 0) if linkage_stats else 0
@@ -102,6 +103,9 @@ class ScoringService:
         eo_coverage = (addressed_count / total_eos) if total_eos > 0 else 0.0
         empathy_frequency = (empathy_response_count / total_clinician_turns) if total_clinician_turns > 0 else 0.0
         empathy_score = (0.7 * eo_coverage + 0.3 * empathy_frequency) * 100.0
+        
+        # Addressed rate for EO→response performance; if no EOs, treat as fully addressed.
+        addressed_rate = (addressed_count / total_eos) if total_eos > 0 else 1.0
 
         # Communication score: SPIKES coverage + open-question ratio (with safety handling)
         spikes_coverage_percent = 0.0
@@ -112,7 +116,7 @@ class ScoringService:
             ratio_open = float(question_breakdown.get("ratio_open", 0.0)) * 100.0
         communication_score = (0.7 * spikes_coverage_percent) + (0.3 * ratio_open)
 
-        # Clinical reasoning score: knowledge + strategy + perception partial credit
+        # Clinical reasoning score: SPIKES reasoning stages modulated by empathy performance
         stages_reached = set()
         for turn in turns:
             if turn.spikes_stage:
@@ -123,11 +127,22 @@ class ScoringService:
                     stages_reached.add("strategy")
                 if stage in ["perception", "p"]:
                     stages_reached.add("perception")
-
+        
+        # Stage presence indicators
         knowledge_detected = 1.0 if "knowledge" in stages_reached else 0.0
         strategy_detected = 1.0 if "strategy" in stages_reached else 0.0
         perception_detected = 1.0 if "perception" in stages_reached else 0.0
-        clinical_reasoning_score = ((knowledge_detected + strategy_detected) / 2.0) * 100.0 + (perception_detected * 10.0)
+
+        # Stage score: perception (20), knowledge (40), strategy (40) → max 100
+        stage_score = (
+            perception_detected * 20.0
+            + knowledge_detected * 40.0
+            + strategy_detected * 40.0
+        )
+        
+        # Empathy modifier: 0.5–1.0 based on addressed_rate
+        empathy_modifier = 0.5 + 0.5 * max(0.0, min(1.0, addressed_rate))
+        clinical_reasoning_score = stage_score * empathy_modifier
 
         # Professionalism score: calm clinician turns, penalty for unclear tone
         total_tone_turns = 0
@@ -163,7 +178,7 @@ class ScoringService:
         professionalism_score = self._clamp_score(professionalism_score)
         overall_score = self._clamp_score(round(overall_score, 2))
 
-        # SPIKES completion score (0-10)
+        # SPIKES completion score (0-100, UI-facing)
         spikes_score = self._calculate_spikes_completion(session, turns, all_spans)
         
         # Placeholder fields for fairness/reliability (only include if populated)
@@ -260,6 +275,16 @@ class ScoringService:
 
         # Create response with timeline and suggestions
         response = FeedbackResponse.model_validate(saved_feedback)
+
+        # Detach the ORM instance so that deserialized JSON fields (dict/list)
+        # on saved_feedback do not get re-flushed on later commits in the same
+        # SQLAlchemy session (important for SQLite test/eval runs).
+        try:
+            self.db.expunge(saved_feedback)
+        except Exception:
+            # Best-effort; if expunge fails, we still return the response.
+            pass
+
         return response.model_copy(
             update={
                 "timeline_events": timeline_events or None,
@@ -836,112 +861,47 @@ class ScoringService:
         turns: list,
         all_spans: list,
     ) -> float:
-        """Calculate SPIKES protocol completion score.
+        """Calculate SPIKES protocol completion score as simple coverage.
         
-        Components:
-        - Coverage (0-1): 40% weight
-        - Sequence Correctness (0-1): 40% weight
-        - Empathy During E Stage (0-1): 20% weight
+        Returns a 0–100 score based on how many of the six canonical SPIKES
+        stages were covered at least once in the conversation.
         """
-        # Extract response spans for empathy detection
-        response_spans = [s for s in all_spans if s.get("span_type") == "response"]
-        
-        # 3.1 Coverage Component
-        stages_reached = set()
+        # Map various labels to the canonical six SPIKES stages
+        stage_map = {
+            "s": "setting",
+            "setting": "setting",
+            "p": "perception",
+            "perception": "perception",
+            "i": "invitation",
+            "invitation": "invitation",
+            "k": "knowledge",
+            "knowledge": "knowledge",
+            "e": "empathy",
+            "emotion": "empathy",
+            "empathy": "empathy",
+            "s2": "strategy",
+            "strategy": "strategy",
+            "summary": "strategy",
+        }
+
+        covered: set[str] = set()
         for turn in turns:
-            if turn.spikes_stage:
-                # Normalize stage names (handle both "summary" and "S2", etc.)
-                stage = turn.spikes_stage.lower()
-                # Map common variations
-                if stage in ["s2", "strategy", "summary"]:
-                    stage = "strategy"
-                elif stage == "s" or stage == "setting":
-                    # Skip Setting from denominator
-                    continue
-                stages_reached.add(stage)
-        
-        # Consider only P, I, K, E, Strategy (exclude Setting)
-        target_stages = {"perception", "invitation", "knowledge", "empathy", "strategy"}
-        covered_stages = stages_reached & target_stages
-        
-        coverage_fraction = len(covered_stages) / len(target_stages) if target_stages else 0.0
-        coverage_score = coverage_fraction  # in [0, 1]
-        
-        # 3.2 Sequence Correctness Component
-        # Expected order: P → I → K → E → Strategy
-        expected_order = ["perception", "invitation", "knowledge", "empathy", "strategy"]
-        
-        # Get timestamps/turn_numbers for each stage
-        stage_timestamps = {}
-        for turn in turns:
-            if turn.spikes_stage:
-                stage = turn.spikes_stage.lower()
-                # Map variations
-                if stage in ["s2", "strategy", "summary"]:
-                    stage = "strategy"
-                elif stage in ["s", "setting"]:
-                    continue
-                
-                if stage in expected_order:
-                    # Use turn_number as proxy for sequence (lower = earlier)
-                    if stage not in stage_timestamps:
-                        stage_timestamps[stage] = turn.turn_number
-        
-        # Check consecutive pairs
-        correct_pairs = 0
-        num_pairs_present = 0
-        
-        for i in range(len(expected_order) - 1):
-            earlier_stage = expected_order[i]
-            later_stage = expected_order[i + 1]
-            
-            # Both stages must be present to form a pair
-            if earlier_stage in stage_timestamps and later_stage in stage_timestamps:
-                num_pairs_present += 1
-                # Check if earlier stage occurs before later stage
-                if stage_timestamps[earlier_stage] < stage_timestamps[later_stage]:
-                    correct_pairs += 1
-        
-        if num_pairs_present == 0:
-            sequence_fraction = 0.0
-        else:
-            sequence_fraction = correct_pairs / num_pairs_present
-        
-        sequence_score = sequence_fraction  # in [0, 1]
-        
-        # 3.3 Empathy During E Stage Component
-        # Find turns tagged as empathy stage
-        empathy_turns = [turn for turn in turns if turn.spikes_stage and turn.spikes_stage.lower() == "empathy"]
-        
-        if not empathy_turns:
-            empathy_during_e = 0.0
-        else:
-            # For each empathy turn, check if it has response spans
-            empathy_turns_with_response = 0
-            for empathy_turn in empathy_turns:
-                turn_num = empathy_turn.turn_number
-                # Check if there are any response spans in this turn
-                has_response = any(
-                    resp_span.get("turn_number") == turn_num 
-                    for resp_span in response_spans
-                )
-                if has_response:
-                    empathy_turns_with_response += 1
-            
-            total_empathy_turns = len(empathy_turns)
-            empathy_during_e = empathy_turns_with_response / total_empathy_turns if total_empathy_turns > 0 else 0.0
-        
-        # 3.4 Final SPIKES Score
-        spikes_score_0_1 = (
-            0.4 * coverage_score +
-            0.4 * sequence_score +
-            0.2 * empathy_during_e
-        )
-        
-        spikes_completion_score = spikes_score_0_1 * 10.0
-        
-        # Clamp to [0, 10] and round
-        spikes_completion_score = min(10.0, max(0.0, spikes_completion_score))
+            if not turn.spikes_stage:
+                continue
+            raw = str(turn.spikes_stage).strip().lower()
+            canonical = stage_map.get(raw)
+            if canonical:
+                covered.add(canonical)
+
+        # Canonical six stages
+        canonical_stages = ["setting", "perception", "invitation", "knowledge", "empathy", "strategy"]
+        total_stages = len(canonical_stages)
+
+        covered_count = len(covered & set(canonical_stages))
+        coverage_fraction = covered_count / total_stages if total_stages > 0 else 0.0
+
+        spikes_completion_score = coverage_fraction * 100.0
+        spikes_completion_score = max(0.0, min(100.0, spikes_completion_score))
         return round(spikes_completion_score, 2)
     
     def _calculate_question_breakdown(self, turns: list) -> dict[str, Any]:

@@ -1,6 +1,6 @@
 """Feedback repository for database operations."""
 
-from typing import Optional
+from typing import Optional, Any
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -13,6 +13,50 @@ class FeedbackRepository:
     
     def __init__(self, db: Session):
         self.db = db
+
+    def _serialize_json_fields(self, feedback: Feedback) -> None:
+        """Ensure JSON-ish fields are stored as strings (for SQLite compatibility).
+
+        Feedback uses Text columns (JSONType) for many dict/list fields. When running
+        against SQLite, we must not persist raw dict/list objects. This helper
+        defensively json-serializes any such values. On Postgres (where Text is also
+        acceptable for pre-serialized JSON), this is a no-op behavior change.
+        """
+        import json
+
+        json_fields: tuple[str, ...] = (
+            "eo_counts_by_dimension",
+            "elicitation_counts_by_type",
+            "response_counts_by_type",
+            "eo_counts",
+            "linkage_stats",
+            "missed_opportunities",
+            "missed_opportunities_by_dimension",
+            "eo_to_elicitation_links",
+            "eo_to_response_links",
+            "response_types",
+            "spikes_coverage",
+            "spikes_timestamps",
+            "spikes_strategies",
+            "question_breakdown",
+            "bias_probe_info",
+            "evaluator_meta",
+        )
+
+        for field in json_fields:
+            value: Any = getattr(feedback, field, None)
+            if value is None:
+                continue
+            # If already a string, assume it's serialized JSON
+            if isinstance(value, str):
+                continue
+            # For dict/list (or other JSON-serializable objects), serialize
+            try:
+                serialized = json.dumps(value)
+            except TypeError:
+                # Best-effort: fall back to repr() to avoid breaking persistence
+                serialized = json.dumps(repr(value))
+            setattr(feedback, field, serialized)
     
     def get_by_id(self, feedback_id: int) -> Optional[Feedback]:
         """Get feedback by ID."""
@@ -43,6 +87,7 @@ class FeedbackRepository:
     
     def create(self, feedback: Feedback) -> Feedback:
         """Create new feedback."""
+        self._serialize_json_fields(feedback)
         self.db.add(feedback)
         self.db.commit()
         self.db.refresh(feedback)
@@ -50,6 +95,7 @@ class FeedbackRepository:
     
     def update(self, feedback: Feedback) -> Feedback:
         """Update existing feedback."""
+        self._serialize_json_fields(feedback)
         self.db.commit()
         self.db.refresh(feedback)
         return feedback
