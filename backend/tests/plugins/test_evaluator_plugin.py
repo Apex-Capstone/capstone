@@ -62,13 +62,9 @@ def seeded_session(test_db):
 
 
 @pytest.mark.asyncio
-async def test_evaluator_returns_feedback_response(test_db, seeded_session, monkeypatch: pytest.MonkeyPatch):
+async def test_evaluator_returns_feedback_response(test_db, seeded_session):
+    """ApexHybridEvaluator.evaluate returns a FeedbackResponse when called directly."""
     evaluator = ApexHybridEvaluator()
-
-    # Ensure ScoringService.generate_feedback resolves this evaluator via its local import
-    import services.scoring_service as scoring_service_module
-
-    monkeypatch.setattr(scoring_service_module, "get_evaluator", lambda: evaluator)
 
     feedback = await evaluator.evaluate(test_db, seeded_session.id)
 
@@ -76,12 +72,9 @@ async def test_evaluator_returns_feedback_response(test_db, seeded_session, monk
 
 
 @pytest.mark.asyncio
-async def test_evaluator_scores_within_expected_range(test_db, seeded_session, monkeypatch: pytest.MonkeyPatch):
+async def test_evaluator_scores_within_expected_range(test_db, seeded_session):
+    """Evaluator scores are in [0, 100]."""
     evaluator = ApexHybridEvaluator()
-
-    import services.scoring_service as scoring_service_module
-
-    monkeypatch.setattr(scoring_service_module, "get_evaluator", lambda: evaluator)
 
     feedback = await evaluator.evaluate(test_db, seeded_session.id)
 

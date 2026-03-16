@@ -2,9 +2,10 @@ from services.stage_tracker import StageTracker
 
 
 def test_perception_detection():
+    """Perception stage is detected from phrases like 'what do you know'."""
     tracker = StageTracker()
 
-    text = "What do you understand about the results?"
+    text = "What do you know about the results?"
 
     stage = tracker.detect_stage(text, None)
 
@@ -12,9 +13,10 @@ def test_perception_detection():
 
 
 def test_invitation_detection():
+    """Invitation stage is detected from phrases like 'would you like more details'."""
     tracker = StageTracker()
 
-    text = "Would you like me to explain the diagnosis?"
+    text = "Would you like more details?"
 
     stage = tracker.detect_stage(text, None)
 

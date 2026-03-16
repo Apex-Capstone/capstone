@@ -98,11 +98,11 @@ def seeded_session(test_db):
 
 @pytest.mark.asyncio
 async def test_dialogue_service_uses_patient_model_plugin(test_db, seeded_session, monkeypatch: pytest.MonkeyPatch):
-    from core import plugin_manager
+    import services.dialogue_service as dialogue_service_module
 
     dummy_patient_model = _DummyPatientModel()
-    # Ensure DialogueService gets our dummy plugin instance
-    monkeypatch.setattr(plugin_manager, "get_patient_model", lambda: dummy_patient_model)
+    # Patch where get_patient_model is used (dialogue_service imports it at load time)
+    monkeypatch.setattr(dialogue_service_module, "get_patient_model", lambda: dummy_patient_model)
 
     # Use a simple NLU adapter; DialogueService wraps it in NLUPipeline
     nlu = SimpleRuleNLU()
