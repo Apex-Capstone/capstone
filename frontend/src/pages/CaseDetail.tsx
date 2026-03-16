@@ -218,11 +218,11 @@ export const CaseDetail = () => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="h-screen flex flex-col">
       <Navbar />
-      <div className="flex flex-1">
+      <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main className="flex-1 md:ml-64 flex flex-col">
+        <main className="flex-1 overflow-y-auto md:ml-64 flex flex-col">
           {/* Header */}
           <div className="border-b bg-white px-4 py-4 sm:px-6 lg:px-8">
             <nav className="mb-3 text-sm text-gray-500">

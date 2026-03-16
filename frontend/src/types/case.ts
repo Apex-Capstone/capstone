@@ -9,6 +9,7 @@ export interface CaseDTO {
   category?: string | null
   patient_background?: string | null
   expected_spikes_flow?: string | null
+  evaluator_plugin?: string | null
   created_at: string
   updated_at: string
 }
@@ -29,6 +30,7 @@ export interface Case {
   category?: string
   patientBackground?: string
   expectedSpikesFlow?: string
+  evaluatorPlugin?: string | null
   createdAt: string
   updatedAt: string
 }

@@ -122,11 +122,11 @@ export const Research = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col">
+      <div className="h-screen flex flex-col">
         <Navbar />
-        <div className="flex flex-1">
+        <div className="flex flex-1 min-h-0">
           <Sidebar />
-          <main className="flex-1 md:ml-64">
+          <main className="flex-1 overflow-y-auto md:ml-64">
             <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
               <div className="mb-8">
                 <div className="h-8 w-64 bg-gray-200 rounded animate-pulse mb-2"></div>
@@ -161,11 +161,11 @@ export const Research = () => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="h-screen flex flex-col">
       <Navbar />
-      <div className="flex flex-1">
+      <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main className="flex-1 md:ml-64">
+        <main className="flex-1 overflow-y-auto md:ml-64">
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             {/* TODO: FR-8, FR-15 - Research API view with read-only analytics */}
             <nav className="mb-4 text-sm text-gray-500">

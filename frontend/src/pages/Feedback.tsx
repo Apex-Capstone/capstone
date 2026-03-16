@@ -39,11 +39,11 @@ export const Feedback = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col">
+      <div className="h-screen flex flex-col">
         <Navbar />
-        <div className="flex flex-1">
+        <div className="flex flex-1 min-h-0">
           <Sidebar />
-          <main className="flex-1 md:ml-64">
+          <main className="flex-1 overflow-y-auto md:ml-64">
             <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
               {/* TODO: NFR 7.2, 7.3 - Skeleton loader for better UX */}
               <div className="mb-8">
@@ -79,11 +79,11 @@ export const Feedback = () => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="h-screen flex flex-col">
       <Navbar />
-      <div className="flex flex-1">
+      <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main className="flex-1 md:ml-64">
+        <main className="flex-1 overflow-y-auto md:ml-64">
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             {/* TODO: FR-6, FR-12 - Enhanced breadcrumbs and session info */}
             <nav className="mb-4 text-sm text-gray-500">

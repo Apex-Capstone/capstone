@@ -174,3 +174,23 @@ export async function fetchAdminPlugins(): Promise<PluginsResponse> {
   const { data } = await api.get<PluginsResponse>(`${BASE}/plugins`)
   return data
 }
+
+/** Plugin discovery: name + version for dropdowns (e.g. case evaluator). */
+export interface PluginInfo {
+  name: string
+  version: string
+}
+
+export interface PluginDiscoveryResponse {
+  evaluators: PluginInfo[]
+  patient_models: PluginInfo[]
+  metrics: PluginInfo[]
+}
+
+/**
+ * Fetch registered plugins (name + version). Admin only. Use for case evaluator dropdown.
+ */
+export async function fetchAdminPluginRegistry(): Promise<PluginDiscoveryResponse> {
+  const { data } = await api.get<PluginDiscoveryResponse>(`${BASE}/plugin-registry`)
+  return data
+}
