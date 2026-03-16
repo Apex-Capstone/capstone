@@ -1,10 +1,24 @@
 """Application settings using Pydantic Settings."""
 
+import json
 from functools import lru_cache
 from typing import List
 
-from pydantic import Field
+from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _parse_cors_origins(v: str) -> List[str]:
+    """Parse CORS_ORIGINS: JSON array string or comma-separated URLs."""
+    if not v or not v.strip():
+        return ["http://localhost:5173", "http://localhost:3000"]
+    v = v.strip()
+    if v.startswith("["):
+        try:
+            return json.loads(v)
+        except json.JSONDecodeError:
+            pass
+    return [origin.strip() for origin in v.split(",") if origin.strip()]
 
 
 class Settings(BaseSettings):
@@ -22,8 +36,17 @@ class Settings(BaseSettings):
     algorithm: str = Field(default="HS256")
     access_token_expire_minutes: int = Field(default=30)
     
-    # CORS
-    cors_origins: List[str] = Field(default=["http://localhost:5173", "http://localhost:3000"])
+    # CORS: stored as string so env never triggers json.loads; parsed via computed_field.
+    # Set CORS_ORIGINS to e.g. https://apex-client.onrender.com or ["https://..."]
+    cors_origins_raw: str = Field(
+        default='["http://localhost:5173","http://localhost:3000"]',
+        alias="CORS_ORIGINS",
+        description="Comma-separated URLs or JSON array",
+    )
+    
+    @computed_field
+    def cors_origins(self) -> List[str]:
+        return _parse_cors_origins(self.cors_origins_raw)
     
     # OpenAI
     openai_api_key: str = Field(...)
