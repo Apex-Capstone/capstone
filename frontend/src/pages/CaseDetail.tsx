@@ -88,6 +88,16 @@ export const CaseDetail = () => {
             const now = new Date()
             setStartTime(now)
             setSessionElapsed(0)
+
+            // Always load session detail so we get turns for both new and resumed sessions
+            const detail = await getSession(session.id)
+            const restoredMessages: Message[] = detail.turns.map((turn) => ({
+              id: `turn-${turn.id}`,
+              role: turn.role as 'user' | 'assistant',
+              content: turn.text,
+              timestamp: turn.timestamp,
+            }))
+            setMessages(restoredMessages)
           } catch (creationError) {
             createdSessionForCase.current = null
             throw creationError
