@@ -6,6 +6,7 @@ from typing import Any, Literal
 from sqlalchemy.orm import Session
 
 from core.errors import NotFoundError
+from core.plugin_manager import get_evaluator
 from domain.entities.feedback import Feedback
 from domain.models.sessions import FeedbackResponse, SuggestedResponse, TimelineEvent
 from repositories.feedback_repo import FeedbackRepository
@@ -54,8 +55,8 @@ class ScoringService:
         score = round(float(score), 2)
         return max(0.0, min(100.0, score))
 
-    async def generate_feedback(self, session_id: int) -> FeedbackResponse:
-        """Generate comprehensive feedback for a session."""
+    async def _generate_feedback_impl(self, session_id: int) -> FeedbackResponse:
+        """Internal implementation of feedback generation used by the default Evaluator."""
         session = self.session_repo.get_by_id(session_id)
         if not session:
             raise NotFoundError(f"Session {session_id} not found")
@@ -170,7 +171,7 @@ class ScoringService:
             + 0.20 * clinical_reasoning_score
             + 0.10 * professionalism_score
         )
-
+        
         # Clamp all scores to [0, 100]
         empathy_score = self._clamp_score(empathy_score)
         communication_score = self._clamp_score(communication_score)
@@ -291,6 +292,11 @@ class ScoringService:
                 "suggested_responses": suggested_responses or None,
             }
         )
+
+    async def generate_feedback(self, session_id: int) -> FeedbackResponse:
+        """Generate comprehensive feedback for a session via the Evaluator plugin."""
+        evaluator = get_evaluator()
+        return await evaluator.evaluate(self.db, session_id)
     
     # AFCE span-based metric calculation methods
     
