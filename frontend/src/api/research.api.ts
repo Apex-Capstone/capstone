@@ -1,5 +1,5 @@
 // src/api/research.api.ts
-import api from '@/api/client'
+// import api from '@/api/client'
 
 export interface ResearchData {
   anonymizedSessions: Array<{
@@ -15,7 +15,7 @@ export interface ResearchData {
   }
 }
 
-const BASE = '/v1/research'
+// const BASE = '/v1/research'
 
 export const fetchResearchData = async (): Promise<ResearchData> => {
   // Real call:
