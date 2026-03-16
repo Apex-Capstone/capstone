@@ -79,9 +79,6 @@ export const Login = () => {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Signing in...' : 'Sign in'}
             </Button>
-            <p className="text-xs text-center text-gray-500 mt-4">
-              Demo: Use any email/password or admin@example.com / admin123 for admin access
-            </p>
           </form>
         </CardContent>
       </Card>
