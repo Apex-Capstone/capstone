@@ -1,13 +1,23 @@
+import type React from 'react'
 import type { Turn } from '@/types/session'
+import type { Feedback } from '@/api/feedback.api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
 interface FeedbackConversationTimelineProps {
   turns: Turn[]
+  feedback: Feedback
 }
 
 type MetricsBadges = {
   labels: string[]
+}
+
+type Span = {
+  id?: string | number
+  span_type?: string
+  start: number
+  end: number
 }
 
 const parseMetricsBadges = (metricsJson?: string): MetricsBadges => {
@@ -86,15 +96,247 @@ const mapRoleToSide = (role: string): 'left' | 'right' => {
   return 'left'
 }
 
+type EmpathyMarkerType = 'empathy_response' | 'empathy_opportunity' | 'missed_opportunity'
+
+type EmpathyMarkersByTurn = Record<
+  number,
+  {
+    types: EmpathyMarkerType[]
+  }
+>
+
+const parseSpans = (spansJson?: unknown): Span[] => {
+  if (!spansJson) return []
+
+  try {
+    const raw =
+      typeof spansJson === 'string'
+        ? JSON.parse(spansJson)
+        : spansJson
+
+    if (!Array.isArray(raw)) {
+      return []
+    }
+
+    // Normalise into internal Span shape, supporting both start/end and start_char/end_char.
+    return raw
+      .map((s: any): Span | null => {
+        if (!s) return null
+
+        const start: number =
+          typeof s.start === 'number'
+            ? s.start
+            : typeof s.start_char === 'number'
+            ? s.start_char
+            : -1
+        const end: number =
+          typeof s.end === 'number'
+            ? s.end
+            : typeof s.end_char === 'number'
+            ? s.end_char
+            : -1
+
+        if (start < 0 || end <= start) {
+          return null
+        }
+
+        return {
+          id: s.id ?? s.span_id,
+          span_type: s.span_type,
+          start,
+          end,
+        }
+      })
+      .filter((s: Span | null): s is Span => s !== null)
+  } catch {
+    return []
+  }
+}
+
+const buildEmpathyTimelineMarkers = (
+  feedback: Feedback,
+  turns: Array<Turn & { spansJson?: string }>,
+): EmpathyMarkersByTurn => {
+  const markers: EmpathyMarkersByTurn = {}
+
+  if (!feedback || !Array.isArray(turns) || turns.length === 0) {
+    return markers
+  }
+
+  // 1) Per-turn markers based on span types (eo / response / elicitation)
+  turns.forEach((turn) => {
+    const spans = parseSpans(turn.spansJson)
+    if (!spans.length) {
+      return
+    }
+
+    const tn = turn.turnNumber
+    if (!markers[tn]) {
+      markers[tn] = { types: [] }
+    }
+
+    if (
+      spans.some(
+        (s) =>
+          s.span_type === 'eo' ||
+          s.span_type === 'empathy_opportunity' ||
+          s.span_type === 'eo_missed',
+      )
+    ) {
+      if (!markers[tn].types.includes('empathy_opportunity')) {
+        markers[tn].types.push('empathy_opportunity')
+      }
+    }
+
+    if (
+      spans.some(
+        (s) =>
+          s.span_type === 'response' ||
+          s.span_type === 'empathy_response',
+      )
+    ) {
+      if (!markers[tn].types.includes('empathy_response')) {
+        markers[tn].types.push('empathy_response')
+      }
+    }
+  })
+
+  // 2) Overlay missed opportunities using backend summary (has turn_number)
+  if (Array.isArray(feedback.missed_opportunities)) {
+    feedback.missed_opportunities.forEach((entry) => {
+      const tn = typeof (entry as any)?.turn_number === 'number'
+        ? (entry as any).turn_number
+        : undefined
+      if (!tn) return
+
+      if (!markers[tn]) {
+        markers[tn] = { types: [] }
+      }
+      if (!markers[tn].types.includes('empathy_opportunity')) {
+        markers[tn].types.push('empathy_opportunity')
+      }
+      if (!markers[tn].types.includes('missed_opportunity')) {
+        markers[tn].types.push('missed_opportunity')
+      }
+    })
+  }
+
+  return markers
+}
+
+const renderTextWithSpans = (
+  text: string,
+  spansJson: string | undefined,
+  feedback: Feedback,
+) => {
+  const spans = parseSpans(spansJson)
+  if (spans.length === 0) {
+    return text
+  }
+
+  const eoSpanIds = new Set<string>()
+  const responseSpanIds = new Set<string>()
+  const missedSpanIds = new Set<string>((feedback.missed_opportunities ?? []).map(String))
+
+  if (feedback.eo_to_response_links && typeof feedback.eo_to_response_links === 'object') {
+    Object.entries(feedback.eo_to_response_links).forEach(
+      ([eoSpanId, links]: [string, unknown]) => {
+        eoSpanIds.add(String(eoSpanId))
+        if (Array.isArray(links)) {
+          ;(links as any[]).forEach((link) => {
+            if (link?.target_span_id) {
+              responseSpanIds.add(String(link.target_span_id))
+            }
+          })
+        }
+      },
+    )
+  }
+
+  const pieces: Array<string | React.ReactNode> = []
+  let cursor = 0
+
+  const sorted = [...spans].sort((a, b) => a.start - b.start)
+
+  sorted.forEach((span, index) => {
+    if (span.start < cursor) {
+      return
+    }
+
+    if (span.start > cursor) {
+      pieces.push(text.slice(cursor, span.start))
+    }
+
+    const spanText = text.slice(span.start, span.end)
+
+    let className = ''
+    const spanId = span.id != null ? String(span.id) : undefined
+    const spanType = span.span_type ?? ''
+
+    // Priority: missed > EO > response, using either backend IDs or span_type hints
+    const isMissed =
+      (spanId && missedSpanIds.has(spanId)) || spanType === 'eo_missed' || spanType === 'missed'
+    const isEo =
+      (spanId && eoSpanIds.has(spanId)) ||
+      spanType === 'eo' ||
+      spanType === 'empathy_opportunity'
+    const isResponse =
+      (spanId && responseSpanIds.has(spanId)) ||
+      spanType === 'response' ||
+      spanType === 'empathy_response'
+    const isElicitation = spanType === 'elicitation'
+
+    if (isMissed) {
+      className = 'underline decoration-red-400 decoration-2 underline-offset-2'
+    } else if (isEo) {
+      className = 'underline decoration-amber-400 decoration-2 underline-offset-2'
+    } else if (isResponse) {
+      className = 'underline decoration-emerald-400 decoration-2 underline-offset-2'
+    } else if (isElicitation) {
+      className = 'underline decoration-blue-400 decoration-2 underline-offset-2'
+    }
+
+    pieces.push(
+      <span
+        key={`span-${index}`}
+        className={className}
+        title={
+          isMissed
+            ? 'Missed empathy opportunity'
+            : isEo
+            ? 'Empathy opportunity detected'
+            : isResponse
+            ? 'Empathic response'
+            : isElicitation
+            ? 'Elicitation question'
+            : undefined
+        }
+      >
+        {spanText}
+      </span>,
+    )
+
+    cursor = span.end
+  })
+
+  if (cursor < text.length) {
+    pieces.push(text.slice(cursor))
+  }
+
+  return pieces
+}
+
 export const FeedbackConversationTimeline = ({
   turns,
+  feedback,
 }: FeedbackConversationTimelineProps) => {
   const sortedTurns = [...turns].sort((a, b) => a.turnNumber - b.turnNumber)
+  const empathyMarkers = buildEmpathyTimelineMarkers(feedback, sortedTurns)
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Conversation Timeline</CardTitle>
+        <CardTitle>Conversation Analysis</CardTitle>
       </CardHeader>
       <CardContent>
         {sortedTurns.length === 0 ? (
@@ -106,6 +348,7 @@ export const FeedbackConversationTimeline = ({
               const side = mapRoleToSide(turn.role)
               const spikesStage = turn.spikesStage ?? '—'
               const { labels: metricBadges } = parseMetricsBadges(turn.metricsJson)
+              const markersForTurn = empathyMarkers[turn.turnNumber]
 
               return (
                 <div
@@ -151,7 +394,29 @@ export const FeedbackConversationTimeline = ({
                       </span>
                     </div>
 
-                    <p className="text-sm whitespace-pre-wrap">{turn.text}</p>
+                    <p className="text-sm whitespace-pre-wrap">
+                      {renderTextWithSpans(turn.text, turn.spansJson, feedback)}
+                    </p>
+
+                    {markersForTurn && markersForTurn.types.length > 0 && (
+                      <div className="mt-2 space-y-1 text-xs">
+                        {markersForTurn.types.includes('empathy_opportunity') && (
+                          <div className="font-medium text-amber-500">
+                            ⚠ Empathy Opportunity
+                          </div>
+                        )}
+                        {markersForTurn.types.includes('missed_opportunity') && (
+                          <div className="font-medium text-amber-600">
+                            ⚠ Missed Empathy Opportunity
+                          </div>
+                        )}
+                        {markersForTurn.types.includes('empathy_response') && (
+                          <div className="font-medium text-emerald-400">
+                            ✓ Empathy Response
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {metricBadges.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">

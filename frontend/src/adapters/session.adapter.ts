@@ -39,6 +39,7 @@ export function turnFromDTO(dto: TurnDTO): Turn {
     metricsJson: dto.metrics_json ?? undefined,
     spikesStage: dto.spikes_stage ?? undefined,
     timestamp: dto.timestamp,
+    spansJson: (dto as any).spans_json ?? undefined,
   }
 }
 

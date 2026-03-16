@@ -1,5 +1,23 @@
 import api from '@/api/client'
 
+export interface SpikesCoverage {
+  setting: boolean
+  perception: boolean
+  invitation: boolean
+  knowledge: boolean
+  emotions: boolean
+  strategy: boolean
+  coveredCount: number
+  total: number
+}
+
+export interface EmpathyLink {
+  source_span_id: string
+  target_span_id: string
+  relation_type: string
+  confidence: number
+}
+
 export interface Feedback {
   sessionId: string
   caseId: string
@@ -14,14 +32,7 @@ export interface Feedback {
     professionalism: number
   }
   createdAt: string
-  spikesMetrics?: {
-    setting: number
-    perception: number
-    invitation: number
-    knowledge: number
-    emotions: number
-    strategy: number
-  }
+  spikesCoverage?: SpikesCoverage
   conversationMetrics?: {
     empathyScore: number
     openQuestionRatio: number
@@ -30,10 +41,51 @@ export interface Feedback {
     strong: Array<{ text: string; context: string }>
     weak: Array<{ text: string; context: string; improvement: string }>
   }
+  eo_to_response_links?: Record<string, EmpathyLink[]>
+  eo_to_elicitation_links?: Record<string, EmpathyLink[]>
+  missed_opportunities?: Array<Record<string, unknown>>
+  eo_counts_by_dimension?: Record<string, unknown>
+  spikes_strategies?: Record<string, unknown>
 }
 
 export const fetchFeedback = async (sessionId: string): Promise<Feedback> => {
   const { data } = await api.get(`/v1/sessions/${sessionId}/feedback`)
+
+  let spikesCoverage: SpikesCoverage | undefined
+
+  if (data.spikes_coverage && typeof data.spikes_coverage === 'object') {
+    const coveredRaw = Array.isArray(data.spikes_coverage.covered)
+      ? data.spikes_coverage.covered
+      : []
+
+    const normalizedCovered = coveredRaw
+      .map((s: unknown) => (typeof s === 'string' ? s.toLowerCase() : ''))
+      .filter(Boolean)
+
+    const setting =
+      normalizedCovered.includes('setting') || normalizedCovered.includes('s')
+    const perception =
+      normalizedCovered.includes('perception') || normalizedCovered.includes('p')
+    const invitation =
+      normalizedCovered.includes('invitation') || normalizedCovered.includes('i')
+    const knowledge =
+      normalizedCovered.includes('knowledge') || normalizedCovered.includes('k')
+    const emotions =
+      normalizedCovered.includes('emotion') ||
+      normalizedCovered.includes('emotions') ||
+      normalizedCovered.includes('e')
+    const strategy =
+      normalizedCovered.includes('strategy') || normalizedCovered.includes('s2')
+
+    const stages = { setting, perception, invitation, knowledge, emotions, strategy }
+    const coveredCount = Object.values(stages).filter(Boolean).length
+
+    spikesCoverage = {
+      ...stages,
+      coveredCount,
+      total: 6,
+    }
+  }
 
   return {
     sessionId: String(data.session_id),
@@ -57,16 +109,7 @@ export const fetchFeedback = async (sessionId: string): Promise<Feedback> => {
       professionalism: data.professionalism_score ?? 0,
     },
     createdAt: data.created_at ?? new Date().toISOString(),
-    spikesMetrics: data.spikes_coverage
-      ? {
-          setting: 0,
-          perception: 0,
-          invitation: 0,
-          knowledge: 0,
-          emotions: 0,
-          strategy: 0,
-        }
-      : undefined,
+    spikesCoverage,
     conversationMetrics:
       data.question_breakdown != null
         ? {
@@ -75,5 +118,10 @@ export const fetchFeedback = async (sessionId: string): Promise<Feedback> => {
           }
         : undefined,
     dialogueExamples: undefined,
+    eo_to_response_links: data.eo_to_response_links ?? undefined,
+    eo_to_elicitation_links: data.eo_to_elicitation_links ?? undefined,
+    missed_opportunities: data.missed_opportunities ?? undefined,
+    eo_counts_by_dimension: data.eo_counts_by_dimension ?? undefined,
+    spikes_strategies: data.spikes_strategies ?? undefined,
   }
 }

@@ -117,43 +117,67 @@ export const Feedback = () => {
             <div className="space-y-8">
               {/* SPIKES Coverage Radar Chart & Key Metrics */}
               <div className="grid gap-6 lg:grid-cols-2">
-                {/* SPIKES Coverage Chart Placeholder */}
+                {/* SPIKES Coverage Checklist */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <span className="text-purple-600">📊</span>
-                      SPIKES Coverage Analysis
+                      SPIKES Coverage
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {feedback.spikesMetrics ? (
+                    {feedback.spikesCoverage ? (
                       <div className="space-y-4">
-                        {/* Placeholder for radar chart - TODO: Replace with actual chart library */}
-                        <div className="relative w-48 h-48 mx-auto bg-gray-100 rounded-full flex items-center justify-center">
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-purple-600">
-                              {Math.round(Object.values(feedback.spikesMetrics).reduce((a, b) => a + b, 0) / 6)}%
-                            </div>
-                            <div className="text-sm text-gray-600">Avg Coverage</div>
-                          </div>
-                        </div>
-                        
-                        {/* SPIKES stage breakdown */}
-                        <div className="grid grid-cols-2 gap-3">
-                          {Object.entries(feedback.spikesMetrics).map(([stage, score]) => (
-                            <div key={stage} className="flex items-center justify-between">
-                              <span className="text-sm font-medium capitalize">{stage}:</span>
-                              <div className="flex items-center gap-2">
-                                <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                  <div 
-                                    className="h-full bg-purple-500 rounded-full"
-                                    style={{ width: `${score}%` }}
-                                  />
-                                </div>
-                                <span className="text-sm font-medium">{score}%</span>
+                        <div className="space-y-2">
+                          {[
+                            { key: 'setting', label: 'Setting' },
+                            { key: 'perception', label: 'Perception' },
+                            { key: 'invitation', label: 'Invitation' },
+                            { key: 'knowledge', label: 'Knowledge' },
+                            { key: 'emotions', label: 'Emotions' },
+                            { key: 'strategy', label: 'Strategy' },
+                          ].map((stage) => {
+                            const covered =
+                              feedback.spikesCoverage &&
+                              feedback.spikesCoverage[stage.key as keyof typeof feedback.spikesCoverage]
+
+                            return (
+                              <div
+                                key={stage.key}
+                                className="flex items-center justify-between py-1 border-b last:border-b-0 border-gray-100"
+                              >
+                                <span className="text-sm font-medium text-gray-800">
+                                  {stage.label}
+                                </span>
+                                {covered ? (
+                                  <span className="text-sm font-semibold text-emerald-500">
+                                    ✓ Covered
+                                  </span>
+                                ) : (
+                                  <span className="text-sm font-semibold text-red-500">
+                                    ✗ Missed
+                                  </span>
+                                )}
                               </div>
-                            </div>
-                          ))}
+                            )
+                          })}
+                        </div>
+
+                        <div className="pt-2 text-sm font-medium text-gray-800">
+                          Overall Coverage:{' '}
+                          <span className="font-semibold text-purple-700">
+                            {feedback.spikesCoverage.coveredCount} / {feedback.spikesCoverage.total}{' '}
+                            stages
+                          </span>
+                          <span className="ml-2 text-gray-500">
+                            (
+                            {Math.round(
+                              (feedback.spikesCoverage.coveredCount /
+                                feedback.spikesCoverage.total) *
+                                100,
+                            )}
+                            %)
+                          </span>
                         </div>
                       </div>
                     ) : (
@@ -216,9 +240,20 @@ export const Feedback = () => {
                 </Card>
               </div>
 
-              {/* Conversation Timeline */}
-              {sessionDetail && sessionDetail.turns && sessionDetail.turns.length > 0 && (
-                <FeedbackConversationTimeline turns={sessionDetail.turns} />
+              {/* Conversation Analysis Timeline */}
+              {sessionDetail && sessionDetail.turns && sessionDetail.turns.length > 0 ? (
+                <FeedbackConversationTimeline turns={sessionDetail.turns} feedback={feedback} />
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Conversation Analysis</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-500">
+                      Conversation analysis unavailable (no transcript data for this session).
+                    </p>
+                  </CardContent>
+                </Card>
               )}
 
               {/* Original metrics chart */}

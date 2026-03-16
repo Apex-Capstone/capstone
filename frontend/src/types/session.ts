@@ -32,6 +32,7 @@ export interface TurnDTO {
   metrics_json?: string | null
   spikes_stage?: string | null
   timestamp: string
+  spans_json?: string | null
 }
 
 export interface TurnResponseWithAudioDTO {
@@ -71,6 +72,7 @@ export interface Turn {
   metricsJson?: string
   spikesStage?: string
   timestamp: string
+  spansJson?: string
 }
 
 export interface TurnResponseWithAudio {

@@ -54,6 +54,7 @@ class TurnResponse(BaseModel):
     metrics_json: Optional[str]
     spikes_stage: Optional[str]
     timestamp: datetime
+    spans_json: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True, extra="ignore")
 
