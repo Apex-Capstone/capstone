@@ -13,7 +13,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "add_unique_open_session_index_001"
+revision: str = "add_ix_sessions_open_001"  # keep <= 32 chars for alembic_version.version_num
 down_revision: Union[str, None] = "e0f0eafeb72a"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -24,9 +24,11 @@ def upgrade() -> None:
       "ix_sessions_user_case_open",
       "sessions",
       ["user_id", "case_id", "ended_at"],
+      schema="core",
+      if_not_exists=True,
   )
 
 
 def downgrade() -> None:
-  op.drop_index("ix_sessions_user_case_open", table_name="sessions")
+  op.drop_index("ix_sessions_user_case_open", table_name="sessions", schema="core")
 
