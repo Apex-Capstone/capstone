@@ -21,17 +21,27 @@ export const Navbar = () => {
           </div>
 
           <div className="hidden md:block">
-            <div className="ml-4 flex items-center space-x-4">
-              <span className="text-sm text-gray-700">
-                {user?.name || user?.email}
-              </span>
-              <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
-                {user?.role}
-              </span>
-              <Button variant="default" size="sm" onClick={logout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-              </Button>
+            <div className="ml-4 flex items-center space-x-6">
+              {user?.role === 'admin' && (
+                <Link
+                  to="/docs/plugin-developer-guide"
+                  className="text-sm font-medium text-gray-700 hover:text-emerald-700"
+                >
+                  Developer Docs
+                </Link>
+              )}
+              <div className="flex items-center space-x-4">
+                <span className="text-sm text-gray-700">
+                  {user?.name || user?.email}
+                </span>
+                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+                  {user?.role}
+                </span>
+                <Button variant="default" size="sm" onClick={logout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -52,6 +62,15 @@ export const Navbar = () => {
               <div className="px-3 py-2 text-sm text-gray-700">
                 {user?.name || user?.email}
               </div>
+              {user?.role === 'admin' && (
+                <Link
+                  to="/docs/plugin-developer-guide"
+                  className="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-md"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Developer Docs
+                </Link>
+              )}
               <div className="px-3 py-2">
                 <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
                   {user?.role}

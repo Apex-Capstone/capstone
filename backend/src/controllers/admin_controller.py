@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import text  
 from sqlalchemy.orm import Session
 
+from config.settings import get_settings
 from core.deps import get_db, require_admin
 from domain.entities.user import User
 from domain.models.admin import AnalyticsDashboard
@@ -52,6 +53,26 @@ class AdminSessionDetail(BaseModel):
     session: SessionDetailResponse
     feedback: Optional[AdminFeedbackSummary] = None
     metrics_timeline: list[MetricsTimeline]
+
+
+class PluginsResponse(BaseModel):
+    """Active plugin paths (module:ClassName) for admin visibility."""
+    patient_model: str
+    evaluator: str
+    metrics: list[str]
+
+
+@router.get("/plugins", response_model=PluginsResponse)
+async def get_active_plugins(
+    current_user: Annotated[User, Depends(require_admin)],
+):
+    """Return configured plugin paths (admin only). Used by Admin UI Developer Tools."""
+    settings = get_settings()
+    return PluginsResponse(
+        patient_model=settings.patient_model_plugin,
+        evaluator=settings.evaluator_plugin,
+        metrics=list(settings.metrics_plugins or []),
+    )
 
 
 @router.get("/health/db")

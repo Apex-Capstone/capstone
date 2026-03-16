@@ -7,6 +7,7 @@ import { CaseDetail } from './pages/CaseDetail'
 import { Feedback } from './pages/Feedback'
 import { Admin } from './pages/Admin'
 import { Research } from './pages/Research'
+import { PluginDeveloperGuide } from './pages/PluginDeveloperGuide'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
 // Component to handle login route with redirect if already authenticated
@@ -67,6 +68,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['admin']}>
               <Research />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/docs/plugin-developer-guide"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <PluginDeveloperGuide />
             </ProtectedRoute>
           }
         />

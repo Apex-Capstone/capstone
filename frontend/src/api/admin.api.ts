@@ -159,3 +159,18 @@ export async function fetchAdminSessionDetail(
   )
   return data
 }
+
+/** Active plugins (module:ClassName) for admin Developer Tools. */
+export interface PluginsResponse {
+  patient_model: string
+  evaluator: string
+  metrics: string[]
+}
+
+/**
+ * Fetch active plugin paths. Admin only.
+ */
+export async function fetchAdminPlugins(): Promise<PluginsResponse> {
+  const { data } = await api.get<PluginsResponse>(`${BASE}/plugins`)
+  return data
+}
