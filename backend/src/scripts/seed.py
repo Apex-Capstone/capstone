@@ -8,7 +8,6 @@ Usage:
 """
 import argparse
 import asyncio
-from datetime import datetime
 from typing import Sequence
 
 from sqlalchemy import text
@@ -20,12 +19,10 @@ from db.base import SessionLocal  # adjust if your session factory lives elsewhe
 from services.auth_service import AuthService
 from services.case_service import CaseService
 from services.session_service import SessionService
+from services.scoring_service import ScoringService
+from services.demo_transcript_replayer import replay_transcript_into_session
 from repositories.session_repo import SessionRepository
-from repositories.turn_repo import TurnRepository
-from repositories.feedback_repo import FeedbackRepository
 from domain.entities.case import Case
-from domain.entities.turn import Turn
-from domain.entities.feedback import Feedback
 from domain.entities.user import User
 from domain.models.auth import UserCreate
 from domain.models.cases import CaseCreate
@@ -217,35 +214,12 @@ async def seed(db: Session, do_reset: bool = False) -> None:
     async def seed_sessions():
         session_service = SessionService(db)
         session_repo = SessionRepository(db)
-        turn_repo = TurnRepository(db)
-        feedback_repo = FeedbackRepository(db)
 
         def strong_user(email: str) -> User | None:
             return db.query(User).filter(User.email == email).first()
 
         def case_by_title(title: str) -> Case | None:
             return db.query(Case).filter(Case.title == title).first()
-
-        def demo_feedback_for_case(title: str):
-            if title == "Responding to Patient Distress":
-                return {
-                    "empathy_score": 72.0,
-                    "communication_score": 68.0,
-                    "spikes_completion_score": 70.0,
-                    "overall_score": 71.0,
-                    "strengths": "Consistent validation of patient emotions and clear pacing through most SPIKES stages.",
-                    "areas_for_improvement": "Clarify next steps in more concrete language and check understanding after key explanations.",
-                }
-            if title == "Delivering a Difficult Diagnosis":
-                return {
-                    "empathy_score": 88.0,
-                    "communication_score": 90.0,
-                    "spikes_completion_score": 92.0,
-                    "overall_score": 90.0,
-                    "strengths": "Strong empathy language, explicit naming of the diagnosis, and thorough coverage of SPIKES with clear summaries.",
-                    "areas_for_improvement": "Invite questions a bit earlier and explore patient coping strategies before closing the visit.",
-                }
-            return None
 
         def already_has_session(user_id: int, case_id: int, must_be_completed: bool) -> bool:
             existing = session_repo.get_by_user(user_id)
@@ -272,43 +246,16 @@ async def seed(db: Session, do_reset: bool = False) -> None:
                 return
             session_data = SessionCreate(case_id=case.id, force_new=force_new)
             session = await session_service.create_session(user.id, session_data)
-            for idx, (role, text) in enumerate(dialogue, start=1):
-                turn = Turn(
-                    session_id=session.id,
-                    user_id=user.id if role == "user" else None,
-                    turn_number=idx,
-                    role=role,
-                    text=text,
-                    audio_url=None,
-                    metrics_json=None,
-                    spikes_stage=None,
-                    timestamp=datetime.utcnow(),
-                )
-                turn_repo.create(turn)
+            await replay_transcript_into_session(
+                db=db,
+                session_id=session.id,
+                user_id=user.id,
+                transcript=dialogue,
+            )
             if close_after:
                 await session_service.close_session(session.id)
-                demo_scores = demo_feedback_for_case(case.title)
-                if demo_scores:
-                    existing_feedback = feedback_repo.get_by_session(session.id)
-                    if existing_feedback:
-                        existing_feedback.empathy_score = demo_scores["empathy_score"]
-                        existing_feedback.communication_score = demo_scores["communication_score"]
-                        existing_feedback.spikes_completion_score = demo_scores["spikes_completion_score"]
-                        existing_feedback.overall_score = demo_scores["overall_score"]
-                        existing_feedback.strengths = demo_scores["strengths"]
-                        existing_feedback.areas_for_improvement = demo_scores["areas_for_improvement"]
-                        feedback_repo.update(existing_feedback)
-                    else:
-                        feedback = Feedback(
-                            session_id=session.id,
-                            empathy_score=demo_scores["empathy_score"],
-                            communication_score=demo_scores["communication_score"],
-                            spikes_completion_score=demo_scores["spikes_completion_score"],
-                            overall_score=demo_scores["overall_score"],
-                            strengths=demo_scores["strengths"],
-                            areas_for_improvement=demo_scores["areas_for_improvement"],
-                        )
-                        feedback_repo.create(feedback)
+                scoring_service = ScoringService(db)
+                await scoring_service.generate_feedback(session.id)
             status = "closed" if close_after else "open"
             print(f"[seed] session -> {user.email} | {case.title} | {status} | id={session.id}")
 
