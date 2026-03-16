@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from adapters.llm import LLMAdapter
+from adapters.llm import LLMAdapter, OpenAIAdapter, GeminiAdapter
+from config.settings import get_settings
 from services.patient_prompt_builder import PatientPromptBuilder
 
 
@@ -12,8 +13,17 @@ class DefaultLLMPatientModel:
     behavior used by DialogueService for patient response generation.
     """
 
-    def __init__(self, llm_adapter: LLMAdapter) -> None:
-        self._llm_adapter = llm_adapter
+    def __init__(self, llm_adapter: LLMAdapter | None = None) -> None:
+        if llm_adapter is None:
+            settings = get_settings()
+            provider = (settings.default_llm_provider or "openai").lower()
+            if provider == "gemini":
+                self._llm_adapter = GeminiAdapter()
+            else:
+                # Default to OpenAI if provider is unknown or "openai"
+                self._llm_adapter = OpenAIAdapter()
+        else:
+            self._llm_adapter = llm_adapter
         self._prompt_builder = PatientPromptBuilder()
 
     async def generate_response(self, state: Any, clinician_input: str) -> str:

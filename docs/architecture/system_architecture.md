@@ -973,4 +973,85 @@ Most importantly, the architecture translates theory into software structure:
 * scoring logic converts interaction traces into educational feedback
 * persistence and export make the system analyzable, testable, and extensible
 
-For capstone purposes, this makes APEX not only functionally complete, but also architecturally defensible.
+For capstone purposes, this makes APEX not only functionally complete, but also architecturally defensible.  
+
+---
+
+## 17. Plugin Architecture: Stable vs Experimental Components
+
+The APEX backend separates **stable, theory-grounded infrastructure** from **experimental, research-driven components**. This is necessary to support extensibility for clinical research while preserving the validated educational constructs implemented in the core dialogue engine.
+
+SPIKES stage tracking and empathic opportunity (EO) detection are treated as **stable infrastructure** because they encode constructs that have already been validated in the literature:
+
+- SPIKES protocol for delivering bad news: Baile et al., 2000
+- Empathic opportunity analysis in physician–patient communication: Suchman et al., 1997
+
+These frameworks define how conversations should be structured and how empathy events are theorized and annotated. In APEX, they are implemented through:
+
+- explicit SPIKES stage tracking in the dialogue engine
+- EO span detection and AFCE-aligned span types
+- turn- and session-level persistence of these annotations for scoring and export
+
+Because these constructs are part of the **definition of the training task itself**, they are not experimental and must remain stable.
+
+### 17.1 Stable Core Components
+
+The following backend components are considered **stable infrastructure** and must preserve their contracts over time:
+
+- **DialogueService**: orchestrates turn processing, NLU, SPIKES stage updates, patient response generation, and turn persistence.
+- **SPIKES stage tracker** (`StageTracker` and related logic): implements protocol-aware stage progression and storage.
+- **EO detection pipeline** (`NLUPipeline`, `SimpleRuleNLU`, `SpanDetector` and span logic): detects empathic opportunities, elicitation, and empathic responses aligned with AFCE.
+- **Session lifecycle** (`SessionService`, `Session` model): manages session creation, active/closed state, timestamps, and SPIKES state.
+- **TurnResponse schema**: defines the API contract for returning individual turns from the dialogue system.
+- **FeedbackResponse schema**: defines the API contract for returning post-session feedback and metrics.
+
+These components encode the educational and research constructs that define what a “session”, “turn”, “SPIKES stage”, and “empathic opportunity” mean in APEX. Changing them would alter the semantics of the system rather than just the implementation.
+
+### 17.2 Experimental / Plugin Components
+
+Researchers need to experiment with different models and scoring approaches **around** this stable core. For that reason, APEX introduces a **plugin layer** for components whose internal behavior may change while their external contracts remain fixed:
+
+- **Patient simulation models**:
+  - Alternative implementations of the simulated patient (e.g., different LLM prompts, different model providers, or hybrid scripted/LLM behavior).
+  - Exposed via a `PatientModel` plugin interface.
+- **Evaluators / scoring algorithms**:
+  - Alternative scoring pipelines that interpret the same stored turns, spans, and SPIKES stages in different ways.
+  - Exposed via an `Evaluator` plugin interface that always returns `FeedbackResponse`.
+- **Metrics calculators**:
+  - Additional research-oriented metrics or analytic summaries derived from persisted sessions and feedback.
+  - Exposed via `Metrics` plugin interfaces that compute extra, non-breaking analytics.
+
+These components are **experimental** in the sense that researchers are expected to swap them in and out without touching controllers, session lifecycle, or database schemas.
+
+### 17.3 Research Extensibility
+
+The plugin architecture supports research extensibility in several ways:
+
+- **Model experimentation**: new patient simulators can be introduced (e.g., different LLM configurations or non-LLM models) without changing `DialogueService` inputs/outputs or the `TurnResponse` schema.
+- **Evaluation experimentation**: novel scoring algorithms can be evaluated side-by-side with the existing hybrid evaluator by implementing new `Evaluator` plugins that read the same structured turns and spans and still return `FeedbackResponse`.
+- **Metrics experimentation**: additional analytics (e.g., new EO clustering metrics, timing features, or bias probes) can be added as metrics plugins that operate on existing persisted data without altering the core API.
+
+In all cases, the plugin surface is **strictly bounded**: plugins can change *how* patient text, scores, or research metrics are computed, but they cannot:
+
+- redefine what a `TurnResponse` or `FeedbackResponse` looks like
+- bypass `DialogueService`, SPIKES tracking, or EO detection
+- mutate session lifecycle semantics
+
+### 17.4 Core / Plugin Relationship Diagram
+
+The relationship between the stable core and the plugin layer can be summarized as:
+
+```text
+Core System
+   |
+   |-- Dialogue Engine (DialogueService, DialogueState)
+   |-- SPIKES Tracker (StageTracker, session.current_spikes_stage)
+   |-- EO Detection (NLUPipeline, SimpleRuleNLU, SpanDetector)
+   |
+   +-- Plugin Layer
+          |-- Patient Models (PatientModel plugins)
+          |-- Evaluators (Evaluator plugins)
+          |-- Metrics (Metrics plugins)
+```
+
+This diagram emphasizes that plugins **attach to** the dialogue and scoring pipeline but do not replace the underlying SPIKES/EO infrastructure or the public API schemas.

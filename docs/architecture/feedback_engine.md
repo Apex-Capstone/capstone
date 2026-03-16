@@ -56,6 +56,23 @@ Example:
   "spikes_score": 90
 }
 
+## Plugin-based Evaluator
+
+The feedback engine is designed so that evaluation logic can evolve without changing the external API contract. To support this, the `ScoringService` will delegate its core evaluation work to a pluggable **`Evaluator`** component.
+
+- `ScoringService` remains the stable entry point used by controllers and higher-level services.
+- Internally, it will call an `Evaluator` plugin that:
+  - reads session and turn data (including SPIKES stages and EO spans)
+  - computes empathy, communication, and SPIKES metrics
+  - constructs and returns a `FeedbackResponse` instance
+
+The **`Evaluator` plugin must always return a `FeedbackResponse`** object that conforms to the existing schema in `domain.models.sessions`. This guarantees that:
+
+- the API responses from endpoints that expose feedback remain stable, and
+- experimental scoring algorithms can be swapped in or out without requiring any changes to frontend clients or external integrations.
+
+In this design, the evaluator plugins are free to change *how* scores are calculated, but **`FeedbackResponse` remains the canonical API schema** for post-session feedback.
+
 ## Implementation Location
 
 backend/services/scoring_service.py

@@ -3,13 +3,13 @@
 from functools import lru_cache
 from typing import List
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
-
+    
     # Application
     environment: str = Field(default="development")
     log_level: str = Field(default="INFO")
@@ -49,6 +49,17 @@ class Settings(BaseSettings):
     # Research export anonymization (deterministic session IDs)
     research_anon_salt: str = Field(default="research-anon-salt-change-in-production")
 
+    # Plugin configuration
+    patient_model_plugin: str = Field(
+        default="plugins.patient_models.default_llm_patient:DefaultLLMPatientModel"
+    )
+    evaluator_plugin: str = Field(
+        default="plugins.evaluators.apex_hybrid_evaluator:ApexHybridEvaluator"
+    )
+    metrics_plugins: list[str] = Field(
+        default_factory=lambda: ["plugins.metrics.apex_metrics:ApexMetrics"]
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -56,9 +67,37 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @field_validator("patient_model_plugin")
+    @classmethod
+    def _validate_patient_model_plugin(cls, v: str) -> str:
+        if ":" not in v:
+            raise ValueError(
+                f"Invalid plugin path '{v}'. Expected format 'module.path:ClassName'"
+            )
+        return v
+
+    @field_validator("evaluator_plugin")
+    @classmethod
+    def _validate_evaluator_plugin(cls, v: str) -> str:
+        if ":" not in v:
+            raise ValueError(
+                f"Invalid plugin path '{v}'. Expected format 'module.path:ClassName'"
+            )
+        return v
+
+    @field_validator("metrics_plugins")
+    @classmethod
+    def _validate_metrics_plugins(cls, v: list[str]) -> list[str]:
+        for path in v:
+            if ":" not in path:
+                raise ValueError(
+                    f"Invalid plugin path '{path}'. Expected format 'module.path:ClassName'"
+                )
+        return v
+
 
 @lru_cache()
 def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()
-
+ 

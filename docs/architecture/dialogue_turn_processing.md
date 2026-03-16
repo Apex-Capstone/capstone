@@ -346,6 +346,14 @@ Example generated response:
 
 > I'm scared that this means my treatment is not working.
 
+### Note on PatientModel Plugin Architecture
+
+In the current implementation, the patient response is generated through a provider-specific LLM adapter (for example, `OpenAIAdapter` or `GeminiAdapter`). As the system evolves, this adapter will be accessed through a **`PatientModel` plugin** interface rather than being called directly from `DialogueService`.
+
+The plugin will receive the same structured context that the dialogue engine already prepares (case background, conversation history, current SPIKES stage, and patient prompt) and will return only the generated patient text. **The public contract of `DialogueService` does not change**: it will continue to return a `TurnResponse` object, and the controller layer and frontend will see the same response shape.
+
+In other words, the plugin architecture affects *how* the patient utterance is produced, not *what* the `DialogueService → TurnResponse` contract looks like.
+
 ---
 
 ## Step 10: Analyze Patient Response for Empathy Opportunities

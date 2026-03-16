@@ -436,5 +436,39 @@ This design balances
 * explainable scoring
 * research traceability
 * modular extensibility
+---
 
-These decisions form the foundation for subsequent implementation and validation of the system.
+## Decision: Introduce Plugin Architecture for Experimental Components
+
+**Context.** APEX must support clinical research and future experimentation with different patient simulation models, evaluation algorithms, and analytics metrics. At the same time, it encodes validated constructs from the literature, including SPIKES stage tracking (Baile et al., 2000) and empathic opportunity analysis (Suchman et al., 1997), which define the educational meaning of the system’s behavior.
+
+**Decision.** The backend will introduce a lightweight plugin architecture for **experimental components** while keeping the **core infrastructure** stable:
+
+- **Plugins (experimental components):**
+  - Patient simulation models (via `PatientModel` plugins)
+  - Evaluators / scoring algorithms (via `Evaluator` plugins)
+  - Research metrics calculators (via `Metrics` plugins)
+
+- **Stable core components:**
+  - `DialogueService` and its turn-processing contract
+  - SPIKES stage tracker and related session fields
+  - EO detection pipeline (`NLUPipeline`, `SpanDetector`, and associated span logic)
+  - Session lifecycle (`SessionService`, `Session` model)
+  - `TurnResponse` schema
+  - `FeedbackResponse` schema
+
+**Rationale.** SPIKES and EO detection represent validated, theory-grounded constructs; they define how the system interprets and structures clinical communication. Changing these would alter the semantics of APEX rather than just the implementation of models or scores. By contrast, patient simulators, evaluators, and research metrics are natural targets for experimentation: researchers may wish to compare different LLM prompts, scoring rules, or analytic summaries while keeping the underlying dialogue and data model fixed.
+
+**Constraints.**
+
+- Plugins are restricted to **well-defined interfaces**:
+  - `PatientModel.generate_response(state, clinician_input) -> str`
+  - `Evaluator.evaluate(db, session_id) -> FeedbackResponse`
+  - `MetricsPlugin.compute(db, session_id) -> dict`
+- Plugins may change **how** patient text, scores, or metrics are computed but may not:
+  - modify session lifecycle semantics
+  - bypass SPIKES or EO detection
+  - redefine the shapes of `TurnResponse` or `FeedbackResponse`
+- Controllers and API schemas continue to depend only on stable services and models, not on plugin implementations.
+
+This decision allows APEX to remain a stable, research-aligned simulator while providing a clear, safe surface for ongoing experimentation in patient modeling, evaluation, and analytics.
