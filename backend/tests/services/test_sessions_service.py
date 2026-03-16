@@ -1,4 +1,9 @@
-"""Tests for session functionality."""
+"""Mirrored tests for session service behaviour (non-src tree).
+
+These tests intentionally duplicate backend/src/tests/test_sessions.py so that
+they are picked up when pytest is pointed at the top-level backend/tests/
+directory. Keep them in sync with the source-tree tests.
+"""
 
 import pytest
 from sqlalchemy import create_engine
@@ -59,9 +64,9 @@ async def test_create_session(test_db, test_user, test_case):
     """Test creating a session."""
     session_service = SessionService(test_db)
     session_data = SessionCreate(case_id=test_case.id)
-    
+
     session = await session_service.create_session(test_user.id, session_data)
-    
+
     assert session.user_id == test_user.id
     assert session.case_id == test_case.id
     assert session.state == "active"
@@ -112,14 +117,14 @@ async def test_create_session_repeated_calls_do_not_duplicate(test_db, test_user
 async def test_close_session(test_db, test_user, test_case):
     """Test closing a session."""
     session_service = SessionService(test_db)
-    
+
     # Create session
     session_data = SessionCreate(case_id=test_case.id)
     created_session = await session_service.create_session(test_user.id, session_data)
-    
+
     # Close session
     closed_session = await session_service.close_session(created_session.id)
-    
+
     assert closed_session.state == "completed"
     assert closed_session.ended_at is not None
 

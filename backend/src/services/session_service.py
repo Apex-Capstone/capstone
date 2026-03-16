@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+from sqlalchemy import exc as sa_exceptions
 from sqlalchemy.orm import Session
 
 from core.errors import NotFoundError
@@ -20,13 +21,13 @@ from repositories.turn_repo import TurnRepository
 
 class SessionService:
     """Service for session operations."""
-    
+
     def __init__(self, db: Session):
         self.db = db
         self.session_repo = SessionRepository(db)
         self.case_repo = CaseRepository(db)
         self.turn_repo = TurnRepository(db)
-    
+
     @staticmethod
     def _row_to_dict(row) -> dict:
         # Only map real table columns -> values, avoiding SA's `.metadata`
@@ -39,23 +40,32 @@ class SessionService:
             data["case_title"] = derived_title
         data["status"] = "closed" if data.get("ended_at") else "active"
         return SessionResponse.model_validate(data)
-    
+
     async def create_session(
         self,
         user_id: int,
         session_data: SessionCreate,
     ) -> SessionResponse:
-        """Create a new session."""
+        """Create a new session.
+
+        Behaviour:
+        - force_new=False: return the most recent open session for (user, case) if it exists,
+          otherwise create one. Concurrent calls that race to create will be collapsed by the
+          database unique constraint and this method will re-query and return the existing row.
+        - force_new=True: always create a new session (callers must only use this when they
+          truly want a new run, e.g. "Start New Session" in the UI).
+        """
         # Verify case exists
         case = self.case_repo.get_by_id(session_data.case_id)
         if not case:
             raise NotFoundError(f"Case with ID {session_data.case_id} not found")
+
         # Reuse any existing open session for this case/user
         if not session_data.force_new:
             existing_session = self.session_repo.get_active_for_user_case(user_id, session_data.case_id)
             if existing_session:
                 return self._session_to_response(existing_session, case_title=case.title)
-        
+
         # Create session entity
         session = SessionEntity(
             user_id=user_id,
@@ -63,8 +73,25 @@ class SessionService:
             state="active",
             current_spikes_stage="setting",
         )
-        
-        created_session = self.session_repo.create(session)
+
+        # Persist, handling potential uniqueness races for non-forced creation
+        try:
+            created_session = self.session_repo.create(session)
+        except sa_exceptions.IntegrityError:
+            # For force_new=True we intentionally bubble up integrity errors rather than
+            # silently reusing, because callers explicitly asked for a new session.
+            if session_data.force_new:
+                raise
+
+            # For non-forced creation, treat integrity errors as a signal that another
+            # request created the open session first. Re-query and return that row.
+            self.db.rollback()
+            existing_session = self.session_repo.get_active_for_user_case(user_id, session_data.case_id)
+            if not existing_session:
+                # Fallback: if we truly cannot find it, re-raise so the caller sees the error.
+                raise
+            created_session = existing_session
+
         return self._session_to_response(created_session, case_title=case.title)
     
     async def get_session(self, session_id: int) -> SessionDetailResponse:

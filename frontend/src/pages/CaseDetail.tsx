@@ -31,12 +31,16 @@ export const CaseDetail = () => {
   const [currentSpikesStage, setCurrentSpikesStage] = useState<string>('setting')
   const [error, setError] = useState<string | null>(null)
   const createdSessionForCase = useRef<number | null>(null)
+  const initializingRef = useRef(false)
 
   const sessionParam = searchParams.get('sessionId')
 
   // --- Load case and create session ---
   useEffect(() => {
     const initializeSession = async () => {
+      if (initializingRef.current) return
+      initializingRef.current = true
+
       if (!caseId) return
 
       const numericCaseId = Number(caseId)
@@ -93,6 +97,7 @@ export const CaseDetail = () => {
         console.error('Failed to initialize session:', error)
         setError('Failed to start session. Please try again.')
       } finally {
+        initializingRef.current = false
         setLoading(false)
       }
     }
