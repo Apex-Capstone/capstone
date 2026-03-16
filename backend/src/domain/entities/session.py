@@ -24,6 +24,9 @@ class Session(Base):
     session_metadata = Column("metadata", Text)  # JSON for additional session data
     evaluator_plugin = Column(String, nullable=True)
     evaluator_version = Column(String, nullable=True)
+    patient_model_plugin = Column(String, nullable=True)  # Frozen at session creation
+    patient_model_version = Column(String, nullable=True)
+    metrics_plugins = Column(Text, nullable=True)  # JSON array of metrics plugin names frozen at creation
 
     # Relationships
     user = relationship("User", back_populates="sessions")

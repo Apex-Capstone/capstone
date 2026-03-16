@@ -23,6 +23,8 @@ class Case(Base):
     patient_background = Column(Text)  # Patient history and context
     expected_spikes_flow = Column(Text)  # JSON describing expected SPIKES progression
     evaluator_plugin = Column(String, nullable=True)  # Optional case-level evaluator override (registry key)
+    patient_model_plugin = Column(String, nullable=True)  # Optional case-level patient model override (registry key)
+    metrics_plugins = Column(Text, nullable=True)  # JSON array of metrics plugin names, e.g. ["plugin.name:Class"]
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
