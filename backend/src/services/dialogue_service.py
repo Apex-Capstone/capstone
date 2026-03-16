@@ -2,6 +2,7 @@
 
 import json
 import time
+from types import SimpleNamespace
 from sqlalchemy.orm import Session
 
 from adapters.llm import LLMAdapter
@@ -9,6 +10,7 @@ from adapters.nlu import NLUAdapter
 from config.logging import get_logger
 from config.settings import get_settings
 from core.errors import NotFoundError
+from core.plugin_manager import get_patient_model
 from domain.entities.turn import Turn
 from domain.models.sessions import TurnCreate, TurnResponse
 from repositories.case_repo import CaseRepository
@@ -107,21 +109,21 @@ class DialogueService:
         )
         self.turn_repo.create(user_turn)
         
-        # Generate patient response with latency tracking
+        # Generate patient response with latency tracking via PatientModel plugin
         conversation_history = self._get_conversation_history(session_id)
 
-        # Build patient prompt from case metadata and current SPIKES stage
-        patient_context = self.patient_prompt_builder.build_prompt(
-            case=case,
-            stage=session.current_spikes_stage,
-        )
+        # Enrich dialogue state with additional context expected by PatientModel plugins
+        state.case = case
+        state.session = session
+        state.conversation_history = conversation_history
 
-        # Track latency for LLM call
+        patient_model = get_patient_model()
+
+        # Track latency for patient model call
         start_time = time.time()
-        patient_response = await self.llm_adapter.generate_patient_response(
-            case_script=patient_context,
-            conversation_history=conversation_history,
-            current_spikes_stage=session.current_spikes_stage or "setting",
+        patient_response = await patient_model.generate_response(
+            state=state,
+            clinician_input=turn_data.text,
         )
         end_time = time.time()
         latency_ms = (end_time - start_time) * 1000  # Convert to milliseconds
