@@ -13,6 +13,7 @@ from config.settings import get_settings
 from core.deps import get_db, require_admin
 from domain.entities.user import User
 from domain.models.admin import AnalyticsDashboard
+from plugins.registry import PluginRegistry
 from domain.models.cases import CaseCreate, CaseResponse
 from domain.models.sessions import SessionDetailResponse, SessionListResponse, TurnResponse
 from repositories.feedback_repo import FeedbackRepository
@@ -60,6 +61,42 @@ class PluginsResponse(BaseModel):
     patient_model: str
     evaluator: str
     metrics: list[str]
+
+
+class PluginInfo(BaseModel):
+    """Name and version of a registered plugin."""
+    name: str
+    version: str
+
+
+class PluginDiscoveryResponse(BaseModel):
+    """Plugin discovery: registered evaluators, patient_models, and metrics with name+version."""
+    evaluators: list[PluginInfo]
+    patient_models: list[PluginInfo]
+    metrics: list[PluginInfo]
+
+
+@router.get("/plugin-registry", response_model=PluginDiscoveryResponse)
+async def get_plugin_registry(
+    current_user: Annotated[User, Depends(require_admin)],
+):
+    """Return registered plugins from PluginRegistry (name + version). Used for discovery and case override UI."""
+    evaluators = []
+    for plugin_cls in PluginRegistry.list_evaluators().values():
+        evaluators.append(
+            PluginInfo(name=getattr(plugin_cls, "name", ""), version=getattr(plugin_cls, "version", ""))
+        )
+    patient_models = []
+    for plugin_cls in PluginRegistry.list_patient_models().values():
+        patient_models.append(
+            PluginInfo(name=getattr(plugin_cls, "name", ""), version=getattr(plugin_cls, "version", ""))
+        )
+    metrics = []
+    for plugin_cls in PluginRegistry.list_metrics_plugins().values():
+        metrics.append(
+            PluginInfo(name=getattr(plugin_cls, "name", ""), version=getattr(plugin_cls, "version", ""))
+        )
+    return PluginDiscoveryResponse(evaluators=evaluators, patient_models=patient_models, metrics=metrics)
 
 
 @router.get("/plugins", response_model=PluginsResponse)

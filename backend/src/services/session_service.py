@@ -5,6 +5,8 @@ from datetime import datetime
 from sqlalchemy import exc as sa_exceptions
 from sqlalchemy.orm import Session
 
+from fastapi import HTTPException
+
 from config.settings import get_settings
 from core.errors import NotFoundError
 from core.plugin_manager import _load_class_from_path
@@ -69,23 +71,27 @@ class SessionService:
             if existing_session:
                 return self._session_to_response(existing_session, case_title=case.title)
 
-        # Resolve evaluator plugin at creation time so that sessions are
-        # frozen to the evaluator in use when they were started.
+        # Resolve evaluator plugin at creation time: case override else settings.
+        # Sessions are frozen to the evaluator in use when they were started.
         settings = get_settings()
-        evaluator_path: str | None = getattr(settings, "evaluator_plugin", None)
+        case_override = getattr(case, "evaluator_plugin", None)
+        plugin_name: str | None = case_override if case_override else getattr(settings, "evaluator_plugin", None)
 
         evaluator_version: str | None = None
-        if evaluator_path:
+        if plugin_name:
             try:
-                evaluator_cls = PluginRegistry.get_evaluator(evaluator_path)
+                evaluator_cls = PluginRegistry.get_evaluator(plugin_name)
             except ValueError:
-                # Backward compatibility: if the evaluator was not registered
-                # via self-registration/import side effects, load it from the
-                # configured path and register it under that path.
-                evaluator_cls = _load_class_from_path(evaluator_path)
-                PluginRegistry.register_evaluator(evaluator_path, evaluator_cls)
+                # Case override must exist in registry; do not auto-load.
+                if case_override:
+                    raise HTTPException(status_code=400, detail="Invalid evaluator plugin")
+                # Backward compatibility: no case override, load from settings path.
+                evaluator_cls = _load_class_from_path(plugin_name)
+                PluginRegistry.register_evaluator(plugin_name, evaluator_cls)
 
             evaluator_version = getattr(evaluator_cls, "version", None)
+            # Freeze the plugin name as stored on the plugin class (registry key).
+            plugin_name = getattr(evaluator_cls, "name", plugin_name)
 
         # Create session entity
         session = SessionEntity(
@@ -93,7 +99,7 @@ class SessionService:
             case_id=session_data.case_id,
             state="active",
             current_spikes_stage="setting",
-            evaluator_plugin=evaluator_path,
+            evaluator_plugin=plugin_name,
             evaluator_version=evaluator_version,
         )
 

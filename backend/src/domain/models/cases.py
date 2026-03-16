@@ -17,6 +17,7 @@ class CaseBase(BaseModel):
     category: Optional[str] = None
     patient_background: Optional[str] = None
     expected_spikes_flow: Optional[str] = None
+    evaluator_plugin: Optional[str] = None
 
 
 class CaseCreate(CaseBase):
@@ -35,6 +36,7 @@ class CaseUpdate(BaseModel):
     category: Optional[str] = None
     patient_background: Optional[str] = None
     expected_spikes_flow: Optional[str] = None
+    evaluator_plugin: Optional[str] = None
 
 
 class CaseResponse(CaseBase):

@@ -28,6 +28,7 @@ class CaseService:
             category=case_data.category,
             patient_background=case_data.patient_background,
             expected_spikes_flow=case_data.expected_spikes_flow,
+            evaluator_plugin=case_data.evaluator_plugin,
         )
         
         created_case = self.case_repo.create(case)

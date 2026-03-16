@@ -22,6 +22,7 @@ class Case(Base):
     category = Column(String)  # e.g., oncology, pediatrics, etc.
     patient_background = Column(Text)  # Patient history and context
     expected_spikes_flow = Column(Text)  # JSON describing expected SPIKES progression
+    evaluator_plugin = Column(String, nullable=True)  # Optional case-level evaluator override (registry key)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
