@@ -1,4 +1,4 @@
-import type { Message } from '@/api/client'
+import type { Message } from '@/types/session'
 import { cn } from '@/lib/utils'
 import { User, Bot } from 'lucide-react'
 
