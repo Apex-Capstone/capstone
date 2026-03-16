@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { fetchAdminPluginRegistry, type PluginInfo } from '@/api/admin.api'
+import { fetchAdminPluginRegistry } from '@/api/admin.api'
 import type { Case } from '@/types/case'
+import type { PluginsResponse, PluginInfo } from '@/types/plugins'
 
 const EVALUATOR_DEFAULT = ''
+const PATIENT_MODEL_DEFAULT = ''
 
 type Props = {
   open: boolean
@@ -18,7 +20,7 @@ type Props = {
   submitting?: boolean
 }
 
-function evaluatorLabel(p: PluginInfo) {
+function pluginLabel(p: PluginInfo) {
   const shortName = p.name.includes(':') ? p.name.split(':').pop() ?? p.name : p.name
   return p.version ? `${shortName} (v${p.version})` : shortName
 }
@@ -34,9 +36,11 @@ export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }:
     patientBackground: '',
     expectedSpikesFlow: '',
     evaluatorPlugin: '',
+    patientModelPlugin: '',
+    metricsPlugins: [],
   })
-  const [evaluators, setEvaluators] = useState<PluginInfo[]>([])
-  const [evaluatorsLoading, setEvaluatorsLoading] = useState(false)
+  const [plugins, setPlugins] = useState<PluginsResponse | null>(null)
+  const [pluginsLoading, setPluginsLoading] = useState(false)
 
   useEffect(() => {
     if (initial) setValues((v) => ({ ...v, ...initial }))
@@ -44,11 +48,11 @@ export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }:
 
   useEffect(() => {
     if (!open) return
-    setEvaluatorsLoading(true)
+    setPluginsLoading(true)
     fetchAdminPluginRegistry()
-      .then((r) => setEvaluators(r.evaluators ?? []))
-      .catch(() => setEvaluators([]))
-      .finally(() => setEvaluatorsLoading(false))
+      .then(setPlugins)
+      .catch(() => setPlugins(null))
+      .finally(() => setPluginsLoading(false))
   }, [open])
 
   const set = (k: keyof Case, v: unknown) => setValues((prev) => ({ ...prev, [k]: v }))
@@ -58,6 +62,12 @@ export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }:
     const toSend = { ...values }
     if (toSend.evaluatorPlugin === EVALUATOR_DEFAULT || toSend.evaluatorPlugin === '') {
       toSend.evaluatorPlugin = undefined
+    }
+    if (toSend.patientModelPlugin === PATIENT_MODEL_DEFAULT || toSend.patientModelPlugin === '') {
+      toSend.patientModelPlugin = undefined
+    }
+    if (toSend.metricsPlugins?.length === 0) {
+      toSend.metricsPlugins = undefined
     }
     await onSubmit(toSend)
   }
@@ -180,25 +190,69 @@ export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }:
               <CardHeader>
                 <CardTitle className="text-lg">AI Configuration</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Patient Model</label>
+                  <select
+                    className="w-full border rounded-md h-10 px-3 text-sm"
+                    value={values.patientModelPlugin ?? PATIENT_MODEL_DEFAULT}
+                    onChange={(e) => set('patientModelPlugin', e.target.value || undefined)}
+                    disabled={pluginsLoading}
+                  >
+                    <option value={PATIENT_MODEL_DEFAULT}>System Default</option>
+                    {plugins?.patient_models.map((model) => (
+                      <option key={model.name} value={model.name}>
+                        {pluginLabel(model)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
                   <label className="text-sm font-medium">Evaluator Plugin</label>
                   <select
-                    className="mt-1 w-full border rounded-md h-10 px-3 text-sm"
+                    className="w-full border rounded-md h-10 px-3 text-sm"
                     value={values.evaluatorPlugin ?? EVALUATOR_DEFAULT}
                     onChange={(e) => set('evaluatorPlugin', e.target.value || undefined)}
-                    disabled={evaluatorsLoading}
+                    disabled={pluginsLoading}
                   >
                     <option value={EVALUATOR_DEFAULT}>Default (use system default evaluator)</option>
-                    {evaluators.map((p) => (
+                    {plugins?.evaluators.map((p) => (
                       <option key={p.name} value={p.name}>
-                        {evaluatorLabel(p)}
+                        {pluginLabel(p)}
                       </option>
                     ))}
                   </select>
                   <p className="mt-1 text-xs text-gray-500">
                     Override the evaluator for this case. Default uses the system-configured evaluator.
                   </p>
+                </div>
+
+                <div className="space-y-2 mt-4">
+                  <label className="text-sm font-medium">Metrics Plugins</label>
+                  <div className="space-y-2">
+                    {plugins?.metrics.map((metric) => (
+                      <label key={metric.name} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={values.metricsPlugins?.includes(metric.name) ?? false}
+                          onChange={(e) => {
+                            const current = values.metricsPlugins ?? []
+                            if (e.target.checked) {
+                              set('metricsPlugins', [...current, metric.name])
+                            } else {
+                              set('metricsPlugins', current.filter((m) => m !== metric.name))
+                            }
+                          }}
+                          disabled={pluginsLoading}
+                        />
+                        {pluginLabel(metric)}
+                      </label>
+                    ))}
+                  </div>
+                  {(!plugins?.metrics || plugins.metrics.length === 0) && !pluginsLoading && (
+                    <p className="text-xs text-gray-500">No metrics plugins registered.</p>
+                  )}
                 </div>
               </CardContent>
             </Card>

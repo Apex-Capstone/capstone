@@ -12,6 +12,8 @@ export const caseFromDTO = (dto: CaseDTO): Case => ({
   patientBackground: dto.patient_background ?? undefined,
   expectedSpikesFlow: dto.expected_spikes_flow ?? undefined,
   evaluatorPlugin: dto.evaluator_plugin ?? undefined,
+  patientModelPlugin: dto.patient_model_plugin ?? undefined,
+  metricsPlugins: dto.metrics_plugins ?? undefined,
   createdAt: dto.created_at,
   updatedAt: dto.updated_at,
 })
@@ -27,6 +29,8 @@ export const toCreatePayload = (c: Partial<Case>) => ({
   patient_background: c.patientBackground ?? null,
   expected_spikes_flow: c.expectedSpikesFlow ?? null,
   evaluator_plugin: c.evaluatorPlugin ?? null,
+  patient_model_plugin: c.patientModelPlugin ?? null,
+  metrics_plugins: c.metricsPlugins ?? null,
 })
 
 // domain -> update payload (partial)
@@ -41,5 +45,7 @@ export const toUpdatePayload = (c: Partial<Case>) => {
   if (c.patientBackground !== undefined) p.patient_background = c.patientBackground
   if (c.expectedSpikesFlow !== undefined) p.expected_spikes_flow = c.expectedSpikesFlow
   if (c.evaluatorPlugin !== undefined) p.evaluator_plugin = c.evaluatorPlugin
+  if (c.patientModelPlugin !== undefined) p.patient_model_plugin = c.patientModelPlugin
+  if (c.metricsPlugins !== undefined) p.metrics_plugins = c.metricsPlugins
   return p
 }

@@ -3,17 +3,17 @@ import {
   fetchAdminStats,
   fetchAdminSessions,
   fetchAdminSessionDetail,
-  fetchAdminPlugins,
+  fetchAdminPluginRegistry,
   type AdminStats,
   type AdminSessionListResponse,
   type AdminSessionDetailResponse,
-  type PluginsResponse,
 } from '@/api/admin.api'
+import type { PluginsResponse } from '@/types/plugins'
 import { MetricCard } from '@/components/MetricCard'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
-import { Users, FileText, Activity, TrendingUp, Download, Plus, BarChart3, MessageSquare, Wrench, ExternalLink } from 'lucide-react'
+import { Users, FileText, Activity, TrendingUp, Download, Plus, BarChart3, MessageSquare, Puzzle, ExternalLink } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
@@ -118,16 +118,10 @@ import { CaseForm } from '@/components/admin/CaseForm'
 import { listCases, createCase, updateCase, deleteCase } from '@/api/cases.api'
 import type { Case } from '@/types/case'
 
-/** Extract class name from plugin path "module.path:ClassName". */
-function pluginClassName(path: string): string {
-  const idx = path.lastIndexOf(':')
-  return idx >= 0 ? path.slice(idx + 1) : path
-}
-
 export const Admin = () => {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'sessions' | 'analytics' | 'cases' | 'developer'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'sessions' | 'analytics' | 'cases' | 'plugins'>('overview')
 
   // ---- NEW: cases state ----
   const [caseItems, setCaseItems] = useState<Case[]>([])
@@ -145,8 +139,8 @@ export const Admin = () => {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
 
-  // Developer Tools: plugins
-  const [plugins, setPlugins] = useState<PluginsResponse | null>(null)
+  // Plugins page: installed plugins (name + version)
+  const [installedPlugins, setInstalledPlugins] = useState<PluginsResponse | null>(null)
   const [pluginsLoading, setPluginsLoading] = useState(false)
   const [pluginsError, setPluginsError] = useState<string | null>(null)
 
@@ -207,8 +201,8 @@ export const Admin = () => {
     setPluginsLoading(true)
     setPluginsError(null)
     try {
-      const data = await fetchAdminPlugins()
-      setPlugins(data)
+      const data = await fetchAdminPluginRegistry()
+      setInstalledPlugins(data)
     } catch (e) {
       console.error('Failed to fetch plugins:', e)
       setPluginsError('Failed to load plugins')
@@ -218,7 +212,7 @@ export const Admin = () => {
   }
 
   useEffect(() => {
-    if (activeTab === 'developer') {
+    if (activeTab === 'plugins') {
       void loadPlugins()
     }
   }, [activeTab])
@@ -266,7 +260,7 @@ export const Admin = () => {
     { id: 'sessions', label: 'Session Logs', icon: MessageSquare },
     { id: 'analytics', label: 'Analytics', icon: TrendingUp },
     { id: 'cases', label: 'Case Management', icon: FileText },
-    { id: 'developer', label: 'Developer Tools', icon: Wrench },
+    { id: 'plugins', label: 'Plugins', icon: Puzzle },
   ] as const
 
   if (loading) {
@@ -592,63 +586,74 @@ export const Admin = () => {
           </div>
         )
 
-      case 'developer':
+      case 'plugins':
         return (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium">Developer Tools</h3>
+              <h2 className="text-xl font-semibold">Installed Plugins</h2>
               <Button variant="outline" size="sm" asChild>
-                <a
-                  href="/docs/plugin-developer-guide"
-                  className="flex items-center gap-2"
-                >
+                <a href="/docs/plugin-developer-guide" className="flex items-center gap-2">
                   <ExternalLink className="h-4 w-4" />
                   View Developer Docs
                 </a>
               </Button>
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Active Plugins</CardTitle>
-                <p className="text-sm text-gray-500 mt-1">Configured plugin implementations (module:ClassName)</p>
-              </CardHeader>
-              <CardContent>
-                {pluginsLoading ? (
-                  <p className="text-gray-500 py-4">Loading plugins…</p>
-                ) : pluginsError ? (
-                  <p className="text-red-600 py-4">{pluginsError}</p>
-                ) : plugins ? (
-                  <dl className="space-y-4">
-                    <div>
-                      <dt className="text-sm font-medium text-gray-700">Patient Model</dt>
-                      <dd className="mt-1 text-sm text-gray-900 font-mono">{pluginClassName(plugins.patient_model)}</dd>
-                      <dd className="text-xs text-gray-500 mt-0.5 font-mono">{plugins.patient_model}</dd>
+            {pluginsLoading ? (
+              <p className="text-gray-500 py-8">Loading plugins…</p>
+            ) : pluginsError ? (
+              <p className="text-red-600 py-8">{pluginsError}</p>
+            ) : (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-semibold">Patient Models</h3>
+                  {installedPlugins?.patient_models?.length ? (
+                    <div className="mt-2 space-y-2">
+                      {installedPlugins.patient_models.map((p) => (
+                        <div key={p.name} className="border rounded-lg p-3 bg-white shadow-sm">
+                          <div className="font-medium text-gray-900">{p.name}</div>
+                          <div className="text-sm text-gray-500">Version {p.version}</div>
+                        </div>
+                      ))}
                     </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-700">Evaluator</dt>
-                      <dd className="mt-1 text-sm text-gray-900 font-mono">{pluginClassName(plugins.evaluator)}</dd>
-                      <dd className="text-xs text-gray-500 mt-0.5 font-mono">{plugins.evaluator}</dd>
+                  ) : (
+                    <p className="text-gray-500 text-sm mt-2">No patient model plugins registered.</p>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="font-semibold">Evaluators</h3>
+                  {installedPlugins?.evaluators?.length ? (
+                    <div className="mt-2 space-y-2">
+                      {installedPlugins.evaluators.map((p) => (
+                        <div key={p.name} className="border rounded-lg p-3 bg-white shadow-sm">
+                          <div className="font-medium text-gray-900">{p.name}</div>
+                          <div className="text-sm text-gray-500">Version {p.version}</div>
+                        </div>
+                      ))}
                     </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-700">Metrics</dt>
-                      <dd className="mt-2 space-y-2">
-                        {plugins.metrics.length === 0 ? (
-                          <p className="text-gray-500 text-sm">None configured</p>
-                        ) : (
-                          plugins.metrics.map((path, i) => (
-                            <div key={i}>
-                              <span className="text-sm text-gray-900 font-mono">{pluginClassName(path)}</span>
-                              <span className="text-xs text-gray-500 ml-2 font-mono">{path}</span>
-                            </div>
-                          ))
-                        )}
-                      </dd>
+                  ) : (
+                    <p className="text-gray-500 text-sm mt-2">No evaluator plugins registered.</p>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="font-semibold">Metrics Plugins</h3>
+                  {installedPlugins?.metrics?.length ? (
+                    <div className="mt-2 space-y-2">
+                      {installedPlugins.metrics.map((p) => (
+                        <div key={p.name} className="border rounded-lg p-3 bg-white shadow-sm">
+                          <div className="font-medium text-gray-900">{p.name}</div>
+                          <div className="text-sm text-gray-500">Version {p.version}</div>
+                        </div>
+                      ))}
                     </div>
-                  </dl>
-                ) : null}
-              </CardContent>
-            </Card>
+                  ) : (
+                    <p className="text-gray-500 text-sm mt-2">No metrics plugins registered.</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )
 
