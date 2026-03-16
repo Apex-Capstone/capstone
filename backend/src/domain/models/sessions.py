@@ -1,9 +1,10 @@
 """Session and turn request/response schemas."""
 
+import json
 from datetime import datetime
 from typing import Literal, Optional, Union
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 class TimelineEvent(BaseModel):
@@ -74,9 +75,26 @@ class SessionResponse(BaseModel):
     meta: Optional[str] = Field(default=None, alias="session_metadata")
     evaluator_plugin: Optional[str] = None
     evaluator_version: Optional[str] = None
+    patient_model_plugin: Optional[str] = None
+    patient_model_version: Optional[str] = None
+    metrics_plugins: Optional[list] = None  # JSON array of plugin names
     case_title: Optional[str] = None
     # Computed: "closed" when ended_at is set, else "active"
     status: Literal["active", "closed"]
+
+    @field_validator("metrics_plugins", mode="before")
+    @classmethod
+    def _metrics_plugins_from_entity(cls, v: object) -> Optional[list]:
+        if v is None:
+            return None
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return None
     
     model_config = ConfigDict(from_attributes=True, extra="ignore")
 

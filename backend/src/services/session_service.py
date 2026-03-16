@@ -1,5 +1,6 @@
 """Session management service."""
 
+import json
 from datetime import datetime
 
 from sqlalchemy import exc as sa_exceptions
@@ -93,6 +94,43 @@ class SessionService:
             # Freeze the plugin name as stored on the plugin class (registry key).
             plugin_name = getattr(evaluator_cls, "name", plugin_name)
 
+        # Resolve patient model: case override else settings. Freeze name + version on session.
+        patient_model_plugin: str | None = None
+        patient_model_version: str | None = None
+        case_patient = getattr(case, "patient_model_plugin", None)
+        patient_name: str | None = case_patient if case_patient else getattr(settings, "patient_model_plugin", None)
+        if patient_name:
+            try:
+                model_cls = PluginRegistry.get_patient_model(patient_name)
+            except ValueError:
+                if case_patient:
+                    raise HTTPException(status_code=400, detail="Invalid plugin configuration")
+                model_cls = _load_class_from_path(patient_name)
+                PluginRegistry.register_patient_model(patient_name, model_cls)
+            patient_model_plugin = getattr(model_cls, "name", patient_name)
+            patient_model_version = getattr(model_cls, "version", None)
+
+        # Resolve metrics plugins: case override else settings. Validate each and freeze list on session.
+        metrics_list: list[str] = []
+        raw_case_metrics = getattr(case, "metrics_plugins", None)
+        if isinstance(raw_case_metrics, str) and raw_case_metrics.strip():
+            try:
+                parsed = json.loads(raw_case_metrics)
+                if isinstance(parsed, list):
+                    metrics_list = [str(x) for x in parsed]
+            except (json.JSONDecodeError, TypeError):
+                pass
+        if not metrics_list:
+            metrics_list = list(getattr(settings, "metrics_plugins", []) or [])
+        for name in metrics_list:
+            if not name:
+                continue
+            try:
+                PluginRegistry.get_metrics_plugin(name)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid plugin configuration")
+        metrics_plugins_json: str | None = json.dumps(metrics_list) if metrics_list else None
+
         # Create session entity
         session = SessionEntity(
             user_id=user_id,
@@ -101,6 +139,9 @@ class SessionService:
             current_spikes_stage="setting",
             evaluator_plugin=plugin_name,
             evaluator_version=evaluator_version,
+            patient_model_plugin=patient_model_plugin,
+            patient_model_version=patient_model_version,
+            metrics_plugins=metrics_plugins_json,
         )
 
         # Persist, handling potential uniqueness races for non-forced creation
