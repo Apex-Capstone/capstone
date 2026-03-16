@@ -4,6 +4,7 @@ from typing import Any
 
 from adapters.llm import LLMAdapter, OpenAIAdapter, GeminiAdapter
 from config.settings import get_settings
+from plugins.registry import PluginRegistry
 from services.patient_prompt_builder import PatientPromptBuilder
 
 
@@ -12,6 +13,9 @@ class DefaultLLMPatientModel:
     Default PatientModel implementation that wraps the existing LLM adapter
     behavior used by DialogueService for patient response generation.
     """
+
+    name: str = "plugins.patient_models.default_llm_patient:DefaultLLMPatientModel"
+    version: str = "1.0"
 
     def __init__(self, llm_adapter: LLMAdapter | None = None) -> None:
         if llm_adapter is None:
@@ -57,4 +61,8 @@ class DefaultLLMPatientModel:
         )
 
         return response
+
+
+# Register with the global plugin registry on import.
+PluginRegistry.register_patient_model(DefaultLLMPatientModel.name, DefaultLLMPatientModel)
 

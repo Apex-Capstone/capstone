@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from plugins.registry import PluginRegistry
 from services.scoring_service import ScoringService
 
 
@@ -12,6 +13,9 @@ class ApexMetrics:
     Default MetricsPlugin implementation that reuses ScoringService's
     span- and SPIKES-based metric helpers to expose research metrics.
     """
+
+    name: str = "plugins.metrics.apex_metrics:ApexMetrics"
+    version: str = "1.0"
 
     def compute(self, db: Session, session_id: int) -> dict[str, Any]:
         service = ScoringService(db)
@@ -37,3 +41,6 @@ class ApexMetrics:
             "spikes_coverage": spikes_coverage,
         }
 
+
+# Register with the global plugin registry on import.
+PluginRegistry.register_metrics_plugin(ApexMetrics.name, ApexMetrics)

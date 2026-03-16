@@ -5,10 +5,12 @@ from typing import Any, Literal
 
 from sqlalchemy.orm import Session
 
+from config.settings import get_settings
 from core.errors import NotFoundError
-from core.plugin_manager import get_evaluator
+from core.plugin_manager import _load_class_from_path
 from domain.entities.feedback import Feedback
 from domain.models.sessions import FeedbackResponse, SuggestedResponse, TimelineEvent
+from plugins.registry import PluginRegistry
 from repositories.feedback_repo import FeedbackRepository
 from repositories.session_repo import SessionRepository
 from repositories.turn_repo import TurnRepository
@@ -294,8 +296,35 @@ class ScoringService:
         )
 
     async def generate_feedback(self, session_id: int) -> FeedbackResponse:
-        """Generate comprehensive feedback for a session via the Evaluator plugin."""
-        evaluator = get_evaluator()
+        """Generate comprehensive feedback for a session via the Evaluator plugin.
+
+        The evaluator is resolved primarily from the session's frozen metadata.
+        For backward compatibility with existing sessions, this falls back to
+        the globally configured settings.evaluator_plugin when the session does
+        not yet carry evaluator fields.
+        """
+        session = self.session_repo.get_by_id(session_id)
+        if not session:
+            raise NotFoundError(f"Session {session_id} not found")
+
+        # Prefer the evaluator frozen on the session; fall back to settings.
+        plugin_key: str | None = getattr(session, "evaluator_plugin", None)
+        if not plugin_key:
+            settings = get_settings()
+            plugin_key = getattr(settings, "evaluator_plugin", None)
+
+        if not plugin_key:
+            raise RuntimeError("No evaluator plugin configured for scoring.")
+
+        try:
+            plugin_cls = PluginRegistry.get_evaluator(plugin_key)
+        except ValueError:
+            # Backward compatibility: if the evaluator was not registered
+            # in the PluginRegistry, load and register it on demand.
+            plugin_cls = _load_class_from_path(plugin_key)
+            PluginRegistry.register_evaluator(plugin_key, plugin_cls)
+
+        evaluator = plugin_cls()
         return await evaluator.evaluate(self.db, session_id)
     
     # AFCE span-based metric calculation methods

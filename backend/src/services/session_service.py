@@ -5,7 +5,9 @@ from datetime import datetime
 from sqlalchemy import exc as sa_exceptions
 from sqlalchemy.orm import Session
 
+from config.settings import get_settings
 from core.errors import NotFoundError
+from core.plugin_manager import _load_class_from_path
 from domain.entities.session import Session as SessionEntity
 from domain.models.sessions import (
     SessionCreate,
@@ -14,6 +16,7 @@ from domain.models.sessions import (
     SessionResponse,
     TurnResponse,
 )
+from plugins.registry import PluginRegistry
 from repositories.case_repo import CaseRepository
 from repositories.session_repo import SessionRepository
 from repositories.turn_repo import TurnRepository
@@ -66,12 +69,32 @@ class SessionService:
             if existing_session:
                 return self._session_to_response(existing_session, case_title=case.title)
 
+        # Resolve evaluator plugin at creation time so that sessions are
+        # frozen to the evaluator in use when they were started.
+        settings = get_settings()
+        evaluator_path: str | None = getattr(settings, "evaluator_plugin", None)
+
+        evaluator_version: str | None = None
+        if evaluator_path:
+            try:
+                evaluator_cls = PluginRegistry.get_evaluator(evaluator_path)
+            except ValueError:
+                # Backward compatibility: if the evaluator was not registered
+                # via self-registration/import side effects, load it from the
+                # configured path and register it under that path.
+                evaluator_cls = _load_class_from_path(evaluator_path)
+                PluginRegistry.register_evaluator(evaluator_path, evaluator_cls)
+
+            evaluator_version = getattr(evaluator_cls, "version", None)
+
         # Create session entity
         session = SessionEntity(
             user_id=user_id,
             case_id=session_data.case_id,
             state="active",
             current_spikes_stage="setting",
+            evaluator_plugin=evaluator_path,
+            evaluator_version=evaluator_version,
         )
 
         # Persist, handling potential uniqueness races for non-forced creation

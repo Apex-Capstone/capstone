@@ -22,6 +22,8 @@ class Session(Base):
     ended_at = Column(DateTime, nullable=True)
     duration_seconds = Column(Integer, default=0)
     session_metadata = Column("metadata", Text)  # JSON for additional session data
+    evaluator_plugin = Column(String, nullable=True)
+    evaluator_version = Column(String, nullable=True)
 
     # Relationships
     user = relationship("User", back_populates="sessions")

@@ -72,6 +72,8 @@ class SessionResponse(BaseModel):
     ended_at: Optional[datetime]
     duration_seconds: int
     meta: Optional[str] = Field(default=None, alias="session_metadata")
+    evaluator_plugin: Optional[str] = None
+    evaluator_version: Optional[str] = None
     case_title: Optional[str] = None
     # Computed: "closed" when ended_at is set, else "active"
     status: Literal["active", "closed"]
