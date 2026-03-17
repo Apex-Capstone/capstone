@@ -12,7 +12,7 @@ import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Mic, Send, Clock, PhoneOff } from 'lucide-react'
+import { Mic, Send, Clock, PhoneOff, ChevronDown, ChevronUp } from 'lucide-react'
 
 export const CaseDetail = () => {
   const { caseId } = useParams<{ caseId: string }>()
@@ -29,6 +29,9 @@ export const CaseDetail = () => {
   const [currentSpikesStage, setCurrentSpikesStage] = useState<string>('setting')
   const [error, setError] = useState<string | null>(null)
   const [closing, setClosing] = useState(false)
+  const [briefingExpanded, setBriefingExpanded] = useState(false)
+  type BriefingTab = 'patientBackground' | 'objectives' | 'script' | 'expectedSpikesFlow'
+  const [briefingTab, setBriefingTab] = useState<BriefingTab>('patientBackground')
 
   // --- Load case and create session ---
   useEffect(() => {
@@ -235,16 +238,115 @@ export const CaseDetail = () => {
               </Card>
             </div>
 
-            {/* Script */}
+            {/* Case Briefing (collapsible) */}
             <div className="mt-4">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Script</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium">Case Briefing</CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-600"
+                      onClick={() => setBriefingExpanded((e) => !e)}
+                    >
+                      {briefingExpanded ? (
+                        <>
+                          <ChevronUp className="h-4 w-4 mr-1" />
+                          Hide briefing
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-4 w-4 mr-1" />
+                          View full briefing
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <pre className="whitespace-pre-wrap text-sm text-gray-800">
-                    {caseData.script}
-                  </pre>
+                  {!briefingExpanded ? (
+                    <p className="text-sm text-gray-600 line-clamp-2">
+                      {caseData.patientBackground?.trim() || caseData.description || 'No briefing preview.'}
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap gap-1 border-b border-gray-200 pb-2 mb-3">
+                        {caseData.patientBackground != null && (
+                          <button
+                            type="button"
+                            onClick={() => setBriefingTab('patientBackground')}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-md ${
+                              briefingTab === 'patientBackground'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            Patient background
+                          </button>
+                        )}
+                        {caseData.objectives != null && (
+                          <button
+                            type="button"
+                            onClick={() => setBriefingTab('objectives')}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-md ${
+                              briefingTab === 'objectives'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            Objectives
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setBriefingTab('script')}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-md ${
+                            briefingTab === 'script'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          Script
+                        </button>
+                        {caseData.expectedSpikesFlow != null && (
+                          <button
+                            type="button"
+                            onClick={() => setBriefingTab('expectedSpikesFlow')}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-md ${
+                              briefingTab === 'expectedSpikesFlow'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            Expected SPIKES flow
+                          </button>
+                        )}
+                      </div>
+                      <div className="min-h-[120px] max-h-64 overflow-y-auto">
+                        {briefingTab === 'patientBackground' && (
+                          <pre className="whitespace-pre-wrap text-sm text-gray-800">
+                            {caseData.patientBackground || '—'}
+                          </pre>
+                        )}
+                        {briefingTab === 'objectives' && (
+                          <pre className="whitespace-pre-wrap text-sm text-gray-800">
+                            {caseData.objectives ?? '—'}
+                          </pre>
+                        )}
+                        {briefingTab === 'script' && (
+                          <pre className="whitespace-pre-wrap text-sm text-gray-800">
+                            {caseData.script}
+                          </pre>
+                        )}
+                        {briefingTab === 'expectedSpikesFlow' && (
+                          <pre className="whitespace-pre-wrap text-sm text-gray-800">
+                            {caseData.expectedSpikesFlow ?? '—'}
+                          </pre>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>
