@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { useAuthStore } from '@/store/authStore'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -22,6 +23,18 @@ apiClient.interceptors.request.use((config) => {
   }
   return config
 })
+
+// on 401 (expired/invalid token), clear auth and redirect to login
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      useAuthStore.getState().logout()
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
 
 // ---- Auth (keep here so Login.tsx can import it) ----
 export const loginUser = async (email: string, password: string) => {

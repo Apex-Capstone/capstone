@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { listCases } from '@/api/cases.api'
 import { createSession, listUserSessions } from '@/api/sessions.api'
 import type { Case } from '@/types/case'
@@ -15,6 +15,7 @@ export const Dashboard = () => {
   const [loading, setLoading] = useState(true)
   const [sessions, setSessions] = useState<Session[]>([])
   const [creatingSessionForCase, setCreatingSessionForCase] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const { user } = useAuthStore()
   const navigate = useNavigate()
 
@@ -65,6 +66,23 @@ export const Dashboard = () => {
 
   const activeSessions = sessions.filter((s) => s.status === 'active')
   const closedSessions = sessions.filter((s) => s.status === 'closed')
+  const loadCases = useCallback(async () => {
+    setError(null)
+    setLoading(true)
+    try {
+      const { items } = await listCases()
+      setCases(items)
+    } catch (err) {
+      console.error('Failed to fetch cases:', err)
+      setError('Failed to load cases. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadCases()
+  }, [loadCases])
 
   // derive soft status counts (since BE Case has no status)
   const statusCounts = cases.reduce(
@@ -197,6 +215,17 @@ export const Dashboard = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+            ) : error ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-12 text-center">
+                <p className="text-amber-800 mb-4">{error}</p>
+                <Button onClick={loadCases} variant="outline">
+                  Try again
+                </Button>
+              </div>
+            ) : cases.length === 0 ? (
+              <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
+                <p className="text-gray-500">No virtual patient cases available. Contact your administrator.</p>
               </div>
             ) : (
               <div>
