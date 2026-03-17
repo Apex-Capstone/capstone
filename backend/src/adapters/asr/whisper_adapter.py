@@ -44,6 +44,7 @@ class WhisperAdapter:
                     transcript = await self.client.audio.transcriptions.create(
                         model="whisper-1",
                         file=audio_file,
+                        temperature=0,
                     )
 
                 transcript_text = (transcript.text or "").strip()

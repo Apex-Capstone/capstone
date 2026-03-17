@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { flushSync } from 'react-dom'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { getCase } from '@/api/cases.api'
 import { createSession, transcribeAudioTurn, submitTurn, closeSession, getSession } from '@/api/sessions.api'
@@ -36,6 +35,9 @@ const preferredMimeTypes = [
   'audio/ogg',
   'audio/mp4',
 ]
+
+const VOICE_ACTIVITY_RMS_THRESHOLD = 0.02
+const MIN_VOICE_ACTIVE_FRAMES = 5
 
 type ApiErrorShape = {
   response?: {
@@ -75,6 +77,12 @@ export const CaseDetail = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const audioMonitorFrameRef = useRef<number | null>(null)
+  const voiceActivityRef = useRef({ maxRms: 0, activeFrames: 0 })
+  const recordingStartedAtRef = useRef<number | null>(null)
 
   // --- Load case and create session ---
   useEffect(() => {
@@ -170,15 +178,6 @@ export const CaseDetail = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, sending])
 
-  useEffect(() => {
-    return () => {
-      mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop())
-      mediaRecorderRef.current = null
-      mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
-      mediaStreamRef.current = null
-      audioChunksRef.current = []
-    }
-  }, [])
   // --- Message submission ---
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -235,10 +234,79 @@ export const CaseDetail = () => {
     }
   }
 
-  const stopMediaStream = () => {
+  const stopAudioAnalysis = useCallback(() => {
+    if (audioMonitorFrameRef.current !== null) {
+      cancelAnimationFrame(audioMonitorFrameRef.current)
+      audioMonitorFrameRef.current = null
+    }
+
+    sourceNodeRef.current?.disconnect()
+    sourceNodeRef.current = null
+    analyserRef.current = null
+
+    if (audioContextRef.current) {
+      void audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+  }, [])
+
+  const stopMediaStream = useCallback(() => {
+    stopAudioAnalysis()
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
     mediaStreamRef.current = null
-  }
+  }, [stopAudioAnalysis])
+
+  const startVoiceActivityMonitoring = useCallback((stream: MediaStream) => {
+    if (typeof window === 'undefined' || typeof window.AudioContext === 'undefined') {
+      voiceActivityRef.current = { maxRms: 0, activeFrames: 0 }
+      return
+    }
+
+    const audioContext = new window.AudioContext()
+    const analyser = audioContext.createAnalyser()
+    analyser.fftSize = 2048
+    analyser.smoothingTimeConstant = 0.2
+
+    const sourceNode = audioContext.createMediaStreamSource(stream)
+    sourceNode.connect(analyser)
+
+    const samples = new Uint8Array(analyser.fftSize)
+    voiceActivityRef.current = { maxRms: 0, activeFrames: 0 }
+    audioContextRef.current = audioContext
+    analyserRef.current = analyser
+    sourceNodeRef.current = sourceNode
+
+    const monitor = () => {
+      analyser.getByteTimeDomainData(samples)
+
+      let sumSquares = 0
+      for (const sample of samples) {
+        const normalized = (sample - 128) / 128
+        sumSquares += normalized * normalized
+      }
+
+      const rms = Math.sqrt(sumSquares / samples.length)
+      if (rms > voiceActivityRef.current.maxRms) {
+        voiceActivityRef.current.maxRms = rms
+      }
+      if (rms >= VOICE_ACTIVITY_RMS_THRESHOLD) {
+        voiceActivityRef.current.activeFrames += 1
+      }
+
+      audioMonitorFrameRef.current = requestAnimationFrame(monitor)
+    }
+
+    monitor()
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop())
+      mediaRecorderRef.current = null
+      stopMediaStream()
+      audioChunksRef.current = []
+    }
+  }, [stopMediaStream])
 
   const updateMessage = (messageId: string, updates: Partial<Message>) => {
     setMessages((prev) =>
@@ -275,9 +343,7 @@ export const CaseDetail = () => {
         status: 'sent',
       })
 
-      flushSync(() => {
-        setVoiceStatus('Patient is responding...')
-      })
+      setVoiceStatus(null)
 
       const response = await submitTurn(sessionId, transcription.transcript, transcription.audioUrl)
 
@@ -328,8 +394,10 @@ export const CaseDetail = () => {
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
 
       audioChunksRef.current = []
+      recordingStartedAtRef.current = Date.now()
       mediaRecorderRef.current = recorder
       mediaStreamRef.current = stream
+      startVoiceActivityMonitoring(stream)
 
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -347,6 +415,11 @@ export const CaseDetail = () => {
       recorder.onstop = () => {
         setIsRecording(false)
 
+        const { activeFrames, maxRms } = voiceActivityRef.current
+        const recordingDurationMs = recordingStartedAtRef.current
+          ? Date.now() - recordingStartedAtRef.current
+          : 0
+        recordingStartedAtRef.current = null
         const recordedMimeType = recorder.mimeType || audioChunksRef.current[0]?.type || 'audio/webm'
         const audioBlob = new Blob(audioChunksRef.current, { type: recordedMimeType })
         audioChunksRef.current = []
@@ -355,6 +428,17 @@ export const CaseDetail = () => {
         if (audioBlob.size === 0) {
           setVoiceStatus(null)
           setError('No audio was captured. Please try again.')
+          return
+        }
+
+        const detectedSpeech =
+          maxRms >= VOICE_ACTIVITY_RMS_THRESHOLD &&
+          activeFrames >= MIN_VOICE_ACTIVE_FRAMES &&
+          recordingDurationMs > 0
+
+        if (!detectedSpeech) {
+          setVoiceStatus(null)
+          setError('No speech was detected. Please try again and speak before stopping the microphone.')
           return
         }
 
@@ -382,6 +466,7 @@ export const CaseDetail = () => {
     } catch (recordError) {
       console.error('Failed to start recording:', recordError)
       setError('Microphone access was denied or is unavailable.')
+      recordingStartedAtRef.current = null
       setVoiceStatus(null)
       stopMediaStream()
     }
@@ -418,12 +503,9 @@ export const CaseDetail = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
-  const showVoiceIndicator = Boolean(voiceStatus || isRecording)
-  const isVoiceProcessing =
-    voiceStatus === 'Preparing voice message...' ||
-    voiceStatus === 'Transcribing voice message...'
+  const showVoiceIndicator = isRecording
   const showPatientRespondingIndicator =
-    sending && (!voiceStatus || voiceStatus === 'Patient is responding...')
+    sending && !voiceStatus
   const listeningBarHeights = ['38%', '72%', '54%', '80%', '46%']
 
   if (loading) {
@@ -449,11 +531,6 @@ export const CaseDetail = () => {
           @keyframes listening-wave {
             0%, 100% { transform: scaleY(0.45); opacity: 0.65; }
             50% { transform: scaleY(1); opacity: 1; }
-          }
-
-          @keyframes processing-dot {
-            0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }
-            40% { transform: translateY(-2px); opacity: 0.85; }
           }
         `}
       </style>
@@ -705,54 +782,38 @@ export const CaseDetail = () => {
                 <span>Session time: {formatTime(sessionElapsed)} • SPIKES: {currentSpikesStage}</span>
                 {sessionId && <span>Session ID: {sessionId}</span>}
               </div>
+              {error && (
+                <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
               <div
                 className={`overflow-hidden transition-all duration-300 ease-out ${showVoiceIndicator ? 'mt-3 max-h-24 translate-y-0 opacity-100' : 'mt-0 max-h-0 -translate-y-1 opacity-0'}`}
               >
-                <div className={`rounded-md border px-3 py-2 text-sm transition-colors duration-200 ${isRecording ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-gray-200 bg-gray-50 text-gray-600'}`}>
-                  {isRecording ? (
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <div>
-                          <div className="font-medium">Listening</div>
-                          <div className="text-xs text-emerald-700">
-                            Tap the microphone again when you are done speaking.
-                          </div>
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 transition-colors duration-200">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <div>
+                        <div className="font-medium">Listening</div>
+                        <div className="text-xs text-emerald-700">
+                          Tap the microphone again when you are done speaking.
                         </div>
                       </div>
-                      <div className="flex h-8 w-16 items-end justify-end gap-1">
-                        {listeningBarHeights.map((height, index) => (
-                          <span
-                            key={`voice-bar-${index}`}
-                            className="w-1.5 origin-bottom rounded-full bg-emerald-500"
-                            style={{
-                              height,
-                              animation: `listening-wave 0.9s ease-in-out ${index * 0.12}s infinite`,
-                            }}
-                          />
-                        ))}
-                      </div>
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="text-xs text-gray-500">
-                        {voiceStatus}
-                      </div>
-                      {isVoiceProcessing && (
-                        <div className="flex items-center gap-1">
-                          {[0, 1, 2].map((index) => (
-                            <span
-                              key={`voice-status-dot-${index}`}
-                              className="h-1.5 w-1.5 rounded-full bg-gray-400"
-                              style={{
-                                animation: `processing-dot 1.1s ease-in-out ${index * 0.15}s infinite`,
-                              }}
-                            />
-                          ))}
-                        </div>
-                      )}
+                    <div className="flex h-8 w-16 items-end justify-end gap-1">
+                      {listeningBarHeights.map((height, index) => (
+                        <span
+                          key={`voice-bar-${index}`}
+                          className="w-1.5 origin-bottom rounded-full bg-emerald-500"
+                          style={{
+                            height,
+                            animation: `listening-wave 0.9s ease-in-out ${index * 0.12}s infinite`,
+                          }}
+                        />
+                      ))}
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             </form>
