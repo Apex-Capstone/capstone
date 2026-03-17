@@ -78,10 +78,7 @@ button {
 button:hover {
   border-color: #646cff;
 }
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
+/* Focus ring removed from global button so UI Button component controls it */
 
 @media (prefers-color-scheme: light) {
   :root {

@@ -379,7 +379,8 @@ export const SessionDetailPage = () => {
                         </div>
 
                         <Button
-                          className="mt-2 w-full gap-1.5"
+                          variant="ghost"
+                          className="mt-2 w-full gap-1.5 bg-transparent border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
                           onClick={() => navigate(`/feedback/${session.id}`)}
                         >
                           View Full Feedback
