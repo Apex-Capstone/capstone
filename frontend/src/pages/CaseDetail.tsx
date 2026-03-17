@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getCase } from '@/api/cases.api'
@@ -32,6 +32,7 @@ export const CaseDetail = () => {
   const [briefingExpanded, setBriefingExpanded] = useState(false)
   type BriefingTab = 'patientBackground' | 'objectives' | 'script' | 'expectedSpikesFlow'
   const [briefingTab, setBriefingTab] = useState<BriefingTab>('patientBackground')
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // --- Load case and create session ---
   useEffect(() => {
@@ -70,6 +71,11 @@ export const CaseDetail = () => {
     }, 1000)
     return () => clearInterval(timer)
   }, [startTime])
+
+  // --- Scroll chat to latest message ---
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, sending])
 
   // --- Message submission ---
   const handleSubmit = async (e: FormEvent) => {
@@ -165,7 +171,7 @@ export const CaseDetail = () => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex h-screen flex-col">
       <Navbar />
       <div className="flex flex-1">
         <Sidebar />
@@ -377,6 +383,7 @@ export const CaseDetail = () => {
                   Patient is responding...
                 </div>
               )}
+              <div ref={messagesEndRef} />
             </div>
           </div>
 
