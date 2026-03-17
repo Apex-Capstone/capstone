@@ -119,6 +119,13 @@ The dialogue service implements the SPIKES protocol for breaking bad news:
 - **NLU**: Rule-based NLU for empathy detection and question classification
 - **Storage**: S3 for audio file storage
 
+### Audio Input Notes
+- `POST /v1/sessions/{session_id}/audio` accepts `wav`, `ogg`, `mp3`, `webm`, and `m4a` uploads up to 10 MB.
+- Audio input requires a real `openai_api_key` because transcription uses Whisper.
+- The upload route validates that the session belongs to the authenticated user and is still active.
+- Raw audio storage is best-effort for the current input-only scope. If S3 is not configured or unavailable in local development, transcription can still succeed and the response may return `audio_url: null`.
+- Text-to-speech is still a placeholder; only audio-to-text input is implemented.
+
 ### Scoring & Feedback
 Automated scoring based on:
 - Empathy level

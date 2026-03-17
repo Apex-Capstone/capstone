@@ -1,7 +1,9 @@
 """Sessions controller/router."""
 
 import json
+from pathlib import Path
 from typing import Annotated
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from pydantic import BaseModel
@@ -11,8 +13,9 @@ from adapters.asr.whisper_adapter import WhisperAdapter
 from adapters.llm.openai_adapter import OpenAIAdapter
 from adapters.nlu.simple_rule_nlu import SimpleRuleNLU
 from adapters.storage.s3_storage import S3StorageAdapter
+from config.logging import get_logger
 from core.deps import get_current_user, get_db, verify_session_access
-from core.errors import NotFoundError
+from core.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
 from domain.entities.user import User
 from repositories.feedback_repo import FeedbackRepository
 from repositories.session_repo import SessionRepository
@@ -30,6 +33,9 @@ from services.scoring_service import ScoringService
 from services.session_service import SessionService
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+logger = get_logger(__name__)
+ALLOWED_AUDIO_EXTENSIONS = {"wav", "ogg", "mp3", "webm", "m4a"}
+MAX_AUDIO_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
 def _deserialize_json_field(value: str | None) -> dict | list | None:
@@ -45,12 +51,95 @@ def _deserialize_json_field(value: str | None) -> dict | list | None:
     return value if isinstance(value, (dict, list)) else None
 
 
+def _normalize_audio_extension(upload: UploadFile) -> str:
+    """Get a supported extension from the uploaded file."""
+    suffix = Path(upload.filename or "").suffix.lower().lstrip(".")
+    if suffix in ALLOWED_AUDIO_EXTENSIONS:
+        return suffix
+
+    content_type = (upload.content_type or "").lower()
+    content_type_map = {
+        "audio/wav": "wav",
+        "audio/x-wav": "wav",
+        "audio/mpeg": "mp3",
+        "audio/mp3": "mp3",
+        "audio/ogg": "ogg",
+        "audio/webm": "webm",
+        "audio/mp4": "m4a",
+        "audio/x-m4a": "m4a",
+    }
+    normalized = content_type_map.get(content_type)
+    if normalized:
+        return normalized
+
+    raise ValidationError(
+        f"Unsupported audio format. Allowed formats: {', '.join(sorted(ALLOWED_AUDIO_EXTENSIONS))}"
+    )
+
+
+def _build_audio_storage_key(session_id: int, audio_format: str) -> str:
+    """Generate a stable object key for stored audio uploads."""
+    return f"sessions/{session_id}/{uuid4().hex}.{audio_format}"
+
+
+def _validate_audio_payload(audio_data: bytes) -> None:
+    """Validate uploaded audio bytes."""
+    if not audio_data:
+        raise ValidationError("Audio file is empty")
+    if len(audio_data) > MAX_AUDIO_UPLOAD_BYTES:
+        raise ValidationError(
+            f"Audio file is too large. Maximum size is {MAX_AUDIO_UPLOAD_BYTES // (1024 * 1024)} MB"
+        )
+
+
+def _validate_session_write_access(session_id: int, db: Session, current_user: User):
+    """Ensure the current user can add turns to the session."""
+    session_repo = SessionRepository(db)
+    session = session_repo.get_by_id(session_id)
+    if not session:
+        raise NotFoundError(f"Session with ID {session_id} not found")
+    if session.user_id != current_user.id:
+        raise AuthorizationError("You do not have permission to update this session")
+    if session.state != "active":
+        raise ConflictError("Session is not active")
+    return session
+
+
+async def _store_audio_file(
+    session_id: int,
+    audio_data: bytes,
+    audio_format: str,
+    content_type: str | None,
+) -> str | None:
+    """Best-effort raw audio storage for later review."""
+    storage_adapter = S3StorageAdapter()
+    object_key = _build_audio_storage_key(session_id, audio_format)
+
+    try:
+        return await storage_adapter.put_file(
+            audio_data,
+            object_key,
+            content_type=content_type or f"audio/{audio_format}",
+        )
+    except Exception as exc:
+        # Audio storage is optional for the current input-only scope.
+        logger.warning("Skipping audio storage for session %s: %s", session_id, exc)
+        return None
+
+
 class TurnResponseWithAudio(BaseModel):
     """Turn response with patient reply and audio."""
     turn: TurnResponse
     patient_reply: str
+    transcript: str | None = None
     audio_url: str | None = None
     spikes_stage: str | None = None
+
+
+class AudioTranscriptionResponse(BaseModel):
+    """Audio transcription payload before patient response generation."""
+    transcript: str
+    audio_url: str | None = None
 
 
 class TurnListResponse(BaseModel):
@@ -101,6 +190,7 @@ async def submit_turn(
     return TurnResponseWithAudio(
         turn=patient_turn,
         patient_reply=patient_turn.text,
+        transcript=turn_data.text,
         audio_url=patient_turn.audio_url,
         spikes_stage=session_detail.current_spikes_stage,
     )
@@ -113,51 +203,67 @@ async def submit_audio_turn(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    """Upload audio file (wav/ogg/mp3). Server performs ASR and processes as turn."""
-    session_repo = SessionRepository(db)
-    sess = session_repo.get_by_id(session_id)
-    if not sess:
-        raise NotFoundError(f"Session with ID {session_id} not found")
-    verify_session_access(sess, current_user)
+    """Upload audio file and process it as a normal conversation turn."""
+    transcription = await transcribe_audio_turn(session_id, audio_file, db, current_user)
 
-    # Read audio file
-    audio_data = await audio_file.read()
-    
-    # Transcribe with ASR
-    asr_adapter = WhisperAdapter()
-    transcribed_text = await asr_adapter.transcribe_audio(
-        audio_data,
-        audio_format=audio_file.filename.split(".")[-1] if audio_file.filename else "wav",
-    )
-    
-    # Store audio file
-    storage_adapter = S3StorageAdapter()
-    audio_url = await storage_adapter.put_file(
-        audio_data,
-        f"sessions/{session_id}/{audio_file.filename}",
-        content_type=audio_file.content_type or "audio/wav",
-    )
-    
     # Process as turn
-    turn_data = TurnCreate(text=transcribed_text, audio_url=audio_url)
-    
+    turn_data = TurnCreate(text=transcription.transcript, audio_url=transcription.audio_url)
+
     # Initialize dialogue service
     llm_adapter = OpenAIAdapter()
     nlu_adapter = SimpleRuleNLU()
     dialogue_service = DialogueService(db, llm_adapter, nlu_adapter)
-    
+
     # Process turn
     patient_turn = await dialogue_service.process_user_turn(session_id, turn_data)
-    
+
     # Get updated session
     session_service = SessionService(db)
     session_detail = await session_service.get_session(session_id)
-    
+
     return TurnResponseWithAudio(
         turn=patient_turn,
         patient_reply=patient_turn.text,
-        audio_url=patient_turn.audio_url,
+        transcript=transcription.transcript,
+        audio_url=transcription.audio_url,
         spikes_stage=session_detail.current_spikes_stage,
+    )
+
+
+@router.post("/{session_id}/audio:transcribe", response_model=AudioTranscriptionResponse)
+async def transcribe_audio_turn(
+    session_id: int,
+    audio_file: Annotated[UploadFile, File(...)],
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Upload audio file and return only the transcript plus stored audio URL."""
+    _validate_session_write_access(session_id, db, current_user)
+
+    audio_format = _normalize_audio_extension(audio_file)
+
+    # Read audio file
+    audio_data = await audio_file.read()
+    _validate_audio_payload(audio_data)
+
+    # Transcribe with ASR
+    asr_adapter = WhisperAdapter()
+    transcribed_text = await asr_adapter.transcribe_audio(
+        audio_data,
+        audio_format=audio_format,
+    )
+
+    # Store audio file when storage is available; keep input flow working without it.
+    audio_url = await _store_audio_file(
+        session_id,
+        audio_data,
+        audio_format,
+        audio_file.content_type,
+    )
+
+    return AudioTranscriptionResponse(
+        transcript=transcribed_text,
+        audio_url=audio_url,
     )
 
 

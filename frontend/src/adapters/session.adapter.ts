@@ -47,6 +47,7 @@ export function turnResponseWithAudioFromDTO(dto: TurnResponseWithAudioDTO): Tur
   return {
     turn: turnFromDTO(dto.turn),
     patientReply: dto.patient_reply,
+    transcript: dto.transcript ?? undefined,
     audioUrl: dto.audio_url ?? undefined,
     spikesStage: dto.spikes_stage ?? undefined,
   }

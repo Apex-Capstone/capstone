@@ -30,14 +30,22 @@ export const ChatBubble = ({ message }: ChatBubbleProps) => {
             : 'bg-gray-100 text-gray-900'
         )}
       >
-        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        <p
+          className={cn(
+            'text-sm whitespace-pre-wrap',
+            message.status === 'pending' && 'italic opacity-90',
+            message.status === 'error' && 'font-medium'
+          )}
+        >
+          {message.content}
+        </p>
         <p
           className={cn(
             'mt-1 text-xs',
             isUser ? 'text-emerald-100' : 'text-gray-500'
           )}
         >
-          {new Date(message.timestamp).toLocaleTimeString()}
+          {message.source === 'audio' ? 'Voice' : 'Text'} • {new Date(message.timestamp).toLocaleTimeString()}
         </p>
       </div>
 

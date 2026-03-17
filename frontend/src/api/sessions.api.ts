@@ -99,3 +99,34 @@ export const submitAudioTurn = async (
   return turnResponseWithAudioFromDTO(res.data)
 }
 
+export interface AudioTranscriptionResult {
+  transcript: string
+  audioUrl?: string
+}
+
+/**
+ * Upload audio file and return only the transcript.
+ */
+export const transcribeAudioTurn = async (
+  sessionId: number,
+  audioFile: File
+): Promise<AudioTranscriptionResult> => {
+  const formData = new FormData()
+  formData.append('audio_file', audioFile)
+
+  const res = await api.post<{ transcript: string; audio_url?: string | null }>(
+    `${BASE}/${sessionId}/audio:transcribe`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  )
+
+  return {
+    transcript: res.data.transcript,
+    audioUrl: res.data.audio_url ?? undefined,
+  }
+}
+

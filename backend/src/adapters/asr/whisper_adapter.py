@@ -3,10 +3,11 @@
 import tempfile
 from pathlib import Path
 
-import openai
+from openai import AsyncOpenAI
 
 from config.logging import get_logger
 from config.settings import get_settings
+from core.errors import ExternalServiceError, ValidationError
 
 logger = get_logger(__name__)
 
@@ -17,7 +18,7 @@ class WhisperAdapter:
     def __init__(self):
         settings = get_settings()
         self.api_key = settings.openai_api_key
-        openai.api_key = self.api_key
+        self.client = AsyncOpenAI(api_key=self.api_key)
     
     async def transcribe_audio(
         self,
@@ -25,6 +26,9 @@ class WhisperAdapter:
         audio_format: str = "wav",
     ) -> str:
         """Transcribe audio using Whisper API."""
+        if not audio_data:
+            raise ValidationError("Audio file is empty")
+
         try:
             # Write audio to temporary file (Whisper API requires file input)
             with tempfile.NamedTemporaryFile(
@@ -37,17 +41,23 @@ class WhisperAdapter:
             try:
                 # Transcribe using Whisper
                 with open(temp_path, "rb") as audio_file:
-                    transcript = await openai.Audio.atranscribe(
+                    transcript = await self.client.audio.transcriptions.create(
                         model="whisper-1",
                         file=audio_file,
                     )
-                
-                return transcript.text.strip()
+
+                transcript_text = (transcript.text or "").strip()
+                if not transcript_text:
+                    raise ValidationError("Could not detect speech in the uploaded audio")
+
+                return transcript_text
             finally:
                 # Clean up temporary file
                 temp_path.unlink(missing_ok=True)
                 
+        except ValidationError:
+            raise
         except Exception as e:
             logger.error(f"Whisper transcription error: {e}")
-            raise
+            raise ExternalServiceError("Audio transcription failed") from e
 

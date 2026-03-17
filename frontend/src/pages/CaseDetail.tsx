@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { flushSync } from 'react-dom'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { getCase } from '@/api/cases.api'
-import { createSession, submitTurn, closeSession, getSession } from '@/api/sessions.api'
+import { createSession, transcribeAudioTurn, submitTurn, closeSession, getSession } from '@/api/sessions.api'
 import type { Case as CaseType } from '@/types/case'
 import type { Message } from '@/types/session'
 
@@ -12,8 +13,38 @@ import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Mic, Send, Clock, PhoneOff } from 'lucide-react'
+import { Mic, Send, Clock, PhoneOff, ChevronDown, ChevronUp } from 'lucide-react'
 import { SpikesProgressBar } from '@/components/SpikesProgressBar'
+
+const audioExtensionByMimeType: Record<string, string> = {
+  'audio/webm;codecs=opus': 'webm',
+  'audio/webm': 'webm',
+  'audio/ogg;codecs=opus': 'ogg',
+  'audio/ogg': 'ogg',
+  'audio/mp4': 'm4a',
+  'audio/x-m4a': 'm4a',
+  'audio/mpeg': 'mp3',
+  'audio/mp3': 'mp3',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+}
+
+const preferredMimeTypes = [
+  'audio/webm;codecs=opus',
+  'audio/webm',
+  'audio/ogg;codecs=opus',
+  'audio/ogg',
+  'audio/mp4',
+]
+
+type ApiErrorShape = {
+  response?: {
+    data?: {
+      detail?: string
+      message?: string
+    }
+  }
+}
 
 export const CaseDetail = () => {
   const { caseId } = useParams<{ caseId: string }>()
@@ -32,8 +63,18 @@ export const CaseDetail = () => {
   const [error, setError] = useState<string | null>(null)
   const createdSessionForCase = useRef<number | null>(null)
   const initializingRef = useRef(false)
-
   const sessionParam = searchParams.get('sessionId')
+  const [closing, setClosing] = useState(false)
+  const [briefingExpanded, setBriefingExpanded] = useState(false)
+  type BriefingTab = 'patientBackground' | 'objectives' | 'script' | 'expectedSpikesFlow'
+  const [briefingTab, setBriefingTab] = useState<BriefingTab>('patientBackground')
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [isRecording, setIsRecording] = useState(false)
+  const [voiceStatus, setVoiceStatus] = useState<string | null>(null)
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
 
   // --- Load case and create session ---
   useEffect(() => {
@@ -124,15 +165,30 @@ export const CaseDetail = () => {
     return () => clearInterval(timer)
   }, [startTime])
 
+  // --- Scroll chat to latest message ---
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, sending])
+
+  useEffect(() => {
+    return () => {
+      mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop())
+      mediaRecorderRef.current = null
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
+      mediaStreamRef.current = null
+      audioChunksRef.current = []
+    }
+  }, [])
   // --- Message submission ---
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (!inputValue.trim() || sending || !sessionId) return
+    if (!inputValue.trim() || sending || isRecording || !sessionId) return
 
     const userMessageContent = inputValue
     setInputValue('')
     setSending(true)
     setError(null)
+    setVoiceStatus(null)
 
     // Add user message to UI immediately
     const userMessage: Message = {
@@ -158,11 +214,13 @@ export const CaseDetail = () => {
         role: 'assistant',
         content: response.patientReply,
         timestamp: response.turn.timestamp,
+        source: 'text',
+        status: 'sent',
       }
       setMessages((prev) => [...prev, assistantMessage])
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to submit turn:', error)
-      setError(error.response?.data?.detail || 'Failed to send message. Please try again.')
+      setError(getErrorMessage(error, 'Failed to send message. Please try again.'))
       
       // Add error message to chat
       const errorMessage: Message = {
@@ -177,22 +235,181 @@ export const CaseDetail = () => {
     }
   }
 
+  const stopMediaStream = () => {
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
+    mediaStreamRef.current = null
+  }
+
+  const updateMessage = (messageId: string, updates: Partial<Message>) => {
+    setMessages((prev) =>
+      prev.map((message) => (message.id === messageId ? { ...message, ...updates } : message))
+    )
+  }
+
+  const getPreferredAudioMimeType = () => {
+    if (typeof MediaRecorder === 'undefined') return ''
+
+    return preferredMimeTypes.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? ''
+  }
+
+  const getAudioExtension = (mimeType: string) => {
+    return audioExtensionByMimeType[mimeType.toLowerCase()] ?? 'webm'
+  }
+
+  const getErrorMessage = (error: unknown, fallback: string) => {
+    const apiError = error as ApiErrorShape
+    return apiError.response?.data?.message || apiError.response?.data?.detail || fallback
+  }
+
+  const uploadRecordedAudio = async (audioFile: File, pendingMessageId: string) => {
+    if (!sessionId) return
+
+    setSending(true)
+    setVoiceStatus('Transcribing voice message...')
+
+    try {
+      const transcription = await transcribeAudioTurn(sessionId, audioFile)
+
+      updateMessage(pendingMessageId, {
+        content: transcription.transcript || 'Voice message sent.',
+        status: 'sent',
+      })
+
+      flushSync(() => {
+        setVoiceStatus('Patient is responding...')
+      })
+
+      const response = await submitTurn(sessionId, transcription.transcript, transcription.audioUrl)
+
+      if (response.spikesStage) {
+        setCurrentSpikesStage(response.spikesStage)
+      }
+
+      const assistantMessage: Message = {
+        id: `assistant-${response.turn.id}`,
+        role: 'assistant',
+        content: response.patientReply,
+        timestamp: response.turn.timestamp,
+        source: 'text',
+        status: 'sent',
+      }
+      setMessages((prev) => [...prev, assistantMessage])
+    } catch (uploadError: unknown) {
+      console.error('Failed to submit audio turn:', uploadError)
+      setError(getErrorMessage(uploadError, 'Failed to process voice input. Please try again.'))
+      updateMessage(pendingMessageId, {
+        content: 'Voice message failed. Please try again.',
+        status: 'error',
+      })
+    } finally {
+      setSending(false)
+      setVoiceStatus(null)
+    }
+  }
+
+  const startVoiceRecording = async () => {
+    if (!sessionId || sending || closing) return
+
+    if (
+      typeof navigator === 'undefined' ||
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof MediaRecorder === 'undefined'
+    ) {
+      setError('Voice input is not supported in this browser.')
+      return
+    }
+
+    setError(null)
+    setVoiceStatus('Requesting microphone access...')
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = getPreferredAudioMimeType()
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+
+      audioChunksRef.current = []
+      mediaRecorderRef.current = recorder
+      mediaStreamRef.current = stream
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+
+      recorder.onerror = () => {
+        setError('Microphone recording failed. Please try again.')
+        setIsRecording(false)
+        setVoiceStatus(null)
+        stopMediaStream()
+      }
+
+      recorder.onstop = () => {
+        setIsRecording(false)
+
+        const recordedMimeType = recorder.mimeType || audioChunksRef.current[0]?.type || 'audio/webm'
+        const audioBlob = new Blob(audioChunksRef.current, { type: recordedMimeType })
+        audioChunksRef.current = []
+        stopMediaStream()
+
+        if (audioBlob.size === 0) {
+          setVoiceStatus(null)
+          setError('No audio was captured. Please try again.')
+          return
+        }
+
+        const pendingMessageId = `audio-${Date.now()}`
+        const pendingMessage: Message = {
+          id: pendingMessageId,
+          role: 'user',
+          content: 'Transcribing voice message...',
+          timestamp: new Date().toISOString(),
+          source: 'audio',
+          status: 'pending',
+        }
+        setMessages((prev) => [...prev, pendingMessage])
+
+        const extension = getAudioExtension(recordedMimeType)
+        const audioFile = new File([audioBlob], `voice-message-${Date.now()}.${extension}`, {
+          type: recordedMimeType,
+        })
+        void uploadRecordedAudio(audioFile, pendingMessageId)
+      }
+
+      recorder.start()
+      setIsRecording(true)
+      setVoiceStatus('Listening... Start speaking, then tap the microphone again to stop.')
+    } catch (recordError) {
+      console.error('Failed to start recording:', recordError)
+      setError('Microphone access was denied or is unavailable.')
+      setVoiceStatus(null)
+      stopMediaStream()
+    }
+  }
+
   const handleVoiceInput = () => {
-    alert('Voice input will be implemented when ASR backend is ready')
+    if (isRecording) {
+      mediaRecorderRef.current?.stop()
+      setVoiceStatus('Preparing voice message...')
+      return
+    }
+
+    void startVoiceRecording()
   }
 
   const handleEndSession = async () => {
     if (!sessionId) return
+    setClosing(true)
+    setError(null)
 
     try {
       await closeSession(sessionId)
-    } catch (error) {
-      console.error('Failed to close session:', error)
-      setError('Unable to close session. Please try again.')
-      return
+      navigate(`/feedback/${sessionId}`)
+    } catch (err: unknown) {
+      console.error('Failed to close session:', err)
+      setError(getErrorMessage(err, 'Failed to end session. Please try again.'))
+      setClosing(false)
     }
-
-    navigate(`/feedback/${sessionId}`)
   }
 
   const formatTime = (seconds: number) => {
@@ -200,6 +417,14 @@ export const CaseDetail = () => {
     const secs = seconds % 60
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
+
+  const showVoiceIndicator = Boolean(voiceStatus || isRecording)
+  const isVoiceProcessing =
+    voiceStatus === 'Preparing voice message...' ||
+    voiceStatus === 'Transcribing voice message...'
+  const showPatientRespondingIndicator =
+    sending && (!voiceStatus || voiceStatus === 'Patient is responding...')
+  const listeningBarHeights = ['38%', '72%', '54%', '80%', '46%']
 
   if (loading) {
     return (
@@ -219,6 +444,19 @@ export const CaseDetail = () => {
 
   return (
     <div className="h-screen flex flex-col">
+      <style>
+        {`
+          @keyframes listening-wave {
+            0%, 100% { transform: scaleY(0.45); opacity: 0.65; }
+            50% { transform: scaleY(1); opacity: 1; }
+          }
+
+          @keyframes processing-dot {
+            0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }
+            40% { transform: translateY(-2px); opacity: 0.85; }
+          }
+        `}
+      </style>
       <Navbar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />
@@ -241,10 +479,11 @@ export const CaseDetail = () => {
                 variant="destructive"
                 size="sm"
                 onClick={handleEndSession}
+                disabled={closing}
                 className="flex items-center gap-2"
               >
                 <PhoneOff className="h-4 w-4" />
-                End Session
+                {closing ? 'Generating Feedback...' : 'End Session'}
               </Button>
             </div>
 
@@ -289,6 +528,118 @@ export const CaseDetail = () => {
                 </CardContent>
               </Card>
             </div>
+
+            <div className="mt-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium">Case Briefing</CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="bg-transparent border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                      onClick={() => setBriefingExpanded((expanded) => !expanded)}
+                    >
+                      {briefingExpanded ? (
+                        <>
+                          <ChevronUp className="mr-1 h-4 w-4" />
+                          Hide briefing
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="mr-1 h-4 w-4" />
+                          View full briefing
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {!briefingExpanded ? (
+                    <p className="line-clamp-2 text-sm text-gray-600">
+                      {caseData.patientBackground?.trim() || caseData.description || 'No briefing preview.'}
+                    </p>
+                  ) : (
+                    <>
+                      <div className="mb-3 flex flex-wrap gap-1 border-b border-gray-200 pb-2">
+                        {caseData.patientBackground != null && (
+                          <button
+                            type="button"
+                            onClick={() => setBriefingTab('patientBackground')}
+                            className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                              briefingTab === 'patientBackground'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            Patient background
+                          </button>
+                        )}
+                        {caseData.objectives != null && (
+                          <button
+                            type="button"
+                            onClick={() => setBriefingTab('objectives')}
+                            className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                              briefingTab === 'objectives'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            Objectives
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setBriefingTab('script')}
+                          className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                            briefingTab === 'script'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          Script
+                        </button>
+                        {caseData.expectedSpikesFlow != null && (
+                          <button
+                            type="button"
+                            onClick={() => setBriefingTab('expectedSpikesFlow')}
+                            className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                              briefingTab === 'expectedSpikesFlow'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            Expected SPIKES flow
+                          </button>
+                        )}
+                      </div>
+                      <div className="max-h-64 min-h-[120px] overflow-y-auto">
+                        {briefingTab === 'patientBackground' && (
+                          <pre className="whitespace-pre-wrap text-sm text-gray-800">
+                            {caseData.patientBackground || '—'}
+                          </pre>
+                        )}
+                        {briefingTab === 'objectives' && (
+                          <pre className="whitespace-pre-wrap text-sm text-gray-800">
+                            {caseData.objectives ?? '—'}
+                          </pre>
+                        )}
+                        {briefingTab === 'script' && (
+                          <pre className="whitespace-pre-wrap text-sm text-gray-800">
+                            {caseData.script}
+                          </pre>
+                        )}
+                        {briefingTab === 'expectedSpikesFlow' && (
+                          <pre className="whitespace-pre-wrap text-sm text-gray-800">
+                            {caseData.expectedSpikesFlow ?? '—'}
+                          </pre>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
           {/* Chat area */}
           <div className="flex-1 overflow-y-auto bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
@@ -309,44 +660,100 @@ export const CaseDetail = () => {
               {messages.map((message) => (
                 <ChatBubble key={message.id} message={message} />
               ))}
-              {sending && (
+              {showPatientRespondingIndicator && (
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <div className="h-2 w-2 animate-pulse rounded-full bg-gray-400" />
                   Patient is responding...
                 </div>
               )}
+              <div ref={messagesEndRef} />
             </div>
           </div>
 
           {/* Input */}
           <div className="border-t bg-white px-4 py-4 sm:px-6 lg:px-8">
             <form onSubmit={handleSubmit} className="mx-auto max-w-4xl">
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <Input
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   placeholder="Type your message following the SPIKES framework..."
-                  disabled={sending}
-                  className="flex-1"
+                  disabled={sending || isRecording}
+                  className="h-12 flex-1"
                 />
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
                   onClick={handleVoiceInput}
-                  disabled
-                  className="opacity-50 cursor-not-allowed"
-                  title="Voice input coming soon"
+                  disabled={sending || closing || !sessionId}
+                  className={isRecording ? 'h-12 w-12 shrink-0 border-red-500 bg-red-50 text-red-600 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]' : 'h-12 w-12 shrink-0'}
+                  title={isRecording ? 'Stop recording' : 'Start voice input'}
                 >
-                  <Mic className="h-4 w-4" />
+                  <Mic className="h-5 w-5" />
                 </Button>
-                <Button type="submit" disabled={sending || !inputValue.trim() || !sessionId}>
+                <Button
+                  type="submit"
+                  size="icon"
+                  disabled={sending || closing || isRecording || !inputValue.trim() || !sessionId}
+                  className="h-12 w-12 shrink-0"
+                >
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
               <div className="mt-2 flex justify-between items-center text-xs text-gray-500">
-                <span>Session time: {formatTime(sessionElapsed)}</span>
+                <span>Session time: {formatTime(sessionElapsed)} • SPIKES: {currentSpikesStage}</span>
                 {sessionId && <span>Session ID: {sessionId}</span>}
+              </div>
+              <div
+                className={`overflow-hidden transition-all duration-300 ease-out ${showVoiceIndicator ? 'mt-3 max-h-24 translate-y-0 opacity-100' : 'mt-0 max-h-0 -translate-y-1 opacity-0'}`}
+              >
+                <div className={`rounded-md border px-3 py-2 text-sm transition-colors duration-200 ${isRecording ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-gray-200 bg-gray-50 text-gray-600'}`}>
+                  {isRecording ? (
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <div>
+                          <div className="font-medium">Listening</div>
+                          <div className="text-xs text-emerald-700">
+                            Tap the microphone again when you are done speaking.
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex h-8 w-16 items-end justify-end gap-1">
+                        {listeningBarHeights.map((height, index) => (
+                          <span
+                            key={`voice-bar-${index}`}
+                            className="w-1.5 origin-bottom rounded-full bg-emerald-500"
+                            style={{
+                              height,
+                              animation: `listening-wave 0.9s ease-in-out ${index * 0.12}s infinite`,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="text-xs text-gray-500">
+                        {voiceStatus}
+                      </div>
+                      {isVoiceProcessing && (
+                        <div className="flex items-center gap-1">
+                          {[0, 1, 2].map((index) => (
+                            <span
+                              key={`voice-status-dot-${index}`}
+                              className="h-1.5 w-1.5 rounded-full bg-gray-400"
+                              style={{
+                                animation: `processing-dot 1.1s ease-in-out ${index * 0.15}s infinite`,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </form>
           </div>
