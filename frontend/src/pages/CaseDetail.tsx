@@ -247,7 +247,7 @@ export const CaseDetail = () => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-gray-600"
+                      className="bg-transparent border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
                       onClick={() => setBriefingExpanded((e) => !e)}
                     >
                       {briefingExpanded ? (
