@@ -22,6 +22,7 @@ from services.session_service import SessionService
 from services.scoring_service import ScoringService
 from services.demo_transcript_replayer import replay_transcript_into_session
 from repositories.session_repo import SessionRepository
+from plugins.load_plugins import load_plugins
 from domain.entities.case import Case
 from domain.entities.user import User
 from domain.models.auth import UserCreate
@@ -166,6 +167,9 @@ Strategy: You want to outline a next step plan that respects the patient's goals
 
 
 async def seed(db: Session, do_reset: bool = False) -> None:
+    # Ensure plugin modules are imported so they self-register in PluginRegistry.
+    load_plugins()
+
     # Optional destructive dev reset
     if do_reset:
         # WARNING: dev only - wipe tables
