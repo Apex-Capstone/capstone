@@ -175,6 +175,26 @@ export const Feedback = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Hero: Empathy Score & SPIKES Coverage */}
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-6 text-center">
+                  <div className="text-sm font-medium text-emerald-800 uppercase tracking-wide">Empathy Score</div>
+                  <div className="text-4xl font-bold text-emerald-600 mt-1">
+                    {feedback.empathyScore.toFixed(1)}<span className="text-xl font-semibold text-emerald-500">/10</span>
+                  </div>
+                  <p className="text-xs text-emerald-700 mt-1">Session empathy recognition</p>
+                </div>
+                <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-6 text-center">
+                  <div className="text-sm font-medium text-purple-800 uppercase tracking-wide">SPIKES Coverage</div>
+                  <div className="text-4xl font-bold text-purple-600 mt-1">
+                    {coveragePercent}<span className="text-xl font-semibold text-purple-500">%</span>
+                  </div>
+                  <p className="text-xs text-purple-700 mt-1">
+                    {coveredStages.size}/6 stages reached
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-8">
@@ -186,12 +206,33 @@ export const Feedback = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      <div className="relative w-48 h-48 mx-auto bg-gray-100 rounded-full flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-purple-600">
-                            {coveragePercent}%
-                          </div>
-                          <div className="text-sm text-gray-600">Coverage</div>
+                      <div className="relative w-48 h-48 mx-auto flex items-center justify-center">
+                        <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90" aria-hidden>
+                          {(() => {
+                            const r = 40
+                            const circumference = 2 * Math.PI * r
+                            const segmentLength = circumference / 6
+                            return SPIKES_STAGE_ORDER.map(({ key }, i) => {
+                              const reached = coveredStages.has(key)
+                              return (
+                                <circle
+                                  key={key}
+                                  cx="50"
+                                  cy="50"
+                                  r={r}
+                                  fill="none"
+                                  stroke={reached ? '#7c3aed' : '#e5e7eb'}
+                                  strokeWidth="10"
+                                  strokeDasharray={`${segmentLength} ${circumference - segmentLength}`}
+                                  strokeDashoffset={-i * segmentLength}
+                                />
+                              )
+                            })
+                          })()}
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                          <span className="text-2xl font-bold text-purple-600">{coveragePercent}%</span>
+                          <span className="text-sm text-gray-600">Coverage</span>
                         </div>
                       </div>
 
@@ -231,16 +272,17 @@ export const Feedback = () => {
                       <div className="bg-emerald-50 p-4 rounded-lg">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">Empathy Score</span>
-                          <span className="text-lg font-bold text-emerald-600">
+                          <span className="text-xl font-bold text-emerald-600">
                             {feedback.empathyScore.toFixed(1)}/10
                           </span>
                         </div>
-                        <div className="w-full h-2 bg-emerald-200 rounded-full mt-2">
+                        <div className="w-full h-4 bg-gray-200 rounded-full mt-2 overflow-hidden">
                           <div
-                            className="h-full bg-emerald-500 rounded-full"
+                            className="h-full rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 transition-[width]"
                             style={{ width: `${empathyPercent}%` }}
                           />
                         </div>
+                        <p className="text-xs text-gray-500 mt-1">Band: red (low) → yellow → green (high)</p>
                       </div>
 
                       {openRatio !== null && (

@@ -1,13 +1,67 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { fetchResearchData, type ResearchData } from '@/api/research.api'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertTriangle, Database, Shield, BarChart3 } from 'lucide-react'
+import { AlertTriangle, Database, Shield, BarChart3, TrendingUp } from 'lucide-react'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+} from 'recharts'
 
 export const Research = () => {
   const [data, setData] = useState<ResearchData | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const trendChartData = useMemo(() => {
+    if (!data?.anonymizedSessions?.length) return []
+    const sorted = [...data.anonymizedSessions].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    )
+    return sorted.map((s) => ({
+      date: new Date(s.timestamp).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: '2-digit',
+      }),
+      empathy: s.scores.empathy,
+      communication: s.scores.communication,
+      clinical: s.scores.clinical,
+    }))
+  }, [data?.anonymizedSessions])
+
+  const averageScoresChartData = useMemo(() => {
+    if (!data?.anonymizedSessions?.length) return []
+    return [
+      {
+        name: 'Empathy',
+        value: Math.round(
+          data.anonymizedSessions.reduce((sum, s) => sum + s.scores.empathy, 0) / data.anonymizedSessions.length
+        ),
+      },
+      {
+        name: 'Communication',
+        value: Math.round(
+          data.anonymizedSessions.reduce((sum, s) => sum + s.scores.communication, 0) /
+            data.anonymizedSessions.length
+        ),
+      },
+      {
+        name: 'Clinical',
+        value: Math.round(
+          data.anonymizedSessions.reduce((sum, s) => sum + s.scores.clinical, 0) / data.anonymizedSessions.length
+        ),
+      },
+    ]
+  }, [data?.anonymizedSessions])
 
   useEffect(() => {
     const loadData = async () => {
@@ -98,6 +152,35 @@ export const Research = () => {
             </div>
 
             <div className="space-y-8">
+              {/* Score trend over time */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-blue-600" />
+                    Score Trends
+                  </CardTitle>
+                  <p className="text-sm text-gray-500 font-normal">
+                    Empathy, communication, and clinical scores by session date
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-72 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={trendChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
+                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
+                        <Tooltip formatter={(value: unknown) => [`${Number(value)}%`, ''] as [React.ReactNode, string]} />
+                        <Legend />
+                        <Line type="monotone" dataKey="empathy" stroke="#10b981" strokeWidth={2} name="Empathy %" />
+                        <Line type="monotone" dataKey="communication" stroke="#22c55e" strokeWidth={2} name="Communication %" />
+                        <Line type="monotone" dataKey="clinical" stroke="#7c3aed" strokeWidth={2} name="Clinical %" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Fairness Metrics */}
               {data.fairnessMetrics && (
                 <Card>
@@ -294,13 +377,21 @@ export const Research = () => {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-sm">Average Empathy Score</CardTitle>
+                    <CardTitle className="text-sm">Average Score Distribution</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">
-                      {Math.round(data.anonymizedSessions.reduce((sum, s) => sum + s.scores.empathy, 0) / data.anonymizedSessions.length)}%
+                    <div className="h-40 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={averageScoresChartData} margin={{ top: 5, right: 5, left: 5, bottom: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-gray-100" />
+                          <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                          <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
+                          <Tooltip formatter={(value: unknown) => [`${Number(value)}%`, 'Average'] as [React.ReactNode, string]} />
+                          <Bar dataKey="value" fill="#7c3aed" name="Average %" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Across all sessions</p>
+                    <p className="text-xs text-gray-500 mt-1">Empathy, communication, clinical</p>
                   </CardContent>
                 </Card>
 
