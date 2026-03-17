@@ -12,6 +12,7 @@ from controllers import (
     sessions_controller,
     ws_controller,
 )
+from controllers.research_controller import router as research_router
 from core.errors import (
     AppError,
     app_error_handler,
@@ -28,8 +29,8 @@ setup_logging()
 
 # Create FastAPI app
 app = FastAPI(
-    title="Medical Case Simulation API",
-    description="AI-powered medical case simulation with SPIKES protocol",
+    title="APEX API",
+    description="AI Patient Experience Simulator backend service",
     version="1.0.0",
     docs_url="/v1/docs",
     redoc_url="/v1/redoc",
@@ -69,6 +70,7 @@ app.include_router(auth_controller.router, prefix="/v1")
 app.include_router(cases_controller.router, prefix="/v1")
 app.include_router(sessions_controller.router, prefix="/v1")
 app.include_router(admin_controller.router, prefix="/v1")
+app.include_router(research_router, prefix="/v1")
 app.include_router(ws_controller.router, prefix="/v1")
 
 

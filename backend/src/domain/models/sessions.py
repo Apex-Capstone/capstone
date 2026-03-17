@@ -1,15 +1,31 @@
 """Session and turn request/response schemas."""
 
+import json
 from datetime import datetime
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
+
+
+class TimelineEvent(BaseModel):
+    """Single event for conversation feedback timeline."""
+    turn_number: int
+    type: Literal["eo", "response", "missed", "spikes"]
+    label: str
+
+
+class SuggestedResponse(BaseModel):
+    """Suggested empathetic response for a missed opportunity."""
+    turn_number: int
+    patient_text: str
+    suggestion: str
 
 
 class SessionCreate(BaseModel):
     """Session creation schema."""
     
     case_id: int
+    force_new: bool = Field(default=False)
 
 
 class SessionUpdate(BaseModel):
@@ -39,6 +55,7 @@ class TurnResponse(BaseModel):
     metrics_json: Optional[str]
     spikes_stage: Optional[str]
     timestamp: datetime
+    spans_json: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True, extra="ignore")
 
@@ -56,6 +73,28 @@ class SessionResponse(BaseModel):
     ended_at: Optional[datetime]
     duration_seconds: int
     meta: Optional[str] = Field(default=None, alias="session_metadata")
+    evaluator_plugin: Optional[str] = None
+    evaluator_version: Optional[str] = None
+    patient_model_plugin: Optional[str] = None
+    patient_model_version: Optional[str] = None
+    metrics_plugins: Optional[list] = None  # JSON array of plugin names
+    case_title: Optional[str] = None
+    # Computed: "closed" when ended_at is set, else "active"
+    status: Literal["active", "closed"]
+
+    @field_validator("metrics_plugins", mode="before")
+    @classmethod
+    def _metrics_plugins_from_entity(cls, v: object) -> Optional[list]:
+        if v is None:
+            return None
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return None
     
     model_config = ConfigDict(from_attributes=True, extra="ignore")
 
@@ -81,6 +120,9 @@ class FeedbackResponse(BaseModel):
     id: int
     session_id: int
     empathy_score: float
+    communication_score: float | None = None
+    clinical_reasoning_score: float | None = None
+    professionalism_score: float | None = None
     spikes_completion_score: float
     overall_score: float
     
@@ -119,6 +161,10 @@ class FeedbackResponse(BaseModel):
     strengths: Optional[str] = None
     areas_for_improvement: Optional[str] = None
     detailed_feedback: Optional[str] = None
+
+    # Conversation feedback timeline
+    timeline_events: Optional[list[TimelineEvent]] = None
+    suggested_responses: Optional[list[SuggestedResponse]] = None
     
     created_at: datetime
     

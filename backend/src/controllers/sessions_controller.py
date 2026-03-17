@@ -11,8 +11,8 @@ from adapters.asr.whisper_adapter import WhisperAdapter
 from adapters.llm.openai_adapter import OpenAIAdapter
 from adapters.nlu.simple_rule_nlu import SimpleRuleNLU
 from adapters.storage.s3_storage import S3StorageAdapter
-from core.deps import get_current_user, get_db
-from core.errors import AuthorizationError, NotFoundError
+from core.deps import get_current_user, get_db, verify_session_access
+from core.errors import NotFoundError
 from domain.entities.user import User
 from repositories.feedback_repo import FeedbackRepository
 from repositories.session_repo import SessionRepository
@@ -80,6 +80,12 @@ async def submit_turn(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Submit trainee turn text; returns patient reply and updated SPIKES stage."""
+    session_repo = SessionRepository(db)
+    sess = session_repo.get_by_id(session_id)
+    if not sess:
+        raise NotFoundError(f"Session with ID {session_id} not found")
+    verify_session_access(sess, current_user)
+
     # Initialize services
     llm_adapter = OpenAIAdapter()
     nlu_adapter = SimpleRuleNLU()
@@ -108,6 +114,12 @@ async def submit_audio_turn(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Upload audio file (wav/ogg/mp3). Server performs ASR and processes as turn."""
+    session_repo = SessionRepository(db)
+    sess = session_repo.get_by_id(session_id)
+    if not sess:
+        raise NotFoundError(f"Session with ID {session_id} not found")
+    verify_session_access(sess, current_user)
+
     # Read audio file
     audio_data = await audio_file.read()
     
@@ -156,6 +168,12 @@ async def get_session(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Get session detail (state, metrics snapshot)."""
+    session_repo = SessionRepository(db)
+    sess = session_repo.get_by_id(session_id)
+    if not sess:
+        raise NotFoundError(f"Session with ID {session_id} not found")
+    verify_session_access(sess, current_user)
+
     session_service = SessionService(db)
     return await session_service.get_session(session_id)
 
@@ -169,8 +187,14 @@ async def get_session_turns(
     limit: int = Query(100, ge=1, le=100),
 ):
     """Get paginated transcript of session turns."""
+    session_repo = SessionRepository(db)
+    sess = session_repo.get_by_id(session_id)
+    if not sess:
+        raise NotFoundError(f"Session with ID {session_id} not found")
+    verify_session_access(sess, current_user)
+
     from repositories.turn_repo import TurnRepository
-    
+
     turn_repo = TurnRepository(db)
     turns = turn_repo.get_by_session(session_id, skip=skip, limit=limit)
     total_turns = turn_repo.get_by_session(session_id)  # Get all for count
@@ -194,6 +218,12 @@ async def close_session_and_get_feedback(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Close session and finalize feedback."""
+    session_repo = SessionRepository(db)
+    sess = session_repo.get_by_id(session_id)
+    if not sess:
+        raise NotFoundError(f"Session with ID {session_id} not found")
+    verify_session_access(sess, current_user)
+
     # Close session
     session_service = SessionService(db)
     await session_service.close_session(session_id)
@@ -221,10 +251,8 @@ async def get_session_feedback(
     session = session_repo.get_by_id(session_id)
     if not session:
         raise NotFoundError(f"Session with ID {session_id} not found")
-    
-    # Verify session ownership
-    if session.user_id != current_user.id:
-        raise AuthorizationError("You do not have permission to access this session's feedback")
+
+    verify_session_access(session, current_user)
     
     # Get feedback
     feedback_repo = FeedbackRepository(db)

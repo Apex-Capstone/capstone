@@ -1,5 +1,35 @@
 // src/api/admin.api.ts
 import api from '@/api/client'
+import type { SessionDetailDTO } from '@/types/session'
+
+// Wire types matching backend admin responses (snake_case)
+export interface MetricsTimelineDTO {
+  turn_number: number
+  timestamp: string
+  empathy_score: number
+  question_type: string
+  spikes_stage: string
+}
+
+export interface AdminSessionListResponse {
+  sessions: SessionDetailDTO[]
+  total: number
+  skip: number
+  limit: number
+}
+
+export interface AdminFeedbackSummaryDTO {
+  empathy_score: number
+  overall_score: number
+  strengths?: string | null
+  areas_for_improvement?: string | null
+}
+
+export interface AdminSessionDetailResponse {
+  session: SessionDetailDTO
+  feedback: AdminFeedbackSummaryDTO | null
+  metrics_timeline: MetricsTimelineDTO[]
+}
 
 export interface AdminStats {
   totalUsers: number
@@ -15,19 +45,10 @@ export interface AdminStats {
     id: string
     name: string
     email: string
-    role: 'student' | 'admin' | 'instructor'
+    role: 'trainee' | 'admin'
     averageScore: number
     completedCases: number
     lastActive: string
-  }>
-  sessionLogs?: Array<{
-    id: string
-    userId: string
-    caseId: string
-    startTime: string
-    endTime?: string
-    score?: number
-    transcript?: string
   }>
   analyticsData?: {
     averageScoreByMonth: Array<{ month: string; score: number }>
@@ -84,10 +105,6 @@ export const fetchAdminStats = async (): Promise<AdminStats> => {
   //     { id: 'trainee_023', name: 'Dr. Michael Chen', email: 'michael.chen@medical.edu', role: 'trainee', averageScore: 79.5, completedCases: 8, lastActive: '2024-01-15T15:25:00Z' },
   //     { id: 'trainee_045', name: 'Dr. Emma Williams', email: 'emma.williams@medical.edu', role: 'trainee', averageScore: 91.3, completedCases: 15, lastActive: '2024-01-15T15:20:00Z' },
   //   ],
-  //   sessionLogs: [
-  //     { id: 'session_789', userId: 'trainee_001', caseId: '1', startTime: '2024-01-15T14:00:00Z', endTime: '2024-01-15T14:35:00Z', score: 85, transcript: 'Session focused on SPIKES framework...' },
-  //     { id: 'session_788', userId: 'trainee_023', caseId: '2', startTime: '2024-01-15T13:30:00Z', endTime: '2024-01-15T14:10:00Z', score: 78, transcript: 'Practice session on managing distress...' },
-  //   ],
   //   analyticsData: {
   //     averageScoreByMonth: [
   //       { month: 'Oct 2024', score: 82.5 },
@@ -114,4 +131,66 @@ export const fetchAdminStats = async (): Promise<AdminStats> => {
     averageScore: data.performance_stats.average_overall_score,
     recentActivity: [],
   }
+}
+
+/**
+ * Fetch admin session list (user transcripts).
+ * Requires admin auth; JWT is sent via Authorization header by api client.
+ */
+export async function fetchAdminSessions(
+  skip = 0,
+  limit = 20
+): Promise<AdminSessionListResponse> {
+  const { data } = await api.get<AdminSessionListResponse>(`${BASE}/sessions`, {
+    params: { skip, limit },
+  })
+  return data
+}
+
+/**
+ * Fetch admin session detail with transcript and metrics timeline.
+ * Requires admin auth; JWT is sent via Authorization header by api client.
+ */
+export async function fetchAdminSessionDetail(
+  sessionId: string
+): Promise<AdminSessionDetailResponse> {
+  const { data } = await api.get<AdminSessionDetailResponse>(
+    `${BASE}/sessions/${sessionId}`
+  )
+  return data
+}
+
+/** Active plugins (module:ClassName) for admin Developer Tools. */
+export interface PluginsResponse {
+  patient_model: string
+  evaluator: string
+  metrics: string[]
+}
+
+/**
+ * Fetch active plugin paths. Admin only.
+ */
+export async function fetchAdminPlugins(): Promise<PluginsResponse> {
+  const { data } = await api.get<PluginsResponse>(`${BASE}/plugins`)
+  return data
+}
+
+/** Plugin discovery: name + version for dropdowns (e.g. case evaluator). */
+export interface PluginInfo {
+  name: string
+  version: string
+}
+
+export interface PluginDiscoveryResponse {
+  evaluators: PluginInfo[]
+  patient_models: PluginInfo[]
+  metrics: PluginInfo[]
+}
+
+/**
+ * Fetch registered plugins (name + version). Admin only. Use for case evaluator dropdown.
+ */
+export async function fetchAdminPluginRegistry(): Promise<PluginDiscoveryResponse> {
+  const { data } = await api.get<PluginDiscoveryResponse>(`${BASE}/plugin-registry`)
+  return data
 }

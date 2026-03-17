@@ -37,7 +37,7 @@ export const Home = () => {
             </div>
           </div>
           <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl mb-4">
-            MedLLM Interface
+            APEX (AI Patient Experience Simulator)
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             Advanced medical training platform powered by AI. Practice clinical reasoning,

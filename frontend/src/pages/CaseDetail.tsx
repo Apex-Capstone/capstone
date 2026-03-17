@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { getCase } from '@/api/cases.api'
-import { createSession, submitTurn, closeSession } from '@/api/sessions.api'
+import { createSession, submitTurn, closeSession, getSession } from '@/api/sessions.api'
 import type { Case as CaseType } from '@/types/case'
 import type { Message } from '@/types/session'
 
@@ -13,10 +13,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Mic, Send, Clock, PhoneOff, ChevronDown, ChevronUp } from 'lucide-react'
+import { SpikesProgressBar } from '@/components/SpikesProgressBar'
 
 export const CaseDetail = () => {
   const { caseId } = useParams<{ caseId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   const [caseData, setCaseData] = useState<CaseType | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -33,34 +35,89 @@ export const CaseDetail = () => {
   type BriefingTab = 'patientBackground' | 'objectives' | 'script' | 'expectedSpikesFlow'
   const [briefingTab, setBriefingTab] = useState<BriefingTab>('patientBackground')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const createdSessionForCase = useRef<number | null>(null)
+  const initializingRef = useRef(false)
 
-  // --- Load case and create session ---
+  const sessionParam = searchParams.get('sessionId')
+
+  // --- Load case and create or resume session ---
   useEffect(() => {
     const initializeSession = async () => {
+      if (initializingRef.current) return
+      initializingRef.current = true
+
       if (!caseId) return
+
+      const numericCaseId = Number(caseId)
+      const resumeSessionId = sessionParam ? Number(sessionParam) : null
+      const shouldResume =
+        resumeSessionId !== null && !Number.isNaN(resumeSessionId)
+
+      if (!shouldResume && createdSessionForCase.current === numericCaseId) {
+        return
+      }
+
       try {
         // Load case data
-        const data = await getCase(Number(caseId))
+        const data = await getCase(numericCaseId)
         setCaseData(data)
 
-        // Create a new session for this case
-        const session = await createSession(Number(caseId))
-        setSessionId(session.id)
-        setCurrentSpikesStage(session.currentSpikesStage || 'setting')
+        if (shouldResume) {
+          const existingSession = await getSession(resumeSessionId as number)
+          if (existingSession.caseId !== numericCaseId) {
+            throw new Error('Session case mismatch')
+          }
+          setSessionId(existingSession.id)
+          setCurrentSpikesStage(existingSession.currentSpikesStage || 'setting')
+          const startedAt = new Date(existingSession.startedAt)
+          const now = Date.now()
+          const rawElapsed = Math.floor((now - startedAt.getTime()) / 1000)
+          const clampedElapsed = Math.max(rawElapsed, 0)
+          setSessionElapsed(clampedElapsed)
+          setStartTime(new Date(now - clampedElapsed * 1000))
+          const restoredMessages: Message[] = existingSession.turns.map((turn) => ({
+            id: `turn-${turn.id}`,
+            role: turn.role as 'user' | 'assistant',
+            content: turn.text,
+            timestamp: turn.timestamp,
+          }))
+          setMessages(restoredMessages)
+        } else {
+          createdSessionForCase.current = numericCaseId
+          try {
+            const session = await createSession(numericCaseId)
+            setSessionId(session.id)
+            setCurrentSpikesStage(session.currentSpikesStage || 'setting')
 
-        // Start timer
-        const now = new Date()
-        setStartTime(now)
-        setSessionElapsed(0)
+            // Start timer
+            const now = new Date()
+            setStartTime(now)
+            setSessionElapsed(0)
+
+            // Always load session detail so we get turns for both new and resumed sessions
+            const detail = await getSession(session.id)
+            const restoredMessages: Message[] = detail.turns.map((turn) => ({
+              id: `turn-${turn.id}`,
+              role: turn.role as 'user' | 'assistant',
+              content: turn.text,
+              timestamp: turn.timestamp,
+            }))
+            setMessages(restoredMessages)
+          } catch (creationError) {
+            createdSessionForCase.current = null
+            throw creationError
+          }
+        }
       } catch (error) {
         console.error('Failed to initialize session:', error)
         setError('Failed to start session. Please try again.')
       } finally {
+        initializingRef.current = false
         setLoading(false)
       }
     }
     initializeSession()
-  }, [caseId])
+  }, [caseId, sessionParam])
 
   // --- Timer updates every second ---
   useEffect(() => {
@@ -146,6 +203,8 @@ export const CaseDetail = () => {
       setError(err.response?.data?.detail || 'Failed to end session. Please try again.')
       setClosing(false)
     }
+
+    navigate(`/feedback/${sessionId}`)
   }
 
   const formatTime = (seconds: number) => {
@@ -173,9 +232,9 @@ export const CaseDetail = () => {
   return (
     <div className="flex h-screen flex-col">
       <Navbar />
-      <div className="flex flex-1">
+      <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main className="flex-1 md:ml-64 flex flex-col">
+        <main className="flex-1 overflow-y-auto md:ml-64 flex flex-col">
           {/* Header */}
           <div className="border-b bg-white px-4 py-4 sm:px-6 lg:px-8">
             <nav className="mb-3 text-sm text-gray-500">
@@ -236,10 +295,10 @@ export const CaseDetail = () => {
 
               <Card className="bg-orange-50 border-orange-200">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">SPIKES Stage</CardTitle>
+                  <CardTitle className="text-sm font-medium">SPIKES</CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0 text-orange-700 font-semibold capitalize">
-                  {currentSpikesStage}
+                <CardContent className="pt-0">
+                  <SpikesProgressBar currentStage={currentSpikesStage} />
                 </CardContent>
               </Card>
             </div>
@@ -273,7 +332,9 @@ export const CaseDetail = () => {
                 <CardContent className="pt-0">
                   {!briefingExpanded ? (
                     <p className="text-sm text-gray-600 line-clamp-2">
-                      {caseData.patientBackground?.trim() || caseData.description || 'No briefing preview.'}
+                      {caseData.patientBackground?.trim() ||
+                        caseData.description ||
+                        'No briefing preview.'}
                     </p>
                   ) : (
                     <>
@@ -357,7 +418,6 @@ export const CaseDetail = () => {
               </Card>
             </div>
           </div>
-
           {/* Chat area */}
           <div className="flex-1 overflow-y-auto bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-4xl space-y-4">
@@ -414,7 +474,7 @@ export const CaseDetail = () => {
                 </Button>
               </div>
               <div className="mt-2 flex justify-between items-center text-xs text-gray-500">
-                <span>Session time: {formatTime(sessionElapsed)} • SPIKES: {currentSpikesStage}</span>
+                <span>Session time: {formatTime(sessionElapsed)}</span>
                 {sessionId && <span>Session ID: {sessionId}</span>}
               </div>
             </form>

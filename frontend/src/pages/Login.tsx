@@ -36,7 +36,7 @@ export const Login = () => {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">MedLLM Interface</CardTitle>
+          <CardTitle className="text-2xl font-bold">APEX (AI Patient Experience Simulator)</CardTitle>
           <CardDescription>
             Sign in to your account to continue
           </CardDescription>

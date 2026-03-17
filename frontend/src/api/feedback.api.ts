@@ -1,5 +1,25 @@
 import api from '@/api/client'
 
+export interface SpikesCoverage {
+  setting: boolean
+  perception: boolean
+  invitation: boolean
+  knowledge: boolean
+  emotions: boolean
+  strategy: boolean
+  coveredCount: number
+  total: number
+   covered: string[]
+   percent: number
+}
+
+export interface EmpathyLink {
+  source_span_id: string
+  target_span_id: string
+  relation_type: string
+  confidence: number
+}
+
 export interface Feedback {
   id: number
   sessionId: number
@@ -36,10 +56,7 @@ export interface Feedback {
     Appreciation: number
   }
 
-  spikesCoverage?: {
-    covered: string[]
-    percent: number
-  }
+  spikesCoverage?: SpikesCoverage
   spikesTimestamps?: Record<string, { start_ts: string; end_ts: string }>
   spikesStrategies?: Record<string, Array<{ strategy: string; turn: number }>>
 
@@ -57,9 +74,63 @@ export interface Feedback {
   detailedFeedback?: string | null
 
   createdAt: string
+  eo_to_response_links?: Record<string, EmpathyLink[]>
+  eo_to_elicitation_links?: Record<string, EmpathyLink[]>
+  missed_opportunities?: Array<Record<string, unknown>>
+  eo_counts_by_dimension?: Record<string, unknown>
+  spikes_strategies?: Record<string, unknown>
 }
 
-function mapSnakeToCamel(data: Record<string, any>): Feedback {
+export const fetchFeedback = async (sessionId: string): Promise<Feedback> => {
+  const { data } = await api.get(`/v1/sessions/${sessionId}/feedback`)
+
+  // Map snake_case API response into the richer Feedback model used by the UI
+  let spikesCoverage: SpikesCoverage | undefined
+
+  if (data.spikes_coverage && typeof data.spikes_coverage === 'object') {
+    const coveredRaw = Array.isArray(data.spikes_coverage.covered)
+      ? data.spikes_coverage.covered
+      : []
+
+    const normalizedCovered = coveredRaw
+      .map((s: unknown) => (typeof s === 'string' ? s.toLowerCase() : ''))
+      .filter(Boolean)
+
+    const setting =
+      normalizedCovered.includes('setting') || normalizedCovered.includes('s')
+    const perception =
+      normalizedCovered.includes('perception') || normalizedCovered.includes('p')
+    const invitation =
+      normalizedCovered.includes('invitation') || normalizedCovered.includes('i')
+    const knowledge =
+      normalizedCovered.includes('knowledge') || normalizedCovered.includes('k')
+    const emotions =
+      normalizedCovered.includes('emotion') ||
+      normalizedCovered.includes('emotions') ||
+      normalizedCovered.includes('e')
+    const strategy =
+      normalizedCovered.includes('strategy') || normalizedCovered.includes('s2')
+
+    const stages = { setting, perception, invitation, knowledge, emotions, strategy }
+    const coveredCount = Object.values(stages).filter(Boolean).length
+    const total = 6
+
+    const percent =
+      typeof data.spikes_coverage.percent === 'number'
+        ? data.spikes_coverage.percent
+        : total > 0
+          ? coveredCount / total
+          : 0
+
+    spikesCoverage = {
+      ...stages,
+      coveredCount,
+      total,
+      covered: normalizedCovered,
+      percent,
+    }
+  }
+
   return {
     id: data.id,
     sessionId: data.session_id,
@@ -71,7 +142,7 @@ function mapSnakeToCamel(data: Record<string, any>): Feedback {
     responseCountsByType: data.response_counts_by_type ?? undefined,
     linkageStats: data.linkage_stats ?? undefined,
     missedOpportunitiesByDimension: data.missed_opportunities_by_dimension ?? undefined,
-    spikesCoverage: data.spikes_coverage ?? undefined,
+    spikesCoverage,
     spikesTimestamps: data.spikes_timestamps ?? undefined,
     spikesStrategies: data.spikes_strategies ?? undefined,
     questionBreakdown: data.question_breakdown ?? undefined,
@@ -80,10 +151,10 @@ function mapSnakeToCamel(data: Record<string, any>): Feedback {
     areasForImprovement: data.areas_for_improvement ?? null,
     detailedFeedback: data.detailed_feedback ?? null,
     createdAt: data.created_at,
+    eo_to_response_links: data.eo_to_response_links ?? undefined,
+    eo_to_elicitation_links: data.eo_to_elicitation_links ?? undefined,
+    missed_opportunities: data.missed_opportunities ?? undefined,
+    eo_counts_by_dimension: data.eo_counts_by_dimension ?? undefined,
+    spikes_strategies: data.spikes_strategies ?? undefined,
   }
-}
-
-export const fetchFeedback = async (sessionId: string): Promise<Feedback> => {
-  const { data } = await api.get(`/v1/sessions/${sessionId}/feedback`)
-  return mapSnakeToCamel(data)
 }

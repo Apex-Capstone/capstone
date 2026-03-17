@@ -68,6 +68,47 @@ async def test_create_session(test_db, test_user, test_case):
 
 
 @pytest.mark.asyncio
+async def test_create_session_reuses_active(test_db, test_user, test_case):
+    """Creating a session twice while the first is still active should return the same session."""
+    session_service = SessionService(test_db)
+    session_data = SessionCreate(case_id=test_case.id)
+
+    first_session = await session_service.create_session(test_user.id, session_data)
+    second_session = await session_service.create_session(test_user.id, session_data)
+
+    assert second_session.id == first_session.id
+    assert second_session.state == "active"
+    assert second_session.started_at == first_session.started_at
+
+
+@pytest.mark.asyncio
+async def test_create_session_force_new(test_db, test_user, test_case):
+    """Passing force_new should create a new session even if one is already active."""
+    session_service = SessionService(test_db)
+    session_data = SessionCreate(case_id=test_case.id)
+    first_session = await session_service.create_session(test_user.id, session_data)
+
+    forced_session_data = SessionCreate(case_id=test_case.id, force_new=True)
+    new_session = await session_service.create_session(test_user.id, forced_session_data)
+
+    assert new_session.id != first_session.id
+    assert new_session.state == "active"
+
+
+@pytest.mark.asyncio
+async def test_create_session_repeated_calls_do_not_duplicate(test_db, test_user, test_case):
+    """Repeated non-forced create_session calls return the same open session."""
+    session_service = SessionService(test_db)
+    session_data = SessionCreate(case_id=test_case.id)
+
+    first_session = await session_service.create_session(test_user.id, session_data)
+    second_session = await session_service.create_session(test_user.id, session_data)
+    third_session = await session_service.create_session(test_user.id, session_data)
+
+    assert first_session.id == second_session.id == third_session.id
+
+
+@pytest.mark.asyncio
 async def test_close_session(test_db, test_user, test_case):
     """Test closing a session."""
     session_service = SessionService(test_db)

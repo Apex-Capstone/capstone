@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { login as apiLogin } from '@/api/auth.api'
 
-type Role = 'student' | 'instructor' | 'admin'
+type Role = 'trainee' | 'admin'
 
 interface AuthState {
   token?: string

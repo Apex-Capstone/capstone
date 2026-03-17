@@ -9,11 +9,17 @@ from adapters.nlu import NLUAdapter
 from config.logging import get_logger
 from config.settings import get_settings
 from core.errors import NotFoundError
+from core.plugin_manager import get_patient_model
 from domain.entities.turn import Turn
 from domain.models.sessions import TurnCreate, TurnResponse
 from repositories.case_repo import CaseRepository
 from repositories.session_repo import SessionRepository
 from repositories.turn_repo import TurnRepository
+from services.stage_tracker import StageTracker
+from services.nlu_pipeline import NLUPipeline
+from services.dialogue_state import DialogueState
+from services.patient_prompt_builder import PatientPromptBuilder
+from services.turn_analysis import analyze_user_input, analyze_assistant_response
 
 logger = get_logger(__name__)
 
@@ -43,6 +49,15 @@ class DialogueService:
         self.session_repo = SessionRepository(db)
         self.case_repo = CaseRepository(db)
         self.turn_repo = TurnRepository(db)
+        self.stage_tracker = StageTracker(self.session_repo)
+        # Consolidated NLU pipeline for dialogue analysis
+        self.nlu_pipeline = NLUPipeline(
+            span_detector=self.nlu_adapter,
+            empathy_detector=self.nlu_adapter,
+            question_classifier=self.nlu_adapter,
+            tone_analyzer=self.nlu_adapter,
+        )
+        self.patient_prompt_builder = PatientPromptBuilder()
     
     async def process_user_turn(
         self,
@@ -61,22 +76,21 @@ class DialogueService:
         
         # Get turn number
         turn_number = self.turn_repo.get_next_turn_number(session_id)
-        
-        # Analyze user input (elicitations and responses)
-        user_metrics, user_spans = await self._analyze_user_input(turn_data.text)
-        
-        # Detect SPIKES stage from content
-        elicitation_spans = await self.nlu_adapter.detect_elicitation_spans(turn_data.text)
-        response_spans = await self.nlu_adapter.detect_response_spans(turn_data.text)
-        from adapters.nlu.span_detector import SpanDetector
-        span_detector = SpanDetector()
-        detected_stage = span_detector.detect_spikes_stage(
-            turn_data.text,
-            has_elicitations=len(elicitation_spans) > 0,
-            has_responses=len(response_spans) > 0,
-        )
-        # Use detected stage if available, otherwise use session stage
-        turn_spikes_stage = detected_stage if detected_stage else session.current_spikes_stage
+
+        # Initialize in-memory dialogue state for this turn
+        state = DialogueState(session)
+
+        # Build legacy-compatible metrics and spans from analysis
+        user_metrics, user_spans = await analyze_user_input(self.nlu_pipeline, turn_data.text)
+
+        # Track question type and emotion spans in state
+        # (analysis already computed inside analyze_user_input)
+        # For now we only keep state for patient model context; metrics/spans live on turns.
+
+        # Detect and update SPIKES stage via StageTracker before LLM generation
+        stage = self.stage_tracker.detect_stage(turn_data.text, session)
+        self.stage_tracker.update_session_stage(session, stage)
+        turn_spikes_stage = stage
         
         # Create user turn
         user_turn = Turn(
@@ -91,28 +105,28 @@ class DialogueService:
         )
         self.turn_repo.create(user_turn)
         
-        # Generate patient response with latency tracking
+        # Generate patient response with latency tracking via PatientModel plugin
         conversation_history = self._get_conversation_history(session_id)
-        
-        # Build patient context from case details
-        patient_context = f"""Patient Background: {case.patient_background or 'General patient'}
 
-Case Scenario: {case.description or case.title}
+        # Enrich dialogue state with additional context expected by PatientModel plugins
+        state.case = case
+        state.session = session
+        state.conversation_history = conversation_history
 
-You are this patient. The trainee doctor will practice communicating with you."""
-        
-        # Track latency for LLM call
+        patient_model = get_patient_model()
+
+        # Track latency for patient model call
         start_time = time.time()
-        patient_response = await self.llm_adapter.generate_patient_response(
-            case_script=patient_context,
-            conversation_history=conversation_history,
-            current_spikes_stage=session.current_spikes_stage or "setting",
+        patient_response = await patient_model.generate_response(
+            state=state,
+            clinician_input=turn_data.text,
         )
         end_time = time.time()
         latency_ms = (end_time - start_time) * 1000  # Convert to milliseconds
         
         # Analyze assistant (patient) response (EO detection)
-        assistant_metrics, assistant_spans = await self._analyze_assistant_response(
+        assistant_metrics, assistant_spans = await analyze_assistant_response(
+            self.nlu_adapter,
             patient_response,
             user_turn,
             latency_ms,
@@ -130,86 +144,7 @@ You are this patient. The trainee doctor will practice communicating with you.""
         )
         created_turn = self.turn_repo.create(assistant_turn)
         
-        # Update SPIKES stage if needed (and update turn's spikes_stage if detected stage differs)
-        await self._update_spikes_stage(session, conversation_history)
-        # If detected stage differs from what we set, update the turn
-        if detected_stage and detected_stage != turn_spikes_stage:
-            user_turn.spikes_stage = detected_stage
-            self.turn_repo.update(user_turn)
-        
         return TurnResponse.model_validate(created_turn)
-    
-    async def _analyze_user_input(self, text: str) -> tuple[dict, list]:
-        """Analyze user input for metrics and spans.
-        
-        Returns:
-            Tuple of (metrics_dict, spans_list) where spans_list contains elicitation and response spans
-        """
-        # Legacy metrics for backward compatibility
-        empathy = await self.nlu_adapter.detect_empathy_cues(text)
-        question_type = await self.nlu_adapter.classify_question_type(text)
-        tone = await self.nlu_adapter.analyze_tone(text)
-        
-        # AFCE-aligned span detection
-        elicitation_spans = await self.nlu_adapter.detect_elicitation_spans(text)
-        response_spans = await self.nlu_adapter.detect_response_spans(text)
-        
-        # Combine all spans
-        all_spans = []
-        for span in elicitation_spans:
-            span["span_type"] = "elicitation"
-            all_spans.append(span)
-        for span in response_spans:
-            span["span_type"] = "response"
-            all_spans.append(span)
-        
-        # Legacy metrics for backward compatibility
-        empathy_response = empathy.get("has_empathy", False)
-        empathy_response_type = await self.nlu_adapter.classify_empathy_response_type(text)
-        
-        metrics = {
-            "empathy": empathy,
-            "question_type": question_type,
-            "tone": tone,
-            "empathy_response": empathy_response,
-            "empathy_response_type": empathy_response_type,
-        }
-        
-        return metrics, all_spans
-    
-    async def _analyze_assistant_response(
-        self,
-        text: str,
-        previous_user_turn: Turn,
-        latency_ms: float,
-    ) -> tuple[dict, list]:
-        """Analyze assistant (patient) response for metrics and spans.
-        
-        Returns:
-            Tuple of (metrics_dict, spans_list) where spans_list contains EO spans
-        """
-        # Legacy EO detection for backward compatibility
-        eo_analysis = await self.nlu_adapter.detect_empathy_opportunity(text)
-        
-        # AFCE-aligned EO span detection
-        eo_spans = await self.nlu_adapter.detect_eo_spans(text)
-        
-        # Add span_type to each EO span
-        all_spans = []
-        for span in eo_spans:
-            span["span_type"] = "eo"
-            all_spans.append(span)
-        
-        # Note: Missed opportunity detection will be handled retrospectively in scoring_service (Part 2)
-        # based on whether the next user turn shows empathy after this assistant turn presents an EO
-        
-        metrics = {
-            "empathy_opportunity_type": eo_analysis.get("empathy_opportunity_type"),
-            "empathy_opportunity": eo_analysis.get("empathy_opportunity", False),
-            "latency_ms": latency_ms,
-        }
-        
-        return metrics, all_spans
     
     def _get_conversation_history(self, session_id: int) -> list[dict[str, str]]:
         """Get conversation history for context."""

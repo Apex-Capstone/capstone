@@ -41,7 +41,7 @@ export interface LoginResponse {
   token: string
   user: {
     email: string
-    role: 'trainee' | 'admin' | 'instructor'
+    role: 'trainee' | 'admin'
     name?: string
   }
 }

@@ -1,9 +1,11 @@
 import { useEffect, useState, useMemo } from 'react'
 import { fetchResearchData, type ResearchData } from '@/api/research.api'
+import { useAuthStore } from '@/store/authStore'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertTriangle, Database, Shield, BarChart3, TrendingUp } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { AlertTriangle, Database, Download, Shield, BarChart3, TrendingUp } from 'lucide-react'
 import {
   LineChart,
   Line,
@@ -17,9 +19,103 @@ import {
   Bar,
 } from 'recharts'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+const safePercent = (value: number | null | undefined) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(100, value))
+}
+
+const formatTimestamp = (value: string | null | undefined) => {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString()
+}
+
 export const Research = () => {
+  const { user } = useAuthStore()
   const [data, setData] = useState<ResearchData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [exportingMetrics, setExportingMetrics] = useState(false)
+  const [exportingTranscripts, setExportingTranscripts] = useState(false)
+  const [exportingSessionId, setExportingSessionId] = useState<string | null>(null)
+
+  const getToken = (): string | null => {
+    try {
+      const raw = localStorage.getItem('auth-storage')
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      return parsed?.state?.token ?? parsed?.token ?? null
+    } catch {
+      return null
+    }
+  }
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
+
+  const handleDownloadMetricsCsv = async () => {
+    const token = getToken()
+    if (!token) return
+    setExportingMetrics(true)
+    try {
+      const response = await fetch(`${API_URL}/v1/research/export/metrics.csv`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error('Metrics export failed')
+      const blob = await response.blob()
+      downloadBlob(blob, 'session_metrics.csv')
+    } catch (err) {
+      console.error('Failed to download metrics CSV:', err)
+    } finally {
+      setExportingMetrics(false)
+    }
+  }
+
+  const handleDownloadTranscriptsCsv = async () => {
+    const token = getToken()
+    if (!token) return
+    setExportingTranscripts(true)
+    try {
+      const response = await fetch(`${API_URL}/v1/research/export/transcripts.csv`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error('Transcripts export failed')
+      const blob = await response.blob()
+      downloadBlob(blob, 'all_transcripts.csv')
+    } catch (err) {
+      console.error('Failed to download transcripts CSV:', err)
+    } finally {
+      setExportingTranscripts(false)
+    }
+  }
+
+  const handleExportSessionTranscript = async (anonSessionId: string) => {
+    const token = getToken()
+    if (!token) return
+    setExportingSessionId(anonSessionId)
+    try {
+      const response = await fetch(
+        `${API_URL}/v1/research/export/session/${encodeURIComponent(anonSessionId)}.csv`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (!response.ok) throw new Error('Session export failed')
+      const blob = await response.blob()
+      const safe = anonSessionId.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 32)
+      downloadBlob(blob, `session_${safe}.csv`)
+    } catch (err) {
+      console.error('Failed to export session transcript:', err)
+    } finally {
+      setExportingSessionId(null)
+    }
+  }
 
   const trendChartData = useMemo(() => {
     if (!data?.anonymizedSessions?.length) return []
@@ -40,25 +136,48 @@ export const Research = () => {
 
   const averageScoresChartData = useMemo(() => {
     if (!data?.anonymizedSessions?.length) return []
+    const empathyValues = data.anonymizedSessions
+      .map((s) => s.scores.empathy)
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+    const communicationValues = data.anonymizedSessions
+      .map((s) => s.scores.communication)
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+    const clinicalValues = data.anonymizedSessions
+      .map((s) => s.scores.clinical)
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+
+    const empathyAvg =
+      empathyValues.length > 0
+        ? Math.round(
+            empathyValues.reduce((sum, v) => sum + v, 0) / empathyValues.length
+          )
+        : 0
+    const communicationAvg =
+      communicationValues.length > 0
+        ? Math.round(
+            communicationValues.reduce((sum, v) => sum + v, 0) /
+              communicationValues.length
+          )
+        : 0
+    const clinicalAvg =
+      clinicalValues.length > 0
+        ? Math.round(
+            clinicalValues.reduce((sum, v) => sum + v, 0) / clinicalValues.length
+          )
+        : 0
+
     return [
       {
         name: 'Empathy',
-        value: Math.round(
-          data.anonymizedSessions.reduce((sum, s) => sum + s.scores.empathy, 0) / data.anonymizedSessions.length
-        ),
+        value: empathyAvg,
       },
       {
         name: 'Communication',
-        value: Math.round(
-          data.anonymizedSessions.reduce((sum, s) => sum + s.scores.communication, 0) /
-            data.anonymizedSessions.length
-        ),
+        value: communicationAvg,
       },
       {
         name: 'Clinical',
-        value: Math.round(
-          data.anonymizedSessions.reduce((sum, s) => sum + s.scores.clinical, 0) / data.anonymizedSessions.length
-        ),
+        value: clinicalAvg,
       },
     ]
   }, [data?.anonymizedSessions])
@@ -80,11 +199,11 @@ export const Research = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col">
+      <div className="h-screen flex flex-col">
         <Navbar />
-        <div className="flex flex-1">
+        <div className="flex flex-1 min-h-0">
           <Sidebar />
-          <main className="flex-1 md:ml-64">
+          <main className="flex-1 overflow-y-auto md:ml-64">
             <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
               <div className="mb-8">
                 <div className="h-8 w-64 bg-gray-200 rounded animate-pulse mb-2"></div>
@@ -119,11 +238,11 @@ export const Research = () => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="h-screen flex flex-col">
       <Navbar />
-      <div className="flex flex-1">
+      <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main className="flex-1 md:ml-64">
+        <main className="flex-1 overflow-y-auto md:ml-64">
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             {/* TODO: FR-8, FR-15 - Research API view with read-only analytics */}
             <nav className="mb-4 text-sm text-gray-500">
@@ -131,9 +250,33 @@ export const Research = () => {
             </nav>
             
             <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">
-                Research Analytics Dashboard
-              </h1>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <h1 className="text-3xl font-bold text-gray-900">
+                  Research Analytics Dashboard
+                </h1>
+                {user?.role === 'admin' && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadMetricsCsv}
+                      disabled={exportingMetrics}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {exportingMetrics ? 'Downloading…' : 'Download Metrics CSV'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadTranscriptsCsv}
+                      disabled={exportingTranscripts}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {exportingTranscripts ? 'Downloading…' : 'Download All Transcripts CSV'}
+                    </Button>
+                  </div>
+                )}
+              </div>
               <p className="mt-2 text-gray-600">
                 Read-only analytics endpoint for research use • Anonymized session data and fairness metrics
               </p>
@@ -206,7 +349,7 @@ export const Research = () => {
                         <div className="text-2xl font-bold text-purple-700 mb-1">
                           {(data.fairnessMetrics.biasProbeConsistency * 100).toFixed(1)}%
                         </div>
-                        <div className="w-full h-2 bg-purple-200 rounded-full">
+                        <div className="w-full h-2 bg-gray-200 rounded-full">
                           <div 
                             className="h-full bg-purple-600 rounded-full"
                             style={{ width: `${data.fairnessMetrics.biasProbeConsistency * 100}%` }}
@@ -231,7 +374,7 @@ export const Research = () => {
                         <div className="text-2xl font-bold text-green-700 mb-1">
                           {(data.fairnessMetrics.demographicParity * 100).toFixed(1)}%
                         </div>
-                        <div className="w-full h-2 bg-green-200 rounded-full">
+                        <div className="w-full h-2 bg-gray-200 rounded-full">
                           <div 
                             className="h-full bg-green-600 rounded-full"
                             style={{ width: `${data.fairnessMetrics.demographicParity * 100}%` }}
@@ -256,7 +399,7 @@ export const Research = () => {
                         <div className="text-2xl font-bold text-emerald-700 mb-1">
                           {(data.fairnessMetrics.equalizedOdds * 100).toFixed(1)}%
                         </div>
-                        <div className="w-full h-2 bg-emerald-200 rounded-full">
+                        <div className="w-full h-2 bg-gray-200 rounded-full">
                           <div 
                             className="h-full bg-emerald-600 rounded-full"
                             style={{ width: `${data.fairnessMetrics.equalizedOdds * 100}%` }}
@@ -302,8 +445,12 @@ export const Research = () => {
                           <th className="text-left py-2">Gender</th>
                           <th className="text-left py-2">Empathy Score</th>
                           <th className="text-left py-2">Communication</th>
+                          <th className="text-left py-2">SPIKES Stage</th>
                           <th className="text-left py-2">Clinical Score</th>
                           <th className="text-left py-2">Timestamp</th>
+                          {user?.role === 'admin' && (
+                            <th className="text-left py-2">Actions</th>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
@@ -315,39 +462,60 @@ export const Research = () => {
                             <td className="py-2">
                               <div className="flex items-center gap-2">
                                 <div className="w-12 h-2 bg-gray-200 rounded-full">
-                                  <div 
+                                  <div
                                     className="h-full bg-emerald-500 rounded-full"
-                                    style={{ width: `${session.scores.empathy}%` }}
+                                    style={{ width: `${safePercent(session.scores.empathy)}%` }}
                                   />
                                 </div>
-                                <span className="font-medium">{session.scores.empathy}%</span>
+                                <span className="font-medium">
+                                  {(session.scores.empathy ?? 0).toFixed(0)}%
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-2 capitalize">
+                              {session.spikes_stage ?? '—'}
+                            </td>
+                            <td className="py-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-12 h-2 bg-gray-200 rounded-full">
+                                  <div
+                                    className="h-full bg-sky-500 rounded-full"
+                                    style={{ width: `${safePercent(session.scores.communication)}%` }}
+                                  />
+                                </div>
+                                <span className="font-medium">
+                                  {(session.scores.communication ?? 0).toFixed(0)}%
+                                </span>
                               </div>
                             </td>
                             <td className="py-2">
                               <div className="flex items-center gap-2">
                                 <div className="w-12 h-2 bg-gray-200 rounded-full">
-                                  <div 
-                                    className="h-full bg-green-500 rounded-full"
-                                    style={{ width: `${session.scores.communication}%` }}
+                                  <div
+                                    className="h-full bg-indigo-500 rounded-full"
+                                    style={{ width: `${safePercent(session.scores.clinical)}%` }}
                                   />
                                 </div>
-                                <span className="font-medium">{session.scores.communication}%</span>
-                              </div>
-                            </td>
-                            <td className="py-2">
-                              <div className="flex items-center gap-2">
-                                <div className="w-12 h-2 bg-gray-200 rounded-full">
-                                  <div 
-                                    className="h-full bg-purple-500 rounded-full"
-                                    style={{ width: `${session.scores.clinical}%` }}
-                                  />
-                                </div>
-                                <span className="font-medium">{session.scores.clinical}%</span>
+                                <span className="font-medium">
+                                  {(session.scores.clinical ?? 0).toFixed(0)}%
+                                </span>
                               </div>
                             </td>
                             <td className="py-2 text-xs text-gray-500">
-                              {new Date(session.timestamp).toLocaleDateString()}
+                              {formatTimestamp(session.timestamp)}
                             </td>
+                            {user?.role === 'admin' && (
+                              <td className="py-2">
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => handleExportSessionTranscript(session.sessionId)}
+                                  disabled={exportingSessionId === session.sessionId}
+                                >
+                                  {exportingSessionId === session.sessionId ? 'Exporting…' : 'Export Transcript'}
+                                </Button>
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>

@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { fetchFeedback } from '@/api/feedback.api'
 import type { Feedback as FeedbackType } from '@/api/feedback.api'
+import { getSession } from '@/api/sessions.api'
+import type { SessionDetail } from '@/types/session'
 import { FeedbackChart } from '@/components/FeedbackChart'
+import { FeedbackConversationTimeline } from '@/components/FeedbackConversationTimeline'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -52,6 +55,7 @@ export const Feedback = () => {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
   const [feedback, setFeedback] = useState<FeedbackType | null>(null)
+  const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -60,11 +64,18 @@ export const Feedback = () => {
       if (!sessionId) return
 
       try {
-        const data = await fetchFeedback(sessionId)
-        setFeedback(data)
-      } catch (err: any) {
-        console.error('Failed to fetch feedback:', err)
-        setError(err.response?.data?.detail || 'Failed to load feedback. The session may not be closed yet.')
+        const [feedbackData, sessionData] = await Promise.all([
+          fetchFeedback(sessionId),
+          getSession(Number(sessionId)),
+        ])
+        setFeedback(feedbackData)
+        setSessionDetail(sessionData)
+      } catch (error: any) {
+        console.error('Failed to fetch feedback or session detail:', error)
+        setError(
+          error?.response?.data?.detail ||
+            'Failed to load feedback. The session may not be closed yet.'
+        )
       } finally {
         setLoading(false)
       }
@@ -75,11 +86,11 @@ export const Feedback = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col">
+      <div className="h-screen flex flex-col">
         <Navbar />
-        <div className="flex flex-1">
+        <div className="flex flex-1 min-h-0">
           <Sidebar />
-          <main className="flex-1 md:ml-64">
+          <main className="flex-1 overflow-y-auto md:ml-64">
             <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
               <div className="mb-8">
                 <div className="h-8 w-64 bg-gray-200 rounded animate-pulse mb-2"></div>
@@ -140,11 +151,11 @@ export const Feedback = () => {
     : null
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="h-screen flex flex-col">
       <Navbar />
-      <div className="flex flex-1">
+      <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main className="flex-1 md:ml-64">
+        <main className="flex-1 overflow-y-auto md:ml-64">
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             <nav className="mb-4 text-sm text-gray-500">
               <span className="cursor-pointer hover:text-gray-700" onClick={() => navigate('/dashboard')}>Dashboard</span>
@@ -200,66 +211,94 @@ export const Feedback = () => {
             <div className="space-y-8">
               {/* SPIKES Coverage & Conversation Metrics */}
               <div className="grid gap-6 lg:grid-cols-2">
+                {/* SPIKES Coverage Checklist */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>SPIKES Coverage Analysis</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      <span className="text-purple-600">📊</span>
+                      SPIKES Coverage
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      <div className="relative w-48 h-48 mx-auto flex items-center justify-center">
-                        <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90" aria-hidden>
-                          {(() => {
-                            const r = 40
-                            const circumference = 2 * Math.PI * r
-                            const segmentLength = circumference / 6
-                            return SPIKES_STAGE_ORDER.map(({ key }, i) => {
-                              const reached = coveredStages.has(key)
-                              return (
-                                <circle
-                                  key={key}
-                                  cx="50"
-                                  cy="50"
-                                  r={r}
-                                  fill="none"
-                                  stroke={reached ? '#7c3aed' : '#e5e7eb'}
-                                  strokeWidth="10"
-                                  strokeDasharray={`${segmentLength} ${circumference - segmentLength}`}
-                                  strokeDashoffset={-i * segmentLength}
-                                />
-                              )
-                            })
-                          })()}
-                        </svg>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                          <span className="text-2xl font-bold text-purple-600">{coveragePercent}%</span>
-                          <span className="text-sm text-gray-600">Coverage</span>
+                    {feedback.spikesCoverage && (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          {[
+                            { key: 'setting', label: 'Setting' },
+                            { key: 'perception', label: 'Perception' },
+                            { key: 'invitation', label: 'Invitation' },
+                            { key: 'knowledge', label: 'Knowledge' },
+                            { key: 'emotions', label: 'Emotions' },
+                            { key: 'strategy', label: 'Strategy' },
+                          ].map((stage) => {
+                            const covered =
+                              feedback.spikesCoverage &&
+                              feedback.spikesCoverage[stage.key as keyof typeof feedback.spikesCoverage]
+
+                            return (
+                              <div
+                                key={stage.key}
+                                className="flex items-center justify-between py-1 border-b last:border-b-0 border-gray-100"
+                              >
+                                <span className="text-sm font-medium text-gray-800">
+                                  {stage.label}
+                                </span>
+                                {covered ? (
+                                  <span className="text-sm font-semibold text-emerald-500">
+                                    ✓ Covered
+                                  </span>
+                                ) : (
+                                  <span className="text-sm font-semibold text-red-500">
+                                    ✗ Missed
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        <div className="pt-2 text-sm font-medium text-gray-800">
+                          Overall Coverage:{' '}
+                          <span className="font-semibold text-purple-700">
+                            {feedback.spikesCoverage.coveredCount} / {feedback.spikesCoverage.total}{' '}
+                            stages
+                          </span>
+                          <span className="ml-2 text-gray-500">
+                            (
+                            {Math.round(
+                              (feedback.spikesCoverage.coveredCount /
+                                feedback.spikesCoverage.total) *
+                                100,
+                            )}
+                            %)
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          {SPIKES_STAGE_ORDER.map(({ key, label }) => {
+                            const reached = coveredStages.has(key)
+                            return (
+                              <div key={key} className="flex items-center justify-between">
+                                <span className="text-sm font-medium">{label}</span>
+                                <span
+                                  className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                    reached
+                                      ? 'bg-green-100 text-green-700'
+                                      : 'bg-gray-100 text-gray-500'
+                                  }`}
+                                >
+                                  {reached ? 'Reached' : 'Missed'}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        <div className="text-xs text-gray-500 pt-2 border-t">
+                          SPIKES Completion Score: {feedback.spikesCompletionScore.toFixed(1)}/10
                         </div>
                       </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        {SPIKES_STAGE_ORDER.map(({ key, label }) => {
-                          const reached = coveredStages.has(key)
-                          return (
-                            <div key={key} className="flex items-center justify-between">
-                              <span className="text-sm font-medium">{label}</span>
-                              <span
-                                className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                                  reached
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'bg-gray-100 text-gray-500'
-                                }`}
-                              >
-                                {reached ? 'Reached' : 'Missed'}
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
-
-                      <div className="text-xs text-gray-500 pt-2 border-t">
-                        SPIKES Completion Score: {feedback.spikesCompletionScore.toFixed(1)}/10
-                      </div>
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -350,7 +389,23 @@ export const Feedback = () => {
                 </Card>
               </div>
 
-              {/* Score chart & Session details */}
+              {/* Conversation Analysis Timeline */}
+              {sessionDetail && sessionDetail.turns && sessionDetail.turns.length > 0 ? (
+                <FeedbackConversationTimeline turns={sessionDetail.turns} feedback={feedback} />
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Conversation Analysis</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-500">
+                      Conversation analysis unavailable (no transcript data for this session).
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Original metrics chart */}
               <div className="grid gap-6 lg:grid-cols-2">
                 <FeedbackChart feedback={feedback} />
 

@@ -22,20 +22,37 @@ class SpanDetector:
     """Detects spans with character offsets for AFCE constructs."""
     
     # AFCE EO keywords by dimension and explicit/implicit
+    # NOTE: These are phrase-level where possible to reduce noisy single-word matches.
     EO_KEYWORDS = {
         (AFCE_DIMENSION_FEELING, AFCE_EXPLICIT): [
+            # Core emotion/fear words
             "scared", "afraid", "worried", "anxious", "terrified",
             "sad", "upset", "devastated", "depressed", "hopeless",
             "angry", "furious", "frustrated", "mad", "annoyed",
             "confused", "overwhelmed", "shocked", "stunned",
-            "pain", "hurting", "ache", "suffering",
+            # Burden / impact phrases
+            "it scares me", "it scares me a lot",
+            "feel alone", "i feel alone",
+            "i barely sleep anymore", "barely sleep anymore",
+            "i hardly sleep", "hardly sleep",
+            "affecting my sleep", "been affecting my sleep",
+            "fatigue", "pressure in my chest",
+            # Progression / seriousness
+            "getting worse", "been getting worse",
+            "symptoms have been getting worse",
+            "my symptoms seem to be getting worse",
+            "something is really wrong",
+            "something serious is happening",
+            # Generic distress
             "don't know what to do", "can't handle", "too much",
         ],
         (AFCE_DIMENSION_FEELING, AFCE_IMPLICIT): [
             "i guess", "maybe", "sort of", "kind of",
             "not sure", "wondering", "thinking about",
             "concerned", "a bit", "somewhat",
-            "difficult", "hard", "challenging", "tough",
+            # Implicit difficulty/strain (avoid bare single tokens)
+            "finding it difficult", "been difficult", "really hard",
+            "really challenging", "tough time",
             "not being able to", "being sick", "take care of",  # Implicit concerns about ability/health
             "picturing being",  # Implicit fears/concerns
         ],
@@ -44,16 +61,21 @@ class SpanDetector:
             "shouldn't have", "should have", "fault", "blame",
         ],
         (AFCE_DIMENSION_JUDGMENT, AFCE_IMPLICIT): [
-            "difficult", "challenging", "tough", "problematic", "concerning", "questionable",
+            # Avoid generic single-word triggers like "difficult"/"tough" which are
+            # highly context-dependent and often appear in clinician turns.
+            "problematic", "concerning", "questionable",
         ],
         (AFCE_DIMENSION_APPRECIATION, AFCE_EXPLICIT): [
-            "important", "meaningful", "valuable", "significant", "matters",
-            "precious", "cherished", "meaningful to me",
+            # Avoid generic 'important' on clinician side; focus on patient appraisal phrases.
+            "important to me", "meaningful to me", "matters to me",
+            "precious", "cherished",
         ],
         (AFCE_DIMENSION_APPRECIATION, AFCE_IMPLICIT): [
             "matters", "significant", "relevant", "counts", "worth it",
             "what this really means for", "for my life", "day to day",  # Implicit Appreciation of impact
             "what this means", "means for my",  # Life impact concerns
+            # Family-history context as concern/appraisal (patient-specific)
+            "my dad had heart problems", "my dad had heart issues",
         ],
     }
     
@@ -86,25 +108,77 @@ class SpanDetector:
         (ELICITATION_INDIRECT, AFCE_DIMENSION_APPRECIATION): [
             "it sounds like this is important", "it seems like this matters",
             "you're saying this is meaningful", "it appears this is valuable",
+            # Invitation-style elicitations of concerns/understanding
+            "is there anything else you're hoping to understand",
+            "anything important you haven't shared",
+            "do you have any other questions",
+            "would you like me to explain more",
+            "would you like me to explain",
+            "can you tell me if there's anything",
+            "can you tell me what part feels the hardest",
+            "can you tell me what has been getting worse",
         ],
     }
     
     # Response keywords (AFCE taxonomy)
     RESPONSE_KEYWORDS = {
         RESPONSE_UNDERSTANDING: [
-            "i understand", "i see", "i get it", "i hear you",
-            "that makes sense", "i can see why", "i follow you",
-            "it makes sense", "it sounds like", "i understand how",
-            "i understand how important", "sounds like",
+            "i understand",
+            "i see",
+            "i get it",
+            "i hear you",
+            "that makes sense",
+            "i can see why",
+            "i follow you",
+            "it makes sense",
+            "it sounds like",
+            "i understand how",
+            "i understand how important",
+            "sounds like",
+            # Additional common empathic framings
+            "i can see this is difficult",
+            "i can see this is hard",
+            "i can see this is a lot",
+            "i can see this is a lot to take in",
+            "i know this is hard",
+            "i know this is difficult",
+            "i understand this is hard",
+            "i understand this must be difficult",
+            # Thanking / acknowledging sharings
+            "thank you for telling me",
+            "thank you for sharing",
+            "thank you for sharing that",
+            # Hearing / validating
+            "i hear that",
+            "i hear you",
+            # Supportive commitments
+            "i'll support you",
+            "i will support you",
+            "we'll support you",
+            "we will support you",
+            "we'll go through this together",
+            "we will go through this together",
         ],
         RESPONSE_SHARING: [
-            "i feel the same", "i understand how", "that resonates",
-            "i can relate", "i've felt that way", "that's how i feel too",
+            "i feel the same",
+            "i understand how",
+            "that resonates",
+            "i can relate",
+            "i've felt that way",
+            "that's how i feel too",
         ],
         RESPONSE_ACCEPTANCE: [
-            "that's valid", "that's understandable", "that makes sense",
-            "that's reasonable", "anyone would feel", "that's normal",
-            "it makes sense that", "makes sense that you'd",
+            "that's valid",
+            "that's understandable",
+            "that makes sense",
+            "that's reasonable",
+            "anyone would feel",
+            "that's normal",
+            "it makes sense that",
+            "makes sense that you'd",
+            # Strong normalizing / validating language
+            "this must be overwhelming",
+            "this must be hard",
         ],
     }
     
@@ -117,12 +191,15 @@ class SpanDetector:
         Returns:
             List of EO spans with dimension, explicit_or_implicit, offsets, confidence, provenance
         """
-        spans = []
+        spans: List[Dict[str, Any]] = []
         text_lower = text.lower()
         
         # Check each dimension and explicit/implicit combination
         for (dimension, explicit_implicit), keywords in self.EO_KEYWORDS.items():
-            for keyword in keywords:
+            # Prefer longer, multiword keywords first so that phrases like
+            # "my symptoms have been getting worse" are matched before shorter
+            # substrings like "worse".
+            for keyword in sorted(keywords, key=len, reverse=True):
                 keyword_lower = keyword.lower()
                 keyword_words = keyword.split()
                 
@@ -179,7 +256,7 @@ class SpanDetector:
                         }
                         spans.append(span)
         
-        # Remove overlapping spans (keep higher confidence)
+        # Remove overlapping spans (keep higher confidence and prefer longer phrases)
         spans = self._remove_overlapping_spans(spans)
         
         # Sort by start_char
@@ -322,8 +399,11 @@ class SpanDetector:
         if not spans:
             return []
         
-        # Sort by start_char, then by priority
-        def sort_key(span: Dict[str, Any]) -> Tuple[int, float, float]:
+        # Sort by start_char, then by priority, then by confidence and length.
+        # For EO spans (default priority_key="confidence"), this ensures that when
+        # multiple overlapping spans share similar confidence, longer phrases like
+        # "it scares me a lot" win over shorter substrings like "scared".
+        def sort_key(span: Dict[str, Any]) -> Tuple[int, float, float, int]:
             priority_val = span.get(priority_key)
             if priority_order and priority_val in priority_order:
                 priority_rank = priority_order.index(priority_val)
@@ -331,8 +411,13 @@ class SpanDetector:
                 priority_rank = -priority_val  # Higher confidence = lower rank number (better)
             else:
                 priority_rank = 999
-            
-            return (span["start_char"], priority_rank, -span.get("confidence", 0))
+            length = span.get("end_char", 0) - span.get("start_char", 0)
+            return (
+                span["start_char"],
+                priority_rank,
+                -span.get("confidence", 0.0),
+                -length,
+            )
         
         sorted_spans = sorted(spans, key=sort_key)
         non_overlapping = []

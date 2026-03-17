@@ -1,9 +1,13 @@
 import api from '@/api/client'
 import type {
+  Session,
   SessionDTO,
-  SessionListDTO,
-  TurnResponseWithAudioDTO,
+  SessionDetail,
   SessionDetailDTO,
+  SessionListResponse,
+  SessionListResponseDTO,
+  TurnResponseWithAudio,
+  TurnResponseWithAudioDTO,
 } from '@/types/session'
 import {
   sessionFromDTO,
@@ -13,15 +17,18 @@ import {
   toSessionCreatePayload,
   toTurnCreatePayload,
 } from '@/adapters/session.adapter'
-import type { Session, SessionList, TurnResponseWithAudio, SessionDetail } from '@/types/session'
 
 const BASE = '/v1/sessions'
 
 /**
  * Create a new session for a case
  */
-export const createSession = async (caseId: number): Promise<Session> => {
-  const res = await api.post<SessionDTO>(BASE, toSessionCreatePayload(caseId))
+export const createSession = async (
+  caseId: number,
+  opts?: { forceNew?: boolean }
+): Promise<Session> => {
+  const { forceNew = false } = opts ?? {}
+  const res = await api.post<SessionDTO>(BASE, toSessionCreatePayload(caseId, forceNew))
   return sessionFromDTO(res.data)
 }
 
@@ -49,6 +56,20 @@ export const getSession = async (sessionId: number): Promise<SessionDetail> => {
 }
 
 /**
+ * List sessions for the current user
+ */
+export const listUserSessions = async (opts?: {
+  skip?: number
+  limit?: number
+}): Promise<SessionListResponse> => {
+  const { skip = 0, limit = 10 } = opts ?? {}
+  const res = await api.get<SessionListResponseDTO>(BASE, {
+    params: { skip, limit },
+  })
+  return sessionListFromDTO(res.data)
+}
+
+/**
  * Close a session and get feedback
  */
 export const closeSession = async (sessionId: number): Promise<any> => {
@@ -57,10 +78,14 @@ export const closeSession = async (sessionId: number): Promise<any> => {
 }
 
 /**
- * List all sessions for the current user
+ * Legacy helper: list all sessions for the current user.
+ * Kept for backwards compatibility; uses the same list endpoint.
  */
-export const listSessions = async (skip = 0, limit = 100): Promise<SessionList> => {
-  const res = await api.get<SessionListDTO>(BASE, { params: { skip, limit } })
+export const listSessions = async (
+  skip = 0,
+  limit = 100
+): Promise<SessionListResponse> => {
+  const res = await api.get<SessionListResponseDTO>(BASE, { params: { skip, limit } })
   return sessionListFromDTO(res.data)
 }
 

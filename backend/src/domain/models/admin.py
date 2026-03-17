@@ -69,3 +69,26 @@ class ResearchExportResponse(BaseModel):
     generated_at: datetime
     record_count: int
 
+
+class ResearchSessionSummary(BaseModel):
+    """Anonymized per-session summary for research dashboard."""
+
+    session_id: str
+    case_id: int
+    duration_seconds: Optional[int] = None
+    state: str
+    spikes_stage: Optional[str] = None
+    empathy_score: Optional[float] = None
+    communication_score: Optional[float] = None
+    clinical_score: Optional[float] = None
+    timestamp: Optional[datetime] = None
+
+
+class ResearchSessionsEnvelope(BaseModel):
+    """Envelope for paginated anonymized research sessions."""
+
+    sessions: list[ResearchSessionSummary]
+    total: int
+    skip: int
+    limit: int
+

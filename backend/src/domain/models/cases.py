@@ -1,9 +1,10 @@
 """Case request/response schemas."""
 
+import json
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class CaseBase(BaseModel):
@@ -17,6 +18,9 @@ class CaseBase(BaseModel):
     category: Optional[str] = None
     patient_background: Optional[str] = None
     expected_spikes_flow: Optional[str] = None
+    evaluator_plugin: Optional[str] = None
+    patient_model_plugin: Optional[str] = None
+    metrics_plugins: Optional[List[str]] = None
 
 
 class CaseCreate(CaseBase):
@@ -35,6 +39,9 @@ class CaseUpdate(BaseModel):
     category: Optional[str] = None
     patient_background: Optional[str] = None
     expected_spikes_flow: Optional[str] = None
+    evaluator_plugin: Optional[str] = None
+    patient_model_plugin: Optional[str] = None
+    metrics_plugins: Optional[List[str]] = None
 
 
 class CaseResponse(CaseBase):
@@ -45,6 +52,20 @@ class CaseResponse(CaseBase):
     updated_at: datetime
     
     model_config = ConfigDict(from_attributes=True, extra="ignore")
+
+    @field_validator("metrics_plugins", mode="before")
+    @classmethod
+    def _metrics_plugins_from_entity(cls, v: object) -> Optional[List[str]]:
+        if v is None:
+            return None
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return None
 
 
 class CaseListResponse(BaseModel):

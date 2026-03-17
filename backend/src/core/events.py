@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from config.logging import get_logger, setup_logging
 from db.base import engine, init_db
+from plugins.load_plugins import load_plugins
 
 logger = get_logger(__name__)
 
@@ -18,6 +19,10 @@ def create_start_app_handler(app: FastAPI):
         # Setup logging
         setup_logging()
         logger.info("Logging configured")
+
+        # Load plugin modules so they register with PluginRegistry
+        load_plugins()
+        logger.info("Plugins loaded")
         
         # Test database connection
         try:

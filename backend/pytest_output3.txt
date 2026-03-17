@@ -1,0 +1,1087 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.3, pytest-7.4.4, pluggy-1.6.0
+rootdir: /Users/aaryank/Developer/school/capstone_feedback/capstone/backend
+configfile: pyproject.toml
+plugins: anyio-4.12.1, cov-4.1.0, asyncio-0.21.2
+asyncio: mode=Mode.AUTO
+collected 11 items
+
+src/tests/test_transcript_scoring_seeded.py ......F.--- Turn-level debug for BAD ---
+TURN 1 (user)
+Text: Let's get started. What brings you here?
+
+Seeded Stage: None
+Preview Stage: setting
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 2 (assistant)
+Text: I've been really tired and scared because my symptoms seem to be getting worse.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'scared' → Feeling, explicit, eo)
+  - 'my symptoms seem to be getting worse' → Appreciation, implicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  - 'scared' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 3 (user)
+Text: Well, symptoms fluctuate. Anyway, when did it start?
+
+Seeded Stage: None
+Preview Stage: setting
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 4 (assistant)
+Text: About a month ago. It's been affecting my sleep and I'm worried something serious is going on.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'affecting my sleep' → Appreciation, implicit, eo)
+  - 'worried' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  - 'worried' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 5 (user)
+Text: Worrying won't help. Did you take the meds I prescribed?
+
+Seeded Stage: None
+Preview Stage: setting
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 6 (assistant)
+Text: Yes, but they aren't helping and I feel like something is really wrong.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'something is really wrong' → Appreciation, implicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  - 'wrong' → Judgment, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 7 (user)
+Text: Okay, noted. Let's move on. Any chest pain?
+
+Seeded Stage: None
+Preview Stage: setting
+
+Preview spans:
+  EO:
+  - 'pain' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 8 (assistant)
+Text: Sometimes, and it scares me a lot. My dad had heart issues.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'it scares me a lot' → Feeling, explicit, eo)
+  - 'My dad had heart issues' → Appreciation, implicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 9 (user)
+Text: Family history is common. Chest pain can be many things.
+
+Seeded Stage: knowledge
+Preview Stage: setting
+
+Preview spans:
+  EO:
+  - 'pain' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 10 (assistant)
+Text: I feel overwhelmed. I don't know what to expect.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'overwhelmed' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  - 'overwhelmed' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 11 (user)
+Text: I'll explain everything after tests. There's no point stressing about it now.
+
+Seeded Stage: knowledge
+Preview Stage: setting
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 12 (assistant)
+Text: I just... feel alone in this.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'feel alone' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 13 (user)
+Text: Well, we're doing what we can. Let's schedule the bloodwork.
+
+Seeded Stage: strategy
+Preview Stage: setting
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+--- Scoring debug ---
+Missed opportunities:
+  - turn=2, dimension=Feeling, text='scared'
+  - turn=2, dimension=Appreciation, text='my symptoms seem to be getting worse'
+  - turn=4, dimension=Appreciation, text='affecting my sleep'
+  - turn=4, dimension=Feeling, text='worried'
+  - turn=6, dimension=Appreciation, text='something is really wrong'
+  - turn=8, dimension=Feeling, text='it scares me a lot'
+  - turn=8, dimension=Appreciation, text='My dad had heart issues'
+  - turn=10, dimension=Feeling, text='overwhelmed'
+  - turn=12, dimension=Feeling, text='feel alone'
+
+EO→response links:
+  (none)
+
+EO→elicitation links:
+  (none)
+
+Linkage stats:
+  total_eos: 9
+  addressed_count: 0
+  missed_count: 9
+  addressed_rate: 0.0
+  missed_rate: 1.0
+
+Timeline events (first 20):
+  [TimelineEvent(turn_number=2, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=2, type='missed', label='Missed Opportunity'), TimelineEvent(turn_number=4, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=4, type='missed', label='Missed Opportunity'), TimelineEvent(turn_number=6, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=6, type='missed', label='Missed Opportunity'), TimelineEvent(turn_number=8, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=8, type='missed', label='Missed Opportunity'), TimelineEvent(turn_number=9, type='spikes', label='SPIKES Knowledge'), TimelineEvent(turn_number=10, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=10, type='missed', label='Missed Opportunity'), TimelineEvent(turn_number=11, type='spikes', label='SPIKES Knowledge'), TimelineEvent(turn_number=12, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=12, type='missed', label='Missed Opportunity'), TimelineEvent(turn_number=13, type='spikes', label='SPIKES Strategy')]
+
+EO spans:
+  - 'scared' | Feeling | eo
+  - 'my symptoms seem to be getting worse' | Appreciation | eo
+  - 'affecting my sleep' | Appreciation | eo
+  - 'worried' | Feeling | eo
+  - 'something is really wrong' | Appreciation | eo
+  - 'it scares me a lot' | Feeling | eo
+  - 'My dad had heart issues' | Appreciation | eo
+  - 'overwhelmed' | Feeling | eo
+  - 'feel alone' | Feeling | eo
+
+Response spans:
+  (none)
+
+Elicitation spans:
+  (none)
+
+.--- Turn-level debug for MEDIUM ---
+TURN 1 (user)
+Text: Thanks for coming in. Is this still a good time to talk?
+
+Seeded Stage: setting
+Preview Stage: setting
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 2 (assistant)
+Text: Yes, but I'm pretty anxious. My symptoms have been getting worse.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'pretty anxious' → Feeling, explicit, eo)
+  - 'my symptoms have been getting worse' → Appreciation, implicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  - 'anxious' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 3 (user)
+Text: I'm sorry it's been stressful. Can you tell me what has been getting worse?
+
+Seeded Stage: perception
+Preview Stage: emotion
+
+Seeded spans:
+  EO:
+  - 'Can you tell me what has been getting worse?' → Appreciation, direct)
+  Responses:
+  - "I'm sorry it's been stressful" → understanding)
+  Elicitations:
+  - 'Can you tell me what has been getting worse?' → Appreciation, direct)
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  - 'Can you tell me what' → Feeling, direct)
+
+TURN 4 (assistant)
+Text: Mostly the fatigue and this pressure in my chest.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'fatigue and this pressure in my chest' → Appreciation, implicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 5 (user)
+Text: I see. We'll sort through it.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  - 'I see' → understanding)
+  Elicitations:
+  (none)
+
+TURN 6 (assistant)
+Text: I barely sleep anymore. I keep thinking something serious is happening.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'I barely sleep anymore' → Appreciation, implicit, eo)
+  - 'I keep thinking something serious is happening' → Feeling, implicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 7 (user)
+Text: That sounds difficult. Have you been taking your meds?
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  (none)
+  Responses:
+  - 'That sounds difficult' → understanding)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  - 'difficult' → Feeling, implicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 8 (assistant)
+Text: Yes, but it doesn't help my fear. My dad had heart problems.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - "doesn't help my fear" → Feeling, explicit, eo)
+  - 'My dad had heart problems' → Appreciation, implicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 9 (user)
+Text: I understand that family history can make this feel scarier.
+
+Seeded Stage: emotion
+Preview Stage: perception
+
+Seeded spans:
+  EO:
+  (none)
+  Responses:
+  - 'I understand that family history can make this feel scarier' → understanding)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  - 'I understand' → understanding)
+  Elicitations:
+  (none)
+
+TURN 10 (assistant)
+Text: Exactly. I'm overwhelmed.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'overwhelmed' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  - 'overwhelmed' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 11 (user)
+Text: Let's take this step by step. I'll explain what tests can help us understand what's going on.
+
+Seeded Stage: knowledge
+Preview Stage: perception
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 12 (assistant)
+Text: Okay. I appreciate that.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'I appreciate that' → Appreciation, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 13 (user)
+Text: Before we move on, is there anything else you're hoping to understand today?
+
+Seeded Stage: invitation
+Preview Stage: perception
+
+Seeded spans:
+  EO:
+  - "is there anything else you're hoping to understand today?" → Appreciation, direct)
+  Responses:
+  (none)
+  Elicitations:
+  - "is there anything else you're hoping to understand today?" → Appreciation, direct)
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+--- Scoring debug ---
+Missed opportunities:
+  - turn=12, dimension=Appreciation, text='I appreciate that'
+
+EO→response links:
+  EO eo_1: 1 linked responses
+  EO eo_2: 1 linked responses
+  EO eo_3: 1 linked responses
+  EO eo_4: 1 linked responses
+  EO eo_5: 1 linked responses
+  EO eo_6: 2 linked responses
+  EO eo_7: 2 linked responses
+  EO eo_8: 1 linked responses
+
+EO→elicitation links:
+  EO eo_3: 1 linked elicitations
+  EO eo_4: 1 linked elicitations
+
+Linkage stats:
+  total_eos: 9
+  addressed_count: 8
+  missed_count: 1
+  addressed_rate: 0.8888888888888888
+  missed_rate: 0.1111111111111111
+
+Timeline events (first 20):
+  [TimelineEvent(turn_number=1, type='spikes', label='SPIKES Setting'), TimelineEvent(turn_number=2, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=3, type='response', label='Empathy Response'), TimelineEvent(turn_number=3, type='spikes', label='SPIKES Perception'), TimelineEvent(turn_number=4, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=6, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=7, type='response', label='Empathy Response'), TimelineEvent(turn_number=8, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=9, type='response', label='Empathy Response'), TimelineEvent(turn_number=9, type='spikes', label='SPIKES Emotion'), TimelineEvent(turn_number=10, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=11, type='spikes', label='SPIKES Knowledge'), TimelineEvent(turn_number=12, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=12, type='missed', label='Missed Opportunity'), TimelineEvent(turn_number=13, type='spikes', label='SPIKES Invitation')]
+
+EO spans:
+  - 'pretty anxious' | Feeling | eo
+  - 'my symptoms have been getting worse' | Appreciation | eo
+  - 'fatigue and this pressure in my chest' | Appreciation | eo
+  - 'I barely sleep anymore' | Appreciation | eo
+  - 'I keep thinking something serious is happening' | Feeling | eo
+  - "doesn't help my fear" | Feeling | eo
+  - 'My dad had heart problems' | Appreciation | eo
+  - 'overwhelmed' | Feeling | eo
+  - 'I appreciate that' | Appreciation | eo
+
+Response spans:
+  - "I'm sorry it's been stressful" | understanding
+  - 'That sounds difficult' | understanding
+  - 'I understand that family history can make this feel scarier' | understanding
+
+Elicitation spans:
+  - 'Can you tell me what has been getting worse?' | Appreciation | direct
+  - "is there anything else you're hoping to understand today?" | Appreciation | direct
+
+.--- Turn-level debug for GOOD ---
+TURN 1 (user)
+Text: Thanks for meeting with me. I want to make sure you're comfortable. Can we talk here, or would you prefer a quieter room?
+
+Seeded Stage: setting
+Preview Stage: setting
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 2 (assistant)
+Text: Here is okay. I'm feeling anxious, and my symptoms have been getting worse.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'anxious' → Feeling, explicit, eo)
+  - 'my symptoms have been getting worse' → Appreciation, implicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  - 'anxious' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 3 (user)
+Text: I hear you. It makes sense you'd feel anxious. Can you tell me what symptoms have been getting worse?
+
+Seeded Stage: perception
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'Can you tell me what symptoms have been getting worse?' → Appreciation, direct)
+  Responses:
+  - 'I hear you' → understanding)
+  - "It makes sense you'd feel anxious" → acceptance)
+  Elicitations:
+  - 'Can you tell me what symptoms have been getting worse?' → Appreciation, direct)
+
+Preview spans:
+  EO:
+  - 'anxious' → Feeling, explicit, eo)
+  Responses:
+  - 'I hear you' → understanding)
+  - 'It makes sense' → understanding)
+  Elicitations:
+  - 'Can you tell me what' → Feeling, direct)
+
+TURN 4 (assistant)
+Text: Mostly the fatigue and this pressure in my chest. It's been really scary.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'the fatigue and this pressure in my chest' → Appreciation, implicit, eo)
+  - 'scary' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 5 (user)
+Text: I understand how frightening that can be.
+
+Seeded Stage: emotion
+Preview Stage: perception
+
+Seeded spans:
+  EO:
+  (none)
+  Responses:
+  - 'I understand how frightening that can be' → understanding)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  - 'I understand how' → sharing)
+  Elicitations:
+  (none)
+
+TURN 6 (assistant)
+Text: And I hardly sleep. I'm afraid something serious is happening.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'I hardly sleep' → Appreciation, implicit, eo)
+  - 'afraid' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  - 'afraid' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 7 (user)
+Text: It makes sense that you'd feel afraid. Can you tell me what part feels the hardest?
+
+Seeded Stage: emotion
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'Can you tell me what part feels the hardest?' → Feeling, direct)
+  Responses:
+  - "It makes sense that you'd feel afraid" → acceptance)
+  Elicitations:
+  - 'Can you tell me what part feels the hardest?' → Feeling, direct)
+
+Preview spans:
+  EO:
+  - 'afraid' → Feeling, explicit, eo)
+  Responses:
+  - 'It makes sense that' → acceptance)
+  Elicitations:
+  - 'Can you tell me what' → Feeling, direct)
+
+TURN 8 (assistant)
+Text: My dad had heart problems, so every sensation makes me feel scared.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'My dad had heart problems' → Appreciation, implicit, eo)
+  - 'scared' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  - 'scared' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 9 (user)
+Text: Thank you for telling me that. I understand how that history would make this even more stressful.
+
+Seeded Stage: emotion
+Preview Stage: perception
+
+Seeded spans:
+  EO:
+  (none)
+  Responses:
+  - 'Thank you for telling me that' → acceptance)
+  - 'I understand how that history would make this even more stressful' → understanding)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  - 'I understand how' → sharing)
+  Elicitations:
+  (none)
+
+TURN 10 (assistant)
+Text: Yeah... I feel overwhelmed.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  - 'overwhelmed' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  - 'overwhelmed' → Feeling, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 11 (user)
+Text: I hear that. Let me walk through what we know so far and what tests can help clarify things.
+
+Seeded Stage: knowledge
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  (none)
+  Responses:
+  - 'I hear that' → understanding)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 12 (assistant)
+Text: Okay, that helps.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 13 (user)
+Text: Before I summarize next steps, can you tell me if there's anything important you haven't shared yet?
+
+Seeded Stage: invitation
+Preview Stage: strategy
+
+Seeded spans:
+  EO:
+  - "Can you tell me if there's anything important you haven't shared yet?" → Appreciation, direct)
+  Responses:
+  (none)
+  Elicitations:
+  - "Can you tell me if there's anything important you haven't shared yet?" → Appreciation, direct)
+
+Preview spans:
+  EO:
+  - 'important' → Appreciation, explicit, eo)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 14 (assistant)
+Text: No, that covers it. Thank you.
+
+Seeded Stage: None
+Preview Stage: setting
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+TURN 15 (user)
+Text: Here's our plan: we'll check your heart, review your symptoms together afterward, and I'll support you through every step.
+
+Seeded Stage: strategy
+Preview Stage: setting
+
+Seeded spans:
+  EO:
+  (none)
+  Responses:
+  - "I'll support you through every step" → other)
+  Elicitations:
+  (none)
+
+Preview spans:
+  EO:
+  (none)
+  Responses:
+  (none)
+  Elicitations:
+  (none)
+
+--- Scoring debug ---
+Missed opportunities:
+  (none)
+
+EO→response links:
+  EO eo_1: 2 linked responses
+  EO eo_2: 2 linked responses
+  EO eo_3: 3 linked responses
+  EO eo_4: 3 linked responses
+  EO eo_5: 2 linked responses
+  EO eo_6: 2 linked responses
+  EO eo_7: 3 linked responses
+  EO eo_8: 3 linked responses
+  EO eo_9: 3 linked responses
+
+EO→elicitation links:
+  EO eo_3: 1 linked elicitations
+  EO eo_5: 1 linked elicitations
+  EO eo_7: 1 linked elicitations
+  EO eo_8: 1 linked elicitations
+  EO eo_9: 1 linked elicitations
+
+Linkage stats:
+  total_eos: 9
+  addressed_count: 9
+  missed_count: 0
+  addressed_rate: 1.0
+  missed_rate: 0.0
+
+Timeline events (first 20):
+  [TimelineEvent(turn_number=1, type='spikes', label='SPIKES Setting'), TimelineEvent(turn_number=2, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=3, type='response', label='Empathy Response'), TimelineEvent(turn_number=3, type='spikes', label='SPIKES Perception'), TimelineEvent(turn_number=4, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=5, type='response', label='Empathy Response'), TimelineEvent(turn_number=5, type='spikes', label='SPIKES Emotion'), TimelineEvent(turn_number=6, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=7, type='response', label='Empathy Response'), TimelineEvent(turn_number=7, type='spikes', label='SPIKES Emotion'), TimelineEvent(turn_number=8, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=9, type='response', label='Empathy Response'), TimelineEvent(turn_number=9, type='spikes', label='SPIKES Emotion'), TimelineEvent(turn_number=10, type='eo', label='Empathy Opportunity'), TimelineEvent(turn_number=11, type='response', label='Empathy Response'), TimelineEvent(turn_number=11, type='spikes', label='SPIKES Knowledge'), TimelineEvent(turn_number=13, type='spikes', label='SPIKES Invitation'), TimelineEvent(turn_number=15, type='response', label='Empathy Response'), TimelineEvent(turn_number=15, type='spikes', label='SPIKES Strategy')]
+
+EO spans:
+  - 'anxious' | Feeling | eo
+  - 'my symptoms have been getting worse' | Appreciation | eo
+  - 'the fatigue and this pressure in my chest' | Appreciation | eo
+  - 'scary' | Feeling | eo
+  - 'I hardly sleep' | Appreciation | eo
+  - 'afraid' | Feeling | eo
+  - 'My dad had heart problems' | Appreciation | eo
+  - 'scared' | Feeling | eo
+  - 'overwhelmed' | Feeling | eo
+
+Response spans:
+  - 'I hear you' | understanding
+  - "It makes sense you'd feel anxious" | acceptance
+  - 'I understand how frightening that can be' | understanding
+  - "It makes sense that you'd feel afraid" | acceptance
+  - 'Thank you for telling me that' | acceptance
+  - 'I understand how that history would make this even more stressful' | understanding
+  - 'I hear that' | understanding
+  - "I'll support you through every step" | other
+
+Elicitation spans:
+  - 'Can you tell me what symptoms have been getting worse?' | Appreciation | direct
+  - 'Can you tell me what part feels the hardest?' | Feeling | direct
+  - "Can you tell me if there's anything important you haven't shared yet?" | Appreciation | direct
+
+.
+
+=================================== FAILURES ===================================
+______________ test_seeded_transcript_score_ranges[fixture_data1] ______________
+
+test_db = <sqlalchemy.orm.session.Session object at 0x10e7e5160>
+test_user = <User(id=1, email=apex_tester@example.com, role=trainee)>
+test_case = <Case(id=1, title=APEX Seeded Fixture Case, difficulty=intermediate)>
+fixture_data = {'expected_feedback': {'elicitation_counts_by_type_min': {'direct': 2}, 'eo_counts_by_dimension_min': {'Appreciation':...fidence': 0.78, 'dimension': 'Feeling', 'explicit_or_implicit': 'implicit', 'provenance': 'fixture', ...}], ...}, ...]}
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "fixture_data",
+        [TEST_CONVERSATION_BAD, TEST_CONVERSATION_MEDIUM, TEST_CONVERSATION_GOOD],
+    )
+    async def test_seeded_transcript_score_ranges(test_db, test_user, test_case, fixture_data):
+        """Assert that top-level scores fall within the ranges declared in the fixture."""
+        result = await run_fixture_seeded_transcript_through_scoring(
+            test_db, test_user, test_case, fixture_data
+        )
+    
+        feedback = result["feedback"]
+        ranges = fixture_data.get("expected_feedback", {}).get("score_ranges", {})
+    
+        def _check_range(name: str, value: float | None):
+            if value is None:
+                return
+            expected = ranges.get(name)
+            label = fixture_data.get("label", fixture_data.get("name", "UNKNOWN"))
+            ctx = (
+                f"Score range check failed for {label}.{name}.\n"
+                f"Value: {value}\n"
+                f"Expected range: {expected if expected else '[0, 100]'}\n"
+                f"All scores: "
+                f"emp={feedback.empathy_score}, comm={feedback.communication_score}, "
+                f"clin={feedback.clinical_reasoning_score}, prof={feedback.professionalism_score}, "
+                f"overall={feedback.overall_score}, spikes={feedback.spikes_completion_score}"
+            )
+    
+            if not expected:
+                # Fallback assumption: global scoring scale is 0–100 for all scores.
+                assert 0.0 <= value <= 100.0, ctx
+            else:
+                low, high = expected
+                assert low <= value <= high, ctx
+    
+>       _check_range("empathy_score", feedback.empathy_score)
+
+src/tests/test_transcript_scoring_seeded.py:200: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+name = 'empathy_score', value = 75.08
+
+    def _check_range(name: str, value: float | None):
+        if value is None:
+            return
+        expected = ranges.get(name)
+        label = fixture_data.get("label", fixture_data.get("name", "UNKNOWN"))
+        ctx = (
+            f"Score range check failed for {label}.{name}.\n"
+            f"Value: {value}\n"
+            f"Expected range: {expected if expected else '[0, 100]'}\n"
+            f"All scores: "
+            f"emp={feedback.empathy_score}, comm={feedback.communication_score}, "
+            f"clin={feedback.clinical_reasoning_score}, prof={feedback.professionalism_score}, "
+            f"overall={feedback.overall_score}, spikes={feedback.spikes_completion_score}"
+        )
+    
+        if not expected:
+            # Fallback assumption: global scoring scale is 0–100 for all scores.
+            assert 0.0 <= value <= 100.0, ctx
+        else:
+            low, high = expected
+>           assert low <= value <= high, ctx
+E           AssertionError: Score range check failed for MEDIUM.empathy_score.
+E             Value: 75.08
+E             Expected range: [35, 75]
+E             All scores: emp=75.08, comm=73.33, clin=56.67, prof=100.0, overall=73.28, spikes=83.33
+E           assert 75.08 <= 75
+
+src/tests/test_transcript_scoring_seeded.py:198: AssertionError
+=============================== warnings summary ===============================
+../../../../../Library/Caches/pypoetry/virtualenvs/capstone-backend-EtO__fRU-py3.14/lib/python3.14/site-packages/google/genai/types.py:43
+  /Users/aaryank/Library/Caches/pypoetry/virtualenvs/capstone-backend-EtO__fRU-py3.14/lib/python3.14/site-packages/google/genai/types.py:43: DeprecationWarning: '_UnionGenericAlias' is deprecated and slated for removal in Python 3.17
+    VersionedUnionType = Union[builtin_types.UnionType, _UnionGenericAlias]
+
+../../../../../Library/Caches/pypoetry/virtualenvs/capstone-backend-EtO__fRU-py3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:155: 291 warnings
+  /Users/aaryank/Library/Caches/pypoetry/virtualenvs/capstone-backend-EtO__fRU-py3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:155: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    return asyncio.iscoroutinefunction(obj)
+
+src/tests/test_transcript_scoring_seeded.py: 11 warnings
+  /Users/aaryank/Library/Caches/pypoetry/virtualenvs/capstone-backend-EtO__fRU-py3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:564: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+
+src/tests/test_transcript_scoring_seeded.py: 11 warnings
+  /Users/aaryank/Library/Caches/pypoetry/virtualenvs/capstone-backend-EtO__fRU-py3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:395: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    policy = asyncio.get_event_loop_policy()
+
+src/tests/test_transcript_scoring_seeded.py: 264 warnings
+  /Users/aaryank/Library/Caches/pypoetry/virtualenvs/capstone-backend-EtO__fRU-py3.14/lib/python3.14/site-packages/sqlalchemy/sql/schema.py:3624: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
+
+src/tests/test_transcript_scoring_seeded.py: 11 warnings
+  /Users/aaryank/Library/Caches/pypoetry/virtualenvs/capstone-backend-EtO__fRU-py3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:441: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    policy = asyncio.get_event_loop_policy()
+
+src/tests/test_transcript_scoring_seeded.py: 11 warnings
+  /Users/aaryank/Library/Caches/pypoetry/virtualenvs/capstone-backend-EtO__fRU-py3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:462: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    policy = asyncio.get_event_loop_policy()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED src/tests/test_transcript_scoring_seeded.py::test_seeded_transcript_score_ranges[fixture_data1]
+================== 1 failed, 10 passed, 600 warnings in 1.34s ==================

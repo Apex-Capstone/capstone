@@ -1,5 +1,6 @@
 """Case management service."""
 
+import json
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -19,6 +20,7 @@ class CaseService:
     
     async def create_case(self, case_data: CaseCreate) -> CaseResponse:
         """Create a new case."""
+        metrics_json = json.dumps(case_data.metrics_plugins) if case_data.metrics_plugins else None
         case = Case(
             title=case_data.title,
             description=case_data.description,
@@ -28,6 +30,9 @@ class CaseService:
             category=case_data.category,
             patient_background=case_data.patient_background,
             expected_spikes_flow=case_data.expected_spikes_flow,
+            evaluator_plugin=case_data.evaluator_plugin,
+            patient_model_plugin=case_data.patient_model_plugin,
+            metrics_plugins=metrics_json,
         )
         
         created_case = self.case_repo.create(case)
@@ -71,6 +76,9 @@ class CaseService:
         
         # Update fields
         update_data = case_data.model_dump(exclude_unset=True)
+        if "metrics_plugins" in update_data:
+            v = update_data["metrics_plugins"]
+            update_data["metrics_plugins"] = json.dumps(v) if v else None
         for field, value in update_data.items():
             setattr(case, field, value)
         

@@ -9,6 +9,7 @@ import { Sessions } from './pages/Sessions'
 import { SessionDetailPage } from './pages/SessionDetailPage'
 import { Admin } from './pages/Admin'
 import { Research } from './pages/Research'
+import { PluginDeveloperGuide } from './pages/PluginDeveloperGuide'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
 // Component to handle login route with redirect if already authenticated
@@ -29,11 +30,11 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<LoginRoute />} />
 
-        {/* Authenticated */}
+        {/* Shared: admin + trainee */}
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['admin', 'trainee']}>
               <Dashboard />
             </ProtectedRoute>
           }
@@ -41,7 +42,7 @@ function App() {
         <Route
           path="/case/:caseId"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['admin', 'trainee']}>
               <CaseDetail />
             </ProtectedRoute>
           }
@@ -49,7 +50,7 @@ function App() {
         <Route
           path="/feedback/:sessionId"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['admin', 'trainee']}>
               <Feedback />
             </ProtectedRoute>
           }
@@ -71,22 +72,28 @@ function App() {
           }
         />
 
-        {/* Admin area: admin + instructor */}
+        {/* Admin routes */}
         <Route
           path="/admin"
           element={
-            <ProtectedRoute allowedRoles={['admin', 'instructor']}>
+            <ProtectedRoute allowedRoles={['admin']}>
               <Admin />
             </ProtectedRoute>
           }
         />
-
-        {/* Research: admin + instructor (change/remove allowedRoles if you want all authenticated users) */}
         <Route
           path="/research"
           element={
-            <ProtectedRoute allowedRoles={['admin', 'instructor']}>
+            <ProtectedRoute allowedRoles={['admin']}>
               <Research />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/docs/plugin-developer-guide"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <PluginDeveloperGuide />
             </ProtectedRoute>
           }
         />

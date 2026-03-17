@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
-import { LayoutDashboard, FileText, Shield, BarChart3, Menu, ClipboardList } from 'lucide-react'
+import { LayoutDashboard, FileText, Shield, BarChart3, Menu } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -16,31 +16,25 @@ export const Sidebar = () => {
       name: 'Dashboard',
       href: '/dashboard',
       icon: LayoutDashboard,
-      roles: ['trainee', 'instructor', 'admin'],
-    },
-    {
-      name: 'My Sessions',
-      href: '/sessions',
-      icon: ClipboardList,
-      roles: ['trainee', 'instructor', 'admin'],
+      roles: ['trainee', 'admin'],
     },
     {
       name: 'Cases',
       href: '/dashboard',
       icon: FileText,
-      roles: ['trainee', 'instructor', 'admin'],
+      roles: ['trainee', 'admin'],
     },
     {
       name: 'Research',
       href: '/research',
       icon: BarChart3,
-      roles: ['instructor', 'admin'],
+      roles: ['admin'],
     },
     {
       name: 'Admin',
       href: '/admin',
       icon: Shield,
-      roles: ['admin', 'instructor'],
+      roles: ['admin'],
     },
   ].filter((item) => item.roles.includes(user?.role || 'trainee'))
 

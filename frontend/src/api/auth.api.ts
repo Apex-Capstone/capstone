@@ -6,7 +6,7 @@ export interface LoginResponse {
   user: {
     id: number
     email: string
-    role: 'student' | 'instructor' | 'admin'
+    role: 'trainee' | 'admin'
     full_name?: string
   }
 }

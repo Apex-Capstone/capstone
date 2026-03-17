@@ -1,5 +1,6 @@
 """Admin controller/router."""
 
+import json
 from datetime import datetime
 from typing import Annotated, Optional
 
@@ -8,11 +9,14 @@ from pydantic import BaseModel
 from sqlalchemy import text  
 from sqlalchemy.orm import Session
 
+from config.settings import get_settings
 from core.deps import get_db, require_admin
 from domain.entities.user import User
 from domain.models.admin import AnalyticsDashboard
+from plugins.registry import PluginRegistry
 from domain.models.cases import CaseCreate, CaseResponse
 from domain.models.sessions import SessionDetailResponse, SessionListResponse, TurnResponse
+from repositories.feedback_repo import FeedbackRepository
 from services.analytics_service import AnalyticsService
 from services.case_service import CaseService
 from services.session_service import SessionService
@@ -37,10 +41,75 @@ class MetricsTimeline(BaseModel):
     spikes_stage: str
 
 
+class AdminFeedbackSummary(BaseModel):
+    """Feedback summary for admin session detail (no ownership restriction)."""
+    empathy_score: float
+    overall_score: float
+    strengths: Optional[str] = None
+    areas_for_improvement: Optional[str] = None
+
+
 class AdminSessionDetail(BaseModel):
-    """Admin session detail with transcript and metrics."""
+    """Admin session detail with transcript, metrics, and feedback summary."""
     session: SessionDetailResponse
+    feedback: Optional[AdminFeedbackSummary] = None
     metrics_timeline: list[MetricsTimeline]
+
+
+class PluginsResponse(BaseModel):
+    """Active plugin paths (module:ClassName) for admin visibility."""
+    patient_model: str
+    evaluator: str
+    metrics: list[str]
+
+
+class PluginInfo(BaseModel):
+    """Name and version of a registered plugin."""
+    name: str
+    version: str
+
+
+class PluginDiscoveryResponse(BaseModel):
+    """Plugin discovery: registered evaluators, patient_models, and metrics with name+version."""
+    evaluators: list[PluginInfo]
+    patient_models: list[PluginInfo]
+    metrics: list[PluginInfo]
+
+
+@router.get("/plugin-registry", response_model=PluginDiscoveryResponse)
+async def get_plugin_registry(
+    current_user: Annotated[User, Depends(require_admin)],
+):
+    """Return registered plugins from PluginRegistry (name + version). Used for discovery and case override UI."""
+    evaluators = []
+    for plugin_cls in PluginRegistry.list_evaluators().values():
+        evaluators.append(
+            PluginInfo(name=getattr(plugin_cls, "name", ""), version=getattr(plugin_cls, "version", ""))
+        )
+    patient_models = []
+    for plugin_cls in PluginRegistry.list_patient_models().values():
+        patient_models.append(
+            PluginInfo(name=getattr(plugin_cls, "name", ""), version=getattr(plugin_cls, "version", ""))
+        )
+    metrics = []
+    for plugin_cls in PluginRegistry.list_metrics_plugins().values():
+        metrics.append(
+            PluginInfo(name=getattr(plugin_cls, "name", ""), version=getattr(plugin_cls, "version", ""))
+        )
+    return PluginDiscoveryResponse(evaluators=evaluators, patient_models=patient_models, metrics=metrics)
+
+
+@router.get("/plugins", response_model=PluginsResponse)
+async def get_active_plugins(
+    current_user: Annotated[User, Depends(require_admin)],
+):
+    """Return configured plugin paths (admin only). Used by Admin UI Developer Tools."""
+    settings = get_settings()
+    return PluginsResponse(
+        patient_model=settings.patient_model_plugin,
+        evaluator=settings.evaluator_plugin,
+        metrics=list(settings.metrics_plugins or []),
+    )
 
 
 @router.get("/health/db")
@@ -98,15 +167,26 @@ async def get_admin_session_detail(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_admin)],
 ):
-    """Get transcript + metrics timeline for a session (admin only)."""
+    """Get transcript, feedback summary, and metrics timeline for a session (admin only)."""
     session_service = SessionService(db)
     session_detail = await session_service.get_session(session_id)
-    
+
+    # Fetch feedback (no ownership restriction for admin)
+    feedback_repo = FeedbackRepository(db)
+    feedback_entity = feedback_repo.get_by_session(session_id)
+    feedback_summary = None
+    if feedback_entity:
+        feedback_summary = AdminFeedbackSummary(
+            empathy_score=feedback_entity.empathy_score,
+            overall_score=feedback_entity.overall_score,
+            strengths=feedback_entity.strengths,
+            areas_for_improvement=feedback_entity.areas_for_improvement,
+        )
+
     # Build metrics timeline
     metrics_timeline = []
     for turn in session_detail.turns:
         if turn.metrics_json:
-            import json
             try:
                 metrics = json.loads(turn.metrics_json.replace("'", '"'))
                 metrics_timeline.append(
@@ -118,11 +198,12 @@ async def get_admin_session_detail(
                         spikes_stage=turn.spikes_stage or "unknown",
                     )
                 )
-            except:
+            except Exception:
                 pass
-    
+
     return AdminSessionDetail(
         session=session_detail,
+        feedback=feedback_summary,
         metrics_timeline=metrics_timeline,
     )
 

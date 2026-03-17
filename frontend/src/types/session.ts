@@ -17,6 +17,9 @@ export interface SessionDTO {
   ended_at?: string | null
   duration_seconds: number
   meta?: string | null
+  case_title?: string | null
+  /** Computed by API: "active" | "closed" (closed when ended_at is set) */
+  status: 'active' | 'closed'
 }
 
 export interface TurnDTO {
@@ -29,6 +32,7 @@ export interface TurnDTO {
   metrics_json?: string | null
   spikes_stage?: string | null
   timestamp: string
+  spans_json?: string | null
 }
 
 export interface TurnResponseWithAudioDTO {
@@ -53,6 +57,9 @@ export interface Session {
   endedAt?: string
   durationSeconds: number
   meta?: string
+  caseTitle?: string
+  /** From API: "active" | "closed" */
+  status: 'active' | 'closed'
 }
 
 export interface Turn {
@@ -65,6 +72,7 @@ export interface Turn {
   metricsJson?: string
   spikesStage?: string
   timestamp: string
+  spansJson?: string
 }
 
 export interface TurnResponseWithAudio {
@@ -78,14 +86,12 @@ export interface SessionDetail extends Session {
   turns: Turn[]
 }
 
-// Wire type for the list endpoint
-export interface SessionListDTO {
+export interface SessionListResponseDTO {
   sessions: SessionDTO[]
   total: number
 }
 
-// UI type for the session list
-export interface SessionList {
+export interface SessionListResponse {
   sessions: Session[]
   total: number
 }

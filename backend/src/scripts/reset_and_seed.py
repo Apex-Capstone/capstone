@@ -25,7 +25,7 @@ async def reset_and_seed() -> None:
     init_db()
 
     # 3) Seed users + cases
-    print("Seeding dev data (admin, instructor, students, cases)...")
+    print("Seeding dev data (admin, trainees, cases)...")
     db = SessionLocal()
     try:
         await seed(db, do_reset=False)

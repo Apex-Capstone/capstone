@@ -4,15 +4,12 @@ import type { ReactNode } from 'react'
 
 interface ProtectedRouteProps {
   children: ReactNode
-  /** Single required role (legacy). */
-  requiredRole?: 'admin' | 'trainee'
   /** Allow access if user role is in this list. */
-  allowedRoles?: string[]
+  allowedRoles?: ('admin' | 'trainee')[]
 }
 
 export const ProtectedRoute = ({
   children,
-  requiredRole,
   allowedRoles,
 }: ProtectedRouteProps) => {
   const { isAuthenticated, user } = useAuthStore()
@@ -21,11 +18,7 @@ export const ProtectedRoute = ({
     return <Navigate to="/login" replace />
   }
 
-  if (allowedRoles !== undefined) {
-    if (!user?.role || !allowedRoles.includes(user.role)) {
-      return <Navigate to="/dashboard" replace />
-    }
-  } else if (requiredRole && user?.role !== requiredRole) {
+  if (allowedRoles && allowedRoles.length > 0 && user?.role && !allowedRoles.includes(user.role)) {
     return <Navigate to="/dashboard" replace />
   }
 
