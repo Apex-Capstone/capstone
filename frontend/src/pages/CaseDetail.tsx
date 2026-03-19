@@ -73,6 +73,7 @@ export const CaseDetail = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [voiceStatus, setVoiceStatus] = useState<string | null>(null)
+  const [audioResponsesEnabled, setAudioResponsesEnabled] = useState(false)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
@@ -83,6 +84,7 @@ export const CaseDetail = () => {
   const audioMonitorFrameRef = useRef<number | null>(null)
   const voiceActivityRef = useRef({ maxRms: 0, activeFrames: 0 })
   const recordingStartedAtRef = useRef<number | null>(null)
+  const activeAssistantAudioRef = useRef<HTMLAudioElement | null>(null)
 
   // --- Load case and create session ---
   useEffect(() => {
@@ -124,6 +126,8 @@ export const CaseDetail = () => {
             role: turn.role as 'user' | 'assistant',
             content: turn.text,
             timestamp: turn.timestamp,
+            source: turn.role === 'user' && turn.audioUrl ? 'audio' : 'text',
+            assistantAudioUrl: turn.role === 'assistant' ? turn.audioUrl : undefined,
           }))
           setMessages(restoredMessages)
         } else {
@@ -145,6 +149,8 @@ export const CaseDetail = () => {
               role: turn.role as 'user' | 'assistant',
               content: turn.text,
               timestamp: turn.timestamp,
+              source: turn.role === 'user' && turn.audioUrl ? 'audio' : 'text',
+              assistantAudioUrl: turn.role === 'assistant' ? turn.audioUrl : undefined,
             }))
             setMessages(restoredMessages)
           } catch (creationError) {
@@ -200,7 +206,7 @@ export const CaseDetail = () => {
 
     try {
       // Submit turn to backend and get patient response
-      const response = await submitTurn(sessionId, userMessageContent)
+      const response = await submitTurn(sessionId, userMessageContent, undefined, audioResponsesEnabled)
       
       // Update SPIKES stage if changed
       if (response.spikesStage) {
@@ -215,8 +221,12 @@ export const CaseDetail = () => {
         timestamp: response.turn.timestamp,
         source: 'text',
         status: 'sent',
+        assistantAudioUrl: response.assistantAudioUrl,
       }
       setMessages((prev) => [...prev, assistantMessage])
+      if (response.assistantAudioUrl) {
+        void playAssistantAudio(response.assistantAudioUrl)
+      }
     } catch (error: unknown) {
       console.error('Failed to submit turn:', error)
       setError(getErrorMessage(error, 'Failed to send message. Please try again.'))
@@ -301,12 +311,31 @@ export const CaseDetail = () => {
 
   useEffect(() => {
     return () => {
+      activeAssistantAudioRef.current?.pause()
+      activeAssistantAudioRef.current = null
       mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop())
       mediaRecorderRef.current = null
       stopMediaStream()
       audioChunksRef.current = []
     }
   }, [stopMediaStream])
+
+  const playAssistantAudio = useCallback(async (audioUrl: string) => {
+    try {
+      activeAssistantAudioRef.current?.pause()
+
+      const audio = new Audio(audioUrl)
+      activeAssistantAudioRef.current = audio
+      audio.onended = () => {
+        if (activeAssistantAudioRef.current === audio) {
+          activeAssistantAudioRef.current = null
+        }
+      }
+      await audio.play()
+    } catch (playbackError) {
+      console.warn('Assistant audio playback failed:', playbackError)
+    }
+  }, [])
 
   const updateMessage = (messageId: string, updates: Partial<Message>) => {
     setMessages((prev) =>
@@ -345,7 +374,12 @@ export const CaseDetail = () => {
 
       setVoiceStatus(null)
 
-      const response = await submitTurn(sessionId, transcription.transcript, transcription.audioUrl)
+      const response = await submitTurn(
+        sessionId,
+        transcription.transcript,
+        undefined,
+        audioResponsesEnabled,
+      )
 
       if (response.spikesStage) {
         setCurrentSpikesStage(response.spikesStage)
@@ -358,8 +392,12 @@ export const CaseDetail = () => {
         timestamp: response.turn.timestamp,
         source: 'text',
         status: 'sent',
+        assistantAudioUrl: response.assistantAudioUrl,
       }
       setMessages((prev) => [...prev, assistantMessage])
+      if (response.assistantAudioUrl) {
+        void playAssistantAudio(response.assistantAudioUrl)
+      }
     } catch (uploadError: unknown) {
       console.error('Failed to submit audio turn:', uploadError)
       setError(getErrorMessage(uploadError, 'Failed to process voice input. Please try again.'))
@@ -735,7 +773,7 @@ export const CaseDetail = () => {
                 </div>
               )}
               {messages.map((message) => (
-                <ChatBubble key={message.id} message={message} />
+                <ChatBubble key={message.id} message={message} onReplayAudio={playAssistantAudio} />
               ))}
               {showPatientRespondingIndicator && (
                 <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -782,6 +820,17 @@ export const CaseDetail = () => {
                 <span>Session time: {formatTime(sessionElapsed)} • SPIKES: {currentSpikesStage}</span>
                 {sessionId && <span>Session ID: {sessionId}</span>}
               </div>
+              <label className="mt-3 inline-flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={audioResponsesEnabled}
+                  onChange={(e) => setAudioResponsesEnabled(e.target.checked)}
+                  disabled={sending || closing}
+                  className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span>Audio responses</span>
+                <span className="text-xs text-gray-500">Off by default</span>
+              </label>
               {error && (
                 <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                   {error}

@@ -49,6 +49,7 @@ export function turnResponseWithAudioFromDTO(dto: TurnResponseWithAudioDTO): Tur
     patientReply: dto.patient_reply,
     transcript: dto.transcript ?? undefined,
     audioUrl: dto.audio_url ?? undefined,
+    assistantAudioUrl: dto.assistant_audio_url ?? undefined,
     spikesStage: dto.spikes_stage ?? undefined,
   }
 }
@@ -75,10 +76,11 @@ export function toSessionCreatePayload(caseId: number, forceNew?: boolean) {
   }
 }
 
-export function toTurnCreatePayload(text: string, audioUrl?: string) {
+export function toTurnCreatePayload(text: string, audioUrl?: string, enableTts = false) {
   return {
     text,
     audio_url: audioUrl,
+    enable_tts: enableTts,
   }
 }
 

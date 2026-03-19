@@ -38,11 +38,12 @@ export const createSession = async (
 export const submitTurn = async (
   sessionId: number,
   text: string,
-  audioUrl?: string
+  audioUrl?: string,
+  enableTts = false,
 ): Promise<TurnResponseWithAudio> => {
   const res = await api.post<TurnResponseWithAudioDTO>(
     `${BASE}/${sessionId}/turns`,
-    toTurnCreatePayload(text, audioUrl)
+    toTurnCreatePayload(text, audioUrl, enableTts)
   )
   return turnResponseWithAudioFromDTO(res.data)
 }
@@ -82,10 +83,12 @@ export const closeSession = async (sessionId: number): Promise<any> => {
  */
 export const submitAudioTurn = async (
   sessionId: number,
-  audioFile: File
+  audioFile: File,
+  enableTts = false,
 ): Promise<TurnResponseWithAudio> => {
   const formData = new FormData()
   formData.append('audio_file', audioFile)
+  formData.append('enable_tts', String(enableTts))
   
   const res = await api.post<TurnResponseWithAudioDTO>(
     `${BASE}/${sessionId}/audio`,
@@ -101,7 +104,6 @@ export const submitAudioTurn = async (
 
 export interface AudioTranscriptionResult {
   transcript: string
-  audioUrl?: string
 }
 
 /**
@@ -114,7 +116,7 @@ export const transcribeAudioTurn = async (
   const formData = new FormData()
   formData.append('audio_file', audioFile)
 
-  const res = await api.post<{ transcript: string; audio_url?: string | null }>(
+  const res = await api.post<{ transcript: string }>(
     `${BASE}/${sessionId}/audio:transcribe`,
     formData,
     {
@@ -126,7 +128,6 @@ export const transcribeAudioTurn = async (
 
   return {
     transcript: res.data.transcript,
-    audioUrl: res.data.audio_url ?? undefined,
   }
 }
 

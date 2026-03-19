@@ -1,13 +1,16 @@
-import type { Message } from '@/api/client'
+import type { Message } from '@/types/session'
 import { cn } from '@/lib/utils'
-import { User, Bot } from 'lucide-react'
+import { User, Bot, Volume2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 interface ChatBubbleProps {
   message: Message
+  onReplayAudio?: (audioUrl: string) => void
 }
 
-export const ChatBubble = ({ message }: ChatBubbleProps) => {
+export const ChatBubble = ({ message, onReplayAudio }: ChatBubbleProps) => {
   const isUser = message.role === 'user'
+  const assistantAudioUrl = message.assistantAudioUrl
 
   return (
     <div
@@ -47,6 +50,18 @@ export const ChatBubble = ({ message }: ChatBubbleProps) => {
         >
           {message.source === 'audio' ? 'Voice' : 'Text'} • {new Date(message.timestamp).toLocaleTimeString()}
         </p>
+        {!isUser && assistantAudioUrl && onReplayAudio && (
+          <Button
+            type="button"
+            onClick={() => onReplayAudio(assistantAudioUrl)}
+            variant="neutral"
+            size="sm"
+            className="mt-2 h-8 gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs font-medium text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800"
+          >
+            <Volume2 className="h-3.5 w-3.5" />
+            Replay audio
+          </Button>
+        )}
       </div>
 
       {isUser && (

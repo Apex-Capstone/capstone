@@ -6,6 +6,7 @@ export interface Message {
   timestamp: string
   source?: 'text' | 'audio'
   status?: 'pending' | 'sent' | 'error'
+  assistantAudioUrl?: string
 }
 
 // Wire types that match backend responses (snake_case)
@@ -42,6 +43,7 @@ export interface TurnResponseWithAudioDTO {
   patient_reply: string
   transcript?: string | null
   audio_url?: string | null
+  assistant_audio_url?: string | null
   spikes_stage?: string | null
 }
 
@@ -83,6 +85,7 @@ export interface TurnResponseWithAudio {
   patientReply: string
   transcript?: string
   audioUrl?: string
+  assistantAudioUrl?: string
   spikesStage?: string
 }
 

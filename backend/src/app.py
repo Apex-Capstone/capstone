@@ -1,10 +1,13 @@
 """FastAPI application instance and router mounting."""
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from config.logging import setup_logging
-from config.settings import get_settings
+from config.settings import get_local_storage_path, get_settings
 from controllers import (
     admin_controller,
     auth_controller,
@@ -72,6 +75,10 @@ app.include_router(sessions_controller.router, prefix="/v1")
 app.include_router(admin_controller.router, prefix="/v1")
 app.include_router(research_router, prefix="/v1")
 app.include_router(ws_controller.router, prefix="/v1")
+
+local_storage_path = get_local_storage_path()
+Path(local_storage_path).mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=str(local_storage_path)), name="media")
 
 
 @app.get("/")

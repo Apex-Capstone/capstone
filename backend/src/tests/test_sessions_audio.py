@@ -13,9 +13,6 @@ from starlette.datastructures import Headers, UploadFile
 os.environ.setdefault("database_url", "sqlite:///./test_audio.db")
 os.environ.setdefault("secret_key", "test-secret")
 os.environ.setdefault("gemini_api_key", "test-gemini-key")
-os.environ.setdefault("aws_access_key_id", "test-access-key")
-os.environ.setdefault("aws_secret_access_key", "test-secret-key")
-os.environ.setdefault("s3_bucket_name", "test-bucket")
 os.environ.setdefault("openai_api_key", "test-openai-key")
 
 from controllers.sessions_controller import submit_audio_turn, transcribe_audio_turn
@@ -28,7 +25,6 @@ from domain.models.sessions import TurnResponse
 from services.dialogue_service import DialogueService
 from services.session_service import SessionService
 from adapters.asr.whisper_adapter import WhisperAdapter
-from adapters.storage.s3_storage import S3StorageAdapter
 
 
 @pytest.fixture
@@ -141,23 +137,18 @@ async def test_submit_audio_turn_success(monkeypatch, test_db, owner_user, activ
         assert audio_format == "webm"
         return "I wanted to ask about my results."
 
-    async def fake_put_file(self, file_data: bytes, file_name: str, content_type: str) -> str:
-        assert file_data == b"fake-audio"
-        assert file_name.startswith(f"sessions/{active_session.id}/")
-        assert content_type == "audio/webm"
-        return "https://example.com/audio.webm"
-
     async def fake_process_user_turn(self, session_id: int, turn_data) -> TurnResponse:
         assert session_id == active_session.id
         assert turn_data.text == "I wanted to ask about my results."
-        assert turn_data.audio_url == "https://example.com/audio.webm"
+        assert turn_data.audio_url is None
+        assert turn_data.enable_tts is False
         return TurnResponse(
             id=42,
             session_id=session_id,
             turn_number=2,
             role="assistant",
             text="Of course. Tell me what is on your mind.",
-            audio_url=None,
+            audio_url="https://example.com/assistant-audio.mp3",
             metrics_json=None,
             spikes_stage="perception",
             timestamp=datetime.utcnow(),
@@ -168,7 +159,6 @@ async def test_submit_audio_turn_success(monkeypatch, test_db, owner_user, activ
         return SimpleNamespace(current_spikes_stage="perception")
 
     monkeypatch.setattr(WhisperAdapter, "transcribe_audio", fake_transcribe_audio)
-    monkeypatch.setattr(S3StorageAdapter, "put_file", fake_put_file)
     monkeypatch.setattr(DialogueService, "process_user_turn", fake_process_user_turn)
     monkeypatch.setattr(SessionService, "get_session", fake_get_session)
 
@@ -181,7 +171,8 @@ async def test_submit_audio_turn_success(monkeypatch, test_db, owner_user, activ
 
     assert response.transcript == "I wanted to ask about my results."
     assert response.patient_reply == "Of course. Tell me what is on your mind."
-    assert response.audio_url == "https://example.com/audio.webm"
+    assert response.audio_url is None
+    assert response.assistant_audio_url == "https://example.com/assistant-audio.mp3"
     assert response.spikes_stage == "perception"
 
 
@@ -194,14 +185,7 @@ async def test_transcribe_audio_turn_success(monkeypatch, test_db, owner_user, a
         assert audio_format == "webm"
         return "I wanted to ask about my results."
 
-    async def fake_put_file(self, file_data: bytes, file_name: str, content_type: str) -> str:
-        assert file_data == b"fake-audio"
-        assert file_name.startswith(f"sessions/{active_session.id}/")
-        assert content_type == "audio/webm"
-        return "https://example.com/audio.webm"
-
     monkeypatch.setattr(WhisperAdapter, "transcribe_audio", fake_transcribe_audio)
-    monkeypatch.setattr(S3StorageAdapter, "put_file", fake_put_file)
 
     response = await transcribe_audio_turn(
         active_session.id,
@@ -211,7 +195,6 @@ async def test_transcribe_audio_turn_success(monkeypatch, test_db, owner_user, a
     )
 
     assert response.transcript == "I wanted to ask about my results."
-    assert response.audio_url == "https://example.com/audio.webm"
 
 
 @pytest.mark.asyncio
@@ -257,11 +240,9 @@ async def test_submit_audio_turn_survives_storage_failure(monkeypatch, test_db, 
     async def fake_transcribe_audio(self, audio_data: bytes, audio_format: str) -> str:
         return "This should still go through."
 
-    async def fake_put_file(self, file_data: bytes, file_name: str, content_type: str) -> str:
-        raise RuntimeError("storage unavailable")
-
     async def fake_process_user_turn(self, session_id: int, turn_data) -> TurnResponse:
         assert turn_data.audio_url is None
+        assert turn_data.enable_tts is False
         return TurnResponse(
             id=43,
             session_id=session_id,
@@ -278,7 +259,6 @@ async def test_submit_audio_turn_survives_storage_failure(monkeypatch, test_db, 
         return SimpleNamespace(current_spikes_stage="perception")
 
     monkeypatch.setattr(WhisperAdapter, "transcribe_audio", fake_transcribe_audio)
-    monkeypatch.setattr(S3StorageAdapter, "put_file", fake_put_file)
     monkeypatch.setattr(DialogueService, "process_user_turn", fake_process_user_turn)
     monkeypatch.setattr(SessionService, "get_session", fake_get_session)
 

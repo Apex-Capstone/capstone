@@ -3,16 +3,16 @@
 import json
 from pathlib import Path
 from typing import Annotated
-from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from adapters.asr.whisper_adapter import WhisperAdapter
 from adapters.llm.openai_adapter import OpenAIAdapter
 from adapters.nlu.simple_rule_nlu import SimpleRuleNLU
-from adapters.storage.s3_storage import S3StorageAdapter
+from adapters.storage import get_storage_adapter
+from adapters.tts import get_tts_adapter
 from config.logging import get_logger
 from core.deps import get_current_user, get_db, verify_session_access
 from core.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
@@ -27,6 +27,7 @@ from domain.models.sessions import (
     SessionResponse,
     TurnCreate,
     TurnResponse,
+    TurnResponseWithAudio,
 )
 from services.dialogue_service import DialogueService
 from services.scoring_service import ScoringService
@@ -77,11 +78,6 @@ def _normalize_audio_extension(upload: UploadFile) -> str:
     )
 
 
-def _build_audio_storage_key(session_id: int, audio_format: str) -> str:
-    """Generate a stable object key for stored audio uploads."""
-    return f"sessions/{session_id}/{uuid4().hex}.{audio_format}"
-
-
 def _validate_audio_payload(audio_data: bytes) -> None:
     """Validate uploaded audio bytes."""
     if not audio_data:
@@ -105,41 +101,9 @@ def _validate_session_write_access(session_id: int, db: Session, current_user: U
     return session
 
 
-async def _store_audio_file(
-    session_id: int,
-    audio_data: bytes,
-    audio_format: str,
-    content_type: str | None,
-) -> str | None:
-    """Best-effort raw audio storage for later review."""
-    storage_adapter = S3StorageAdapter()
-    object_key = _build_audio_storage_key(session_id, audio_format)
-
-    try:
-        return await storage_adapter.put_file(
-            audio_data,
-            object_key,
-            content_type=content_type or f"audio/{audio_format}",
-        )
-    except Exception as exc:
-        # Audio storage is optional for the current input-only scope.
-        logger.warning("Skipping audio storage for session %s: %s", session_id, exc)
-        return None
-
-
-class TurnResponseWithAudio(BaseModel):
-    """Turn response with patient reply and audio."""
-    turn: TurnResponse
-    patient_reply: str
-    transcript: str | None = None
-    audio_url: str | None = None
-    spikes_stage: str | None = None
-
-
 class AudioTranscriptionResponse(BaseModel):
     """Audio transcription payload before patient response generation."""
     transcript: str
-    audio_url: str | None = None
 
 
 class TurnListResponse(BaseModel):
@@ -178,7 +142,13 @@ async def submit_turn(
     # Initialize services
     llm_adapter = OpenAIAdapter()
     nlu_adapter = SimpleRuleNLU()
-    dialogue_service = DialogueService(db, llm_adapter, nlu_adapter)
+    dialogue_service = DialogueService(
+        db,
+        llm_adapter,
+        nlu_adapter,
+        tts_adapter=get_tts_adapter(),
+        storage_adapter=get_storage_adapter(),
+    )
     
     # Process turn and get patient response
     patient_turn = await dialogue_service.process_user_turn(session_id, turn_data)
@@ -191,7 +161,8 @@ async def submit_turn(
         turn=patient_turn,
         patient_reply=patient_turn.text,
         transcript=turn_data.text,
-        audio_url=patient_turn.audio_url,
+        audio_url=None,
+        assistant_audio_url=patient_turn.audio_url,
         spikes_stage=session_detail.current_spikes_stage,
     )
 
@@ -202,17 +173,27 @@ async def submit_audio_turn(
     audio_file: Annotated[UploadFile, File(...)],
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    enable_tts: Annotated[bool, Form()] = False,
 ):
     """Upload audio file and process it as a normal conversation turn."""
     transcription = await transcribe_audio_turn(session_id, audio_file, db, current_user)
 
     # Process as turn
-    turn_data = TurnCreate(text=transcription.transcript, audio_url=transcription.audio_url)
+    turn_data = TurnCreate(
+        text=transcription.transcript,
+        enable_tts=enable_tts,
+    )
 
     # Initialize dialogue service
     llm_adapter = OpenAIAdapter()
     nlu_adapter = SimpleRuleNLU()
-    dialogue_service = DialogueService(db, llm_adapter, nlu_adapter)
+    dialogue_service = DialogueService(
+        db,
+        llm_adapter,
+        nlu_adapter,
+        tts_adapter=get_tts_adapter(),
+        storage_adapter=get_storage_adapter(),
+    )
 
     # Process turn
     patient_turn = await dialogue_service.process_user_turn(session_id, turn_data)
@@ -225,7 +206,8 @@ async def submit_audio_turn(
         turn=patient_turn,
         patient_reply=patient_turn.text,
         transcript=transcription.transcript,
-        audio_url=transcription.audio_url,
+        audio_url=None,
+        assistant_audio_url=patient_turn.audio_url,
         spikes_stage=session_detail.current_spikes_stage,
     )
 
@@ -237,7 +219,7 @@ async def transcribe_audio_turn(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    """Upload audio file and return only the transcript plus stored audio URL."""
+    """Upload audio file and return only the transcript."""
     _validate_session_write_access(session_id, db, current_user)
 
     audio_format = _normalize_audio_extension(audio_file)
@@ -253,17 +235,8 @@ async def transcribe_audio_turn(
         audio_format=audio_format,
     )
 
-    # Store audio file when storage is available; keep input flow working without it.
-    audio_url = await _store_audio_file(
-        session_id,
-        audio_data,
-        audio_format,
-        audio_file.content_type,
-    )
-
     return AudioTranscriptionResponse(
         transcript=transcribed_text,
-        audio_url=audio_url,
     )
 
 

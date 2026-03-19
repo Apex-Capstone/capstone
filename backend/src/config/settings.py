@@ -1,6 +1,7 @@
 """Application settings using Pydantic Settings."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import List
 
 from pydantic import Field, field_validator
@@ -33,18 +34,23 @@ class Settings(BaseSettings):
     gemini_api_key: str = Field(...)
     gemini_model_id: str = Field(default="gemini-pro")
     
-    # AWS S3
-    aws_access_key_id: str = Field(...)
-    aws_secret_access_key: str = Field(...)
-    aws_region: str = Field(default="us-east-1")
-    s3_bucket_name: str = Field(...)
+    # Storage
+    local_storage_path: str = Field(default="./storage")
+    public_base_url: str = Field(default="http://localhost:8000")
     
     # LLM Configuration
     default_llm_provider: str = Field(default="openai")
     
     # TTS/ASR Configuration
-    tts_provider: str = Field(default="generic")
+    tts_provider: str = Field(default="openai")
     asr_provider: str = Field(default="whisper")
+    openai_tts_model_id: str = Field(default="gpt-4o-mini-tts")
+    openai_tts_voice: str = Field(default="coral")
+    openai_tts_response_format: str = Field(default="mp3")
+    openai_tts_instructions: str = Field(
+        default="Speak naturally with warmth, empathy, and a calm bedside manner."
+    )
+    openai_tts_speed: float = Field(default=1.0)
 
     # Research export anonymization (deterministic session IDs)
     research_anon_salt: str = Field(default="research-anon-salt-change-in-production")
@@ -100,4 +106,10 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()
+
+
+def get_local_storage_path() -> Path:
+    """Resolve the configured local storage directory."""
+    settings = get_settings()
+    return Path(settings.local_storage_path).resolve()
  
