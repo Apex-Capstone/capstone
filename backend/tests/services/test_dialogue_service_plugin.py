@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -89,7 +90,7 @@ class _DummyStorageAdapter:
                 "content_type": content_type,
             }
         )
-        return f"https://example.com/{file_name}"
+        return file_name
 
 
 @pytest.fixture
@@ -193,7 +194,9 @@ async def test_dialogue_service_generates_assistant_audio_when_enabled(
     )
 
     assert response.audio_url is not None
-    assert response.audio_url.startswith("https://example.com/sessions/")
+    assert response.audio_url.startswith("sessions/")
+    assert response.audio_expires_at is not None
+    assert response.audio_expires_at > datetime.utcnow()
     assert tts.calls
     assert storage.calls
 

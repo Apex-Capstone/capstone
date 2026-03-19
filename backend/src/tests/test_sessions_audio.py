@@ -148,7 +148,8 @@ async def test_submit_audio_turn_success(monkeypatch, test_db, owner_user, activ
             turn_number=2,
             role="assistant",
             text="Of course. Tell me what is on your mind.",
-            audio_url="https://example.com/assistant-audio.mp3",
+            audio_url="sessions/1/assistant/test.mp3",
+            audio_expires_at=None,
             metrics_json=None,
             spikes_stage="perception",
             timestamp=datetime.utcnow(),
@@ -172,7 +173,7 @@ async def test_submit_audio_turn_success(monkeypatch, test_db, owner_user, activ
     assert response.transcript == "I wanted to ask about my results."
     assert response.patient_reply == "Of course. Tell me what is on your mind."
     assert response.audio_url is None
-    assert response.assistant_audio_url == "https://example.com/assistant-audio.mp3"
+    assert response.assistant_audio_url == "http://localhost:8000/v1/turns/42/audio"
     assert response.spikes_stage == "perception"
 
 

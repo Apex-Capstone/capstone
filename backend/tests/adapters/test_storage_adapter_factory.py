@@ -4,20 +4,20 @@ from pathlib import Path
 
 import pytest
 
-from adapters.storage import LocalStorageAdapter, get_storage_adapter
+from adapters.storage import SupabaseStorageAdapter, get_storage_adapter
+from adapters.storage.local_storage import LocalStorageAdapter
 from config.settings import get_settings
 
 
-def test_get_storage_adapter_returns_local_storage_adapter(
-    monkeypatch,
-    tmp_path: Path,
-):
-    monkeypatch.setenv("local_storage_path", str(tmp_path))
+def test_get_storage_adapter_returns_supabase_storage_adapter(monkeypatch):
+    monkeypatch.setenv("supabase_url", "https://example.supabase.co")
+    monkeypatch.setenv("supabase_service_role_key", "service-role-key")
+    monkeypatch.setenv("supabase_storage_bucket", "assistant-audio")
     get_settings.cache_clear()
 
     adapter = get_storage_adapter()
 
-    assert isinstance(adapter, LocalStorageAdapter)
+    assert isinstance(adapter, SupabaseStorageAdapter)
 
     get_settings.cache_clear()
 

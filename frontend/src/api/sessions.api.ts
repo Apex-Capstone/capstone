@@ -131,3 +131,10 @@ export const transcribeAudioTurn = async (
   }
 }
 
+export const fetchAssistantAudioObjectUrl = async (audioUrl: string): Promise<string> => {
+  const res = await api.get<Blob>(audioUrl, {
+    responseType: 'blob',
+  })
+  return URL.createObjectURL(res.data)
+}
+

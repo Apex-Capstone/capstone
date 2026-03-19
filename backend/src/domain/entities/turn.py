@@ -20,6 +20,7 @@ class Turn(Base):
     role = Column(String, nullable=False)  # user, assistant (patient)
     text = Column(Text, nullable=False)
     audio_url = Column(String, nullable=True)  # URL to stored audio file
+    audio_expires_at = Column(DateTime, nullable=True)  # Expiration timestamp for assistant audio
     metrics_json = Column(Text)  # JSON with turn-level metrics (empathy score, question type, etc.) - kept for backward compatibility
     spans_json = Column(Text, nullable=True)  # JSON with detected spans (EO, elicitation, response, SPIKES) with character offsets
     relations_json = Column(Text, nullable=True)  # JSON with span-relation links (will be populated in Part 2)

@@ -1,6 +1,7 @@
 """Sessions controller/router."""
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -14,6 +15,7 @@ from adapters.nlu.simple_rule_nlu import SimpleRuleNLU
 from adapters.storage import get_storage_adapter
 from adapters.tts import get_tts_adapter
 from config.logging import get_logger
+from config.settings import get_settings
 from core.deps import get_current_user, get_db, verify_session_access
 from core.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
 from domain.entities.user import User
@@ -37,6 +39,16 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 logger = get_logger(__name__)
 ALLOWED_AUDIO_EXTENSIONS = {"wav", "ogg", "mp3", "webm", "m4a"}
 MAX_AUDIO_UPLOAD_BYTES = 10 * 1024 * 1024
+
+
+def _build_turn_audio_url(turn_id: int, audio_url: str | None, audio_expires_at=None) -> str | None:
+    """Build the backend assistant audio endpoint URL when audio is available."""
+    if not audio_url:
+        return None
+    if audio_expires_at is not None and audio_expires_at <= datetime.utcnow():
+        return None
+    base_url = get_settings().public_base_url.rstrip("/")
+    return f"{base_url}/v1/turns/{turn_id}/audio"
 
 
 def _deserialize_json_field(value: str | None) -> dict | list | None:
@@ -156,13 +168,18 @@ async def submit_turn(
     # Get updated session for SPIKES stage
     session_service = SessionService(db)
     session_detail = await session_service.get_session(session_id)
+    resolved_assistant_audio_url = _build_turn_audio_url(
+        patient_turn.id,
+        patient_turn.audio_url,
+        patient_turn.audio_expires_at,
+    )
     
     return TurnResponseWithAudio(
-        turn=patient_turn,
+        turn=patient_turn.model_copy(update={"audio_url": resolved_assistant_audio_url}),
         patient_reply=patient_turn.text,
         transcript=turn_data.text,
         audio_url=None,
-        assistant_audio_url=patient_turn.audio_url,
+        assistant_audio_url=resolved_assistant_audio_url,
         spikes_stage=session_detail.current_spikes_stage,
     )
 
@@ -201,13 +218,18 @@ async def submit_audio_turn(
     # Get updated session
     session_service = SessionService(db)
     session_detail = await session_service.get_session(session_id)
+    resolved_assistant_audio_url = _build_turn_audio_url(
+        patient_turn.id,
+        patient_turn.audio_url,
+        patient_turn.audio_expires_at,
+    )
 
     return TurnResponseWithAudio(
-        turn=patient_turn,
+        turn=patient_turn.model_copy(update={"audio_url": resolved_assistant_audio_url}),
         patient_reply=patient_turn.text,
         transcript=transcription.transcript,
         audio_url=None,
-        assistant_audio_url=patient_turn.audio_url,
+        assistant_audio_url=resolved_assistant_audio_url,
         spikes_stage=session_detail.current_spikes_stage,
     )
 
@@ -279,7 +301,12 @@ async def get_session_turns(
     total_turns = turn_repo.get_by_session(session_id)  # Get all for count
     
     return TurnListResponse(
-        turns=[TurnResponse.model_validate(turn) for turn in turns],
+        turns=[
+            TurnResponse.model_validate(turn).model_copy(
+                update={"audio_url": _build_turn_audio_url(turn.id, turn.audio_url, turn.audio_expires_at)}
+            )
+            for turn in turns
+        ],
         total=len(total_turns),
         skip=skip,
         limit=limit,

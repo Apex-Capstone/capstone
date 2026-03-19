@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { getCase } from '@/api/cases.api'
-import { createSession, transcribeAudioTurn, submitTurn, closeSession, getSession } from '@/api/sessions.api'
+import { createSession, transcribeAudioTurn, submitTurn, closeSession, getSession, fetchAssistantAudioObjectUrl } from '@/api/sessions.api'
 import type { Case as CaseType } from '@/types/case'
 import type { Message } from '@/types/session'
 
@@ -85,6 +85,7 @@ export const CaseDetail = () => {
   const voiceActivityRef = useRef({ maxRms: 0, activeFrames: 0 })
   const recordingStartedAtRef = useRef<number | null>(null)
   const activeAssistantAudioRef = useRef<HTMLAudioElement | null>(null)
+  const activeAssistantAudioObjectUrlRef = useRef<string | null>(null)
 
   // --- Load case and create session ---
   useEffect(() => {
@@ -313,6 +314,10 @@ export const CaseDetail = () => {
     return () => {
       activeAssistantAudioRef.current?.pause()
       activeAssistantAudioRef.current = null
+      if (activeAssistantAudioObjectUrlRef.current) {
+        URL.revokeObjectURL(activeAssistantAudioObjectUrlRef.current)
+        activeAssistantAudioObjectUrlRef.current = null
+      }
       mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop())
       mediaRecorderRef.current = null
       stopMediaStream()
@@ -323,12 +328,23 @@ export const CaseDetail = () => {
   const playAssistantAudio = useCallback(async (audioUrl: string) => {
     try {
       activeAssistantAudioRef.current?.pause()
+      if (activeAssistantAudioObjectUrlRef.current) {
+        URL.revokeObjectURL(activeAssistantAudioObjectUrlRef.current)
+        activeAssistantAudioObjectUrlRef.current = null
+      }
 
-      const audio = new Audio(audioUrl)
+      const objectUrl = await fetchAssistantAudioObjectUrl(audioUrl)
+      activeAssistantAudioObjectUrlRef.current = objectUrl
+
+      const audio = new Audio(objectUrl)
       activeAssistantAudioRef.current = audio
       audio.onended = () => {
         if (activeAssistantAudioRef.current === audio) {
           activeAssistantAudioRef.current = null
+        }
+        if (activeAssistantAudioObjectUrlRef.current === objectUrl) {
+          URL.revokeObjectURL(objectUrl)
+          activeAssistantAudioObjectUrlRef.current = null
         }
       }
       await audio.play()

@@ -13,6 +13,7 @@ from controllers import (
     auth_controller,
     cases_controller,
     sessions_controller,
+    turns_controller,
     ws_controller,
 )
 from controllers.research_controller import router as research_router
@@ -72,6 +73,7 @@ app.add_exception_handler(Exception, general_exception_handler)
 app.include_router(auth_controller.router, prefix="/v1")
 app.include_router(cases_controller.router, prefix="/v1")
 app.include_router(sessions_controller.router, prefix="/v1")
+app.include_router(turns_controller.router, prefix="/v1")
 app.include_router(admin_controller.router, prefix="/v1")
 app.include_router(research_router, prefix="/v1")
 app.include_router(ws_controller.router, prefix="/v1")

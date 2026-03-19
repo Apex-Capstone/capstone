@@ -35,8 +35,15 @@ class Settings(BaseSettings):
     gemini_model_id: str = Field(default="gemini-pro")
     
     # Storage
+    supabase_url: str = Field(default="")
+    supabase_service_role_key: str = Field(default="")
+    supabase_storage_bucket: str = Field(default="")
     local_storage_path: str = Field(default="./storage")
     public_base_url: str = Field(default="http://localhost:8000")
+    audio_cache_path: str = Field(default="./storage/cache/audio")
+    audio_cache_max_bytes: int = Field(default=512 * 1024 * 1024)
+    assistant_audio_ttl_seconds: int = Field(default=604800)
+    assistant_audio_signed_url_ttl_seconds: int = Field(default=3600)
     
     # LLM Configuration
     default_llm_provider: str = Field(default="openai")
@@ -112,4 +119,10 @@ def get_local_storage_path() -> Path:
     """Resolve the configured local storage directory."""
     settings = get_settings()
     return Path(settings.local_storage_path).resolve()
+
+
+def get_audio_cache_path() -> Path:
+    """Resolve the configured assistant audio cache directory."""
+    settings = get_settings()
+    return Path(settings.audio_cache_path).resolve()
  

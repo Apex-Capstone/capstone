@@ -2,6 +2,7 @@
 
 import json
 import time
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
@@ -10,6 +11,7 @@ from adapters.llm import LLMAdapter
 from adapters.nlu import NLUAdapter
 from adapters.storage.base import StorageAdapter
 from config.logging import get_logger
+from config.settings import get_settings
 from core.errors import NotFoundError
 from core.plugin_manager import get_patient_model
 from domain.entities.turn import Turn
@@ -52,6 +54,7 @@ class DialogueService:
         self.nlu_adapter = nlu_adapter
         self.tts_adapter = tts_adapter
         self.storage_adapter = storage_adapter
+        self.settings = get_settings()
         self.session_repo = SessionRepository(db)
         self.case_repo = CaseRepository(db)
         self.turn_repo = TurnRepository(db)
@@ -139,8 +142,9 @@ class DialogueService:
         )
 
         assistant_audio_url = None
+        assistant_audio_expires_at = None
         if turn_data.enable_tts and self.tts_adapter is not None and self.storage_adapter is not None:
-            assistant_audio_url = await self._create_assistant_audio(
+            assistant_audio_url, assistant_audio_expires_at = await self._create_assistant_audio(
                 session_id=session_id,
                 response_text=patient_response,
             )
@@ -152,6 +156,7 @@ class DialogueService:
             role="assistant",
             text=patient_response,
             audio_url=assistant_audio_url,
+            audio_expires_at=assistant_audio_expires_at,
             metrics_json=json.dumps(assistant_metrics),  # kept for backward compatibility
             spans_json=json.dumps(assistant_spans) if assistant_spans else None,
             spikes_stage=session.current_spikes_stage,
@@ -172,23 +177,25 @@ class DialogueService:
         self,
         session_id: int,
         response_text: str,
-    ) -> str | None:
+    ) -> tuple[str | None, datetime | None]:
         """Synthesize assistant speech and persist it, without blocking text replies on failure."""
         try:
             tts_result = await self.tts_adapter.synthesize_speech(response_text)
             if not tts_result.audio_data:
                 logger.warning("TTS returned empty audio payload for session %s", session_id)
-                return None
+                return None, None
 
             object_key = f"sessions/{session_id}/assistant/{uuid4().hex}.{tts_result.file_extension}"
-            return await self.storage_adapter.put_file(
+            stored_key = await self.storage_adapter.put_file(
                 tts_result.audio_data,
                 object_key,
                 content_type=tts_result.content_type,
             )
+            expires_at = datetime.utcnow() + timedelta(seconds=self.settings.assistant_audio_ttl_seconds)
+            return stored_key, expires_at
         except Exception as exc:
             logger.warning("Skipping assistant TTS for session %s: %s", session_id, exc)
-            return None
+            return None, None
     
     async def _update_spikes_stage(
         self,

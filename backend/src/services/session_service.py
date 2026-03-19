@@ -39,6 +39,16 @@ class SessionService:
         # Only map real table columns -> values, avoiding SA's `.metadata`
         return {col.key: getattr(row, col.key) for col in row.__table__.columns}
 
+    @staticmethod
+    def _resolve_turn_audio_url(turn_id: int, audio_url: str | None, audio_expires_at: datetime | None) -> str | None:
+        if not audio_url:
+            return None
+        if audio_expires_at is not None and audio_expires_at <= datetime.utcnow():
+            return None
+
+        base_url = get_settings().public_base_url.rstrip("/")
+        return f"{base_url}/v1/turns/{turn_id}/audio"
+
     def _session_to_response(self, session: SessionEntity, case_title: str | None = None) -> SessionResponse:
         data = self._row_to_dict(session)
         derived_title = case_title or (session.case.title if getattr(session, "case", None) else None)
@@ -173,9 +183,24 @@ class SessionService:
         turns = self.turn_repo.get_by_session(session_id)
         
         session_response = self._session_to_response(session)
+        turn_responses: list[TurnResponse] = []
+        for turn in turns:
+            turn_response = TurnResponse.model_validate(self._row_to_dict(turn))
+            turn_responses.append(
+                turn_response.model_copy(
+                    update={
+                        "audio_url": self._resolve_turn_audio_url(
+                            turn_response.id,
+                            turn_response.audio_url,
+                            turn_response.audio_expires_at,
+                        )
+                    }
+                )
+            )
+
         return SessionDetailResponse(
             **session_response.model_dump(),
-            turns=[TurnResponse.model_validate(self._row_to_dict(turn)) for turn in turns],
+            turns=turn_responses,
         )
     
     async def list_user_sessions(

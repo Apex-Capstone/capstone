@@ -53,6 +53,7 @@ class TurnResponse(BaseModel):
     role: str
     text: str
     audio_url: Optional[str]
+    audio_expires_at: Optional[datetime] = None
     metrics_json: Optional[str]
     spikes_stage: Optional[str]
     timestamp: datetime
