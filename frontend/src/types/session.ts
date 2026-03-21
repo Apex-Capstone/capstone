@@ -4,6 +4,9 @@ export interface Message {
   role: 'user' | 'assistant'
   content: string
   timestamp: string
+  source?: 'text' | 'audio'
+  status?: 'pending' | 'sent' | 'error'
+  assistantAudioUrl?: string
 }
 
 // Wire types that match backend responses (snake_case)
@@ -38,7 +41,9 @@ export interface TurnDTO {
 export interface TurnResponseWithAudioDTO {
   turn: TurnDTO
   patient_reply: string
+  transcript?: string | null
   audio_url?: string | null
+  assistant_audio_url?: string | null
   spikes_stage?: string | null
 }
 
@@ -78,7 +83,9 @@ export interface Turn {
 export interface TurnResponseWithAudio {
   turn: Turn
   patientReply: string
+  transcript?: string
   audioUrl?: string
+  assistantAudioUrl?: string
   spikesStage?: string
 }
 

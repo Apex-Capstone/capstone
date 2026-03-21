@@ -1,6 +1,16 @@
 """Base TTS (Text-to-Speech) adapter protocol."""
 
+from dataclasses import dataclass
 from typing import Protocol
+
+
+@dataclass(slots=True)
+class TTSAudioResult:
+    """Synthesized audio payload plus metadata needed for storage."""
+
+    audio_data: bytes
+    content_type: str
+    file_extension: str
 
 
 class TTSAdapter(Protocol):
@@ -10,15 +20,17 @@ class TTSAdapter(Protocol):
         self,
         text: str,
         voice_id: str = "default",
-    ) -> bytes:
+        instructions: str | None = None,
+    ) -> TTSAudioResult:
         """Convert text to speech audio.
         
         Args:
             text: Text to synthesize
             voice_id: Voice identifier
+            instructions: Optional provider-specific style instructions
             
         Returns:
-            Audio data as bytes
+            Synthesized audio payload and metadata
         """
         ...
 

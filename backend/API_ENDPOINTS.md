@@ -140,17 +140,20 @@ Submit trainee text turn; returns patient reply with updated SPIKES stage.
     "spikes_stage": "perception"
   },
   "patient_reply": "Thank you doctor. I'm quite worried about the results.",
+  "transcript": "Hello, I understand this must be a difficult time for you.",
   "audio_url": null,
   "spikes_stage": "perception"
 }
 ```
 
 ### POST /v1/sessions/{session_id}/audio
-Upload audio file (wav/ogg/mp3). Server performs ASR → normalized text → same processing as /turns.
+Upload audio file and transcribe it into a normal trainee turn. Server performs ASR → normalized text → same processing as `/turns`.
 
 **Request:**
 - Form data with `audio_file` field
-- Supported formats: wav, ogg, mp3
+- Supported formats: `wav`, `ogg`, `mp3`, `webm`, `m4a`
+- Maximum size: 10 MB
+- Session must belong to the authenticated user and still be `active`
 
 **Response:**
 ```json
@@ -161,14 +164,19 @@ Upload audio file (wav/ogg/mp3). Server performs ASR → normalized text → sam
     "turn_number": 4,
     "role": "assistant",
     "text": "I appreciate your concern...",
-    "audio_url": "https://s3.../audio.wav",
+    "audio_url": null,
     "spikes_stage": "knowledge"
   },
   "patient_reply": "I appreciate your concern...",
-  "audio_url": "https://s3.../audio.wav",
+  "transcript": "I wanted to ask about my results.",
+  "audio_url": "https://s3.../audio.webm",
   "spikes_stage": "knowledge"
 }
 ```
+
+**Notes:**
+- `transcript` is the text extracted from the uploaded audio and can be shown in the chat UI as the trainee's message.
+- `audio_url` refers to the uploaded raw trainee audio when storage is available. It may be `null` in local development if raw audio storage is not configured.
 
 ### GET /v1/sessions/{session_id}
 Get session detail (state, metrics snapshot).

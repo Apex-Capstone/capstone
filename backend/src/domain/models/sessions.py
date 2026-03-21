@@ -41,6 +41,7 @@ class TurnCreate(BaseModel):
     
     text: str
     audio_url: Optional[str] = None
+    enable_tts: bool = False
 
 
 class TurnResponse(BaseModel):
@@ -52,12 +53,24 @@ class TurnResponse(BaseModel):
     role: str
     text: str
     audio_url: Optional[str]
+    audio_expires_at: Optional[datetime] = None
     metrics_json: Optional[str]
     spikes_stage: Optional[str]
     timestamp: datetime
     spans_json: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True, extra="ignore")
+
+
+class TurnResponseWithAudio(BaseModel):
+    """Turn response with transcript metadata and optional assistant TTS."""
+
+    turn: TurnResponse
+    patient_reply: str
+    transcript: str | None = None
+    audio_url: str | None = None
+    assistant_audio_url: str | None = None
+    spikes_stage: str | None = None
 
 
 
