@@ -38,11 +38,12 @@ export const createSession = async (
 export const submitTurn = async (
   sessionId: number,
   text: string,
-  audioUrl?: string
+  audioUrl?: string,
+  enableTts = false,
 ): Promise<TurnResponseWithAudio> => {
   const res = await api.post<TurnResponseWithAudioDTO>(
     `${BASE}/${sessionId}/turns`,
-    toTurnCreatePayload(text, audioUrl)
+    toTurnCreatePayload(text, audioUrl, enableTts)
   )
   return turnResponseWithAudioFromDTO(res.data)
 }
@@ -94,10 +95,12 @@ export const listSessions = async (
  */
 export const submitAudioTurn = async (
   sessionId: number,
-  audioFile: File
+  audioFile: File,
+  enableTts = false,
 ): Promise<TurnResponseWithAudio> => {
   const formData = new FormData()
   formData.append('audio_file', audioFile)
+  formData.append('enable_tts', String(enableTts))
   
   const res = await api.post<TurnResponseWithAudioDTO>(
     `${BASE}/${sessionId}/audio`,
@@ -109,5 +112,41 @@ export const submitAudioTurn = async (
     }
   )
   return turnResponseWithAudioFromDTO(res.data)
+}
+
+export interface AudioTranscriptionResult {
+  transcript: string
+}
+
+/**
+ * Upload audio file and return only the transcript.
+ */
+export const transcribeAudioTurn = async (
+  sessionId: number,
+  audioFile: File
+): Promise<AudioTranscriptionResult> => {
+  const formData = new FormData()
+  formData.append('audio_file', audioFile)
+
+  const res = await api.post<{ transcript: string }>(
+    `${BASE}/${sessionId}/audio:transcribe`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  )
+
+  return {
+    transcript: res.data.transcript,
+  }
+}
+
+export const fetchAssistantAudioObjectUrl = async (audioUrl: string): Promise<string> => {
+  const res = await api.get<Blob>(audioUrl, {
+    responseType: 'blob',
+  })
+  return URL.createObjectURL(res.data)
 }
 

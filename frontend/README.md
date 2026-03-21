@@ -100,7 +100,7 @@ This frontend implementation addresses all functional and non-functional require
 | **FR-2** | Case Selection | ✅ SPIKES-focused virtual patient cases with demographics | `Dashboard.tsx`, `CaseCard.tsx` |
 | **FR-3** | Chat Interface | ✅ Text chat with patient emotion indicators | `CaseDetail.tsx`, `ChatBubble.tsx` |
 | **FR-4** | Session Management | ✅ Real-time session timer and SPIKES stage tracking | `CaseDetail.tsx` |
-| **FR-5** | Voice Input Placeholder | ✅ Disabled microphone button (ready for ASR integration) | `CaseDetail.tsx` |
+| **FR-5** | Voice Input | ✅ Microphone capture uploads audio for backend transcription | `CaseDetail.tsx` |
 | **FR-6** | Feedback Dashboard | ✅ SPIKES coverage radar chart and enhanced metrics | `Feedback.tsx`, `FeedbackChart.tsx` |
 | **FR-7** | Admin Dashboard | ✅ Tabbed interface with user management and analytics | `Admin.tsx` |
 | **FR-8** | Research API View | ✅ Read-only analytics with anonymized data | `Research.tsx` |
@@ -122,6 +122,7 @@ This frontend implementation addresses all functional and non-functional require
 
 - **SPIKES Framework Integration**: All case interactions are designed around the 6-stage SPIKES communication model
 - **Real-time Session Tracking**: Live timer and stage progression indicators
+- **Voice Input**: Browser microphone capture uploads audio to the backend and inserts the returned transcript into chat
 - **Comprehensive Feedback**: Multi-dimensional scoring with dialogue examples
 - **Admin Analytics**: Tabbed dashboard with user management, session logs, and performance analytics
 - **Research Interface**: Privacy-focused analytics with fairness metrics
@@ -150,7 +151,7 @@ The app uses Zustand for auth state management with localStorage persistence.
 ## 📡 API Integration
 
 ### Current Status
-The frontend currently uses **mock data** for all API calls. All functions in `src/api/client.ts` return simulated responses.
+The frontend is wired for real API calls through `src/api/*.ts`. Audio input specifically uses the session upload endpoint and expects the backend to return a transcript plus the patient reply.
 
 ### Backend Integration (Future)
 When the FastAPI backend is ready:
@@ -163,6 +164,7 @@ When the FastAPI backend is ready:
    - `POST /auth/login` - User login
    - `GET /cases` - Fetch all cases
    - `GET /cases/{case_id}` - Fetch case details with messages
+   - `POST /sessions/{session_id}/audio` - Upload recorded voice input and receive transcript + patient reply
    - `GET /feedback/{session_id}` - Fetch feedback for a session
    - `GET /admin/stats` - Fetch admin statistics (admin only)
 
