@@ -115,16 +115,18 @@ The dialogue service implements the SPIKES protocol for breaking bad news:
 ### AI Adapters
 - **LLM**: OpenAI GPT-4 or Google Gemini for patient simulation
 - **ASR**: Whisper for speech-to-text
-- **TTS**: Generic TTS adapter (extensible)
+- **TTS**: OpenAI TTS via an extensible adapter interface
 - **NLU**: Rule-based NLU for empathy detection and question classification
-- **Storage**: Local file storage for uploaded and generated audio
+- **Storage**: Supabase object storage for assistant audio with a backend disk cache
 
 ### Audio Input Notes
 - `POST /v1/sessions/{session_id}/audio` accepts `wav`, `ogg`, `mp3`, `webm`, and `m4a` uploads up to 10 MB.
 - Audio input requires a real `openai_api_key` because transcription uses Whisper.
 - The upload route validates that the session belongs to the authenticated user and is still active.
-- Raw and generated audio are stored locally under `backend/storage` and served from `/media/...`.
+- User uploads are transcribed but not persisted after processing.
 - Assistant text-to-speech uses OpenAI when the frontend audio toggle is enabled.
+- Assistant audio is stored in Supabase, served through `GET /v1/turns/{turn_id}/audio`, and cached on local disk for repeat reads.
+- Expired assistant audio can be purged with `poetry run cleanup-expired-audio` and scheduled in Render as a cron job.
 
 ### Scoring & Feedback
 Automated scoring based on:

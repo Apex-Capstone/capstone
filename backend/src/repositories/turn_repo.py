@@ -1,5 +1,6 @@
 """Turn repository for database operations."""
 
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -73,4 +74,24 @@ class TurnRepository:
             .filter(Turn.session_id == session_id, Turn.turn_number == turn_number)
             .first()
         )
+
+    def get_expired_assistant_audio(
+        self,
+        cutoff: datetime,
+        limit: int | None = None,
+    ) -> list[Turn]:
+        """Get assistant turns with expired persisted audio."""
+        query = (
+            self.db.query(Turn)
+            .filter(
+                Turn.role == "assistant",
+                Turn.audio_url.isnot(None),
+                Turn.audio_expires_at.isnot(None),
+                Turn.audio_expires_at <= cutoff,
+            )
+            .order_by(Turn.audio_expires_at.asc())
+        )
+        if limit is not None:
+            query = query.limit(limit)
+        return query.all()
 

@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 # Reuse your project internals
 from core.errors import ConflictError
 from db.base import SessionLocal  # adjust if your session factory lives elsewhere
+from plugins.load_plugins import load_plugins
 from services.auth_service import AuthService
 from services.case_service import CaseService
 from services.session_service import SessionService
@@ -166,6 +167,9 @@ Strategy: You want to outline a next step plan that respects the patient's goals
 
 
 async def seed(db: Session, do_reset: bool = False) -> None:
+    # Seed runs outside FastAPI startup, so load plugins explicitly.
+    load_plugins()
+
     # Optional destructive dev reset
     if do_reset:
         # WARNING: dev only - wipe tables

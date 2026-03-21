@@ -122,24 +122,33 @@ class SessionService:
 
         # Resolve metrics plugins: case override else settings. Validate each and freeze list on session.
         metrics_list: list[str] = []
+        case_metrics_override = False
         raw_case_metrics = getattr(case, "metrics_plugins", None)
         if isinstance(raw_case_metrics, str) and raw_case_metrics.strip():
             try:
                 parsed = json.loads(raw_case_metrics)
                 if isinstance(parsed, list):
                     metrics_list = [str(x) for x in parsed]
+                    case_metrics_override = True
             except (json.JSONDecodeError, TypeError):
                 pass
         if not metrics_list:
             metrics_list = list(getattr(settings, "metrics_plugins", []) or [])
+        resolved_metrics_plugins: list[str] = []
         for name in metrics_list:
             if not name:
                 continue
             try:
-                PluginRegistry.get_metrics_plugin(name)
+                metrics_cls = PluginRegistry.get_metrics_plugin(name)
             except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid plugin configuration")
-        metrics_plugins_json: str | None = json.dumps(metrics_list) if metrics_list else None
+                if case_metrics_override:
+                    raise HTTPException(status_code=400, detail="Invalid plugin configuration")
+                metrics_cls = _load_class_from_path(name)
+                PluginRegistry.register_metrics_plugin(name, metrics_cls)
+            resolved_metrics_plugins.append(getattr(metrics_cls, "name", name))
+        metrics_plugins_json: str | None = (
+            json.dumps(resolved_metrics_plugins) if resolved_metrics_plugins else None
+        )
 
         # Create session entity
         session = SessionEntity(
