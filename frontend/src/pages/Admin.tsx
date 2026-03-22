@@ -117,10 +117,16 @@ import { CasesTable } from '@/components/admin/CasesTable'
 import { CaseForm } from '@/components/admin/CaseForm'
 import { listCases, createCase, updateCase, deleteCase } from '@/api/cases.api'
 import type { Case } from '@/types/case'
+import type { SessionDetailDTO } from '@/types/session'
+
+const OVERVIEW_RECENT_SESSIONS_LIMIT = 8
 
 export const Admin = () => {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [overviewRecentSessions, setOverviewRecentSessions] = useState<SessionDetailDTO[]>([])
+  const [overviewSessionsLoading, setOverviewSessionsLoading] = useState(true)
+  const [overviewSessionsError, setOverviewSessionsError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'sessions' | 'analytics' | 'cases' | 'plugins'>('overview')
 
   // ---- NEW: cases state ----
@@ -145,17 +151,33 @@ export const Admin = () => {
   const [pluginsError, setPluginsError] = useState<string | null>(null)
 
   useEffect(() => {
-    const loadStats = async () => {
-      try {
-        const data = await fetchAdminStats()
-        setStats(data)
-      } catch (error) {
-        console.error('Failed to fetch admin stats:', error)
-      } finally {
-        setLoading(false)
+    const loadOverview = async () => {
+      setOverviewSessionsLoading(true)
+      setOverviewSessionsError(null)
+      const [statsResult, sessionsResult] = await Promise.allSettled([
+        fetchAdminStats(),
+        fetchAdminSessions(0, OVERVIEW_RECENT_SESSIONS_LIMIT),
+      ])
+
+      if (statsResult.status === 'fulfilled') {
+        setStats(statsResult.value)
+      } else {
+        console.error('Failed to fetch admin stats:', statsResult.reason)
       }
+
+      if (sessionsResult.status === 'fulfilled') {
+        setOverviewRecentSessions(sessionsResult.value.sessions)
+        setOverviewSessionsError(null)
+      } else {
+        console.error('Failed to fetch overview sessions:', sessionsResult.reason)
+        setOverviewRecentSessions([])
+        setOverviewSessionsError('Could not load recent sessions.')
+      }
+
+      setLoading(false)
+      setOverviewSessionsLoading(false)
     }
-    loadStats()
+    void loadOverview()
   }, [])
 
   // ---- NEW: fetch cases when switching to the Cases tab ----
@@ -360,23 +382,44 @@ export const Admin = () => {
 
             <Card>
               <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
+                <CardTitle>Recent sessions</CardTitle>
                 <p className="text-sm text-gray-500 mt-1">
-                  Live activity feed is not provided by the API; use Session Logs for history.
+                  Latest sessions by start time.{' '}
+                  <button
+                    type="button"
+                    className="text-primary underline-offset-4 hover:underline font-medium"
+                    onClick={() => setActiveTab('sessions')}
+                  >
+                    Session Logs
+                  </button>{' '}
+                  has the full list and transcripts.
                 </p>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {stats.recentActivity.length === 0 ? (
-                    <p className="text-sm text-gray-500">No recent activity entries.</p>
+                  {overviewSessionsLoading ? (
+                    <p className="text-sm text-gray-500">Loading recent sessions…</p>
+                  ) : overviewSessionsError ? (
+                    <p className="text-sm text-destructive">{overviewSessionsError}</p>
+                  ) : overviewRecentSessions.length === 0 ? (
+                    <p className="text-sm text-gray-500">No sessions yet.</p>
                   ) : (
-                    stats.recentActivity.map((activity, index) => (
-                      <div key={index} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{activity.action}</p>
-                          <p className="text-xs text-gray-500">User: {activity.userId}</p>
+                    overviewRecentSessions.map((session) => (
+                      <div
+                        key={session.id}
+                        className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0 gap-4"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {session.case_title?.trim() || `Session ${session.id}`}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            User {session.user_id} · {session.status} · {session.state}
+                          </p>
                         </div>
-                        <p className="text-xs text-gray-500">{new Date(activity.timestamp).toLocaleString()}</p>
+                        <p className="text-xs text-gray-500 shrink-0">
+                          {new Date(session.started_at).toLocaleString()}
+                        </p>
                       </div>
                     ))
                   )}

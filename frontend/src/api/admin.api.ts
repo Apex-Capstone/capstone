@@ -36,7 +36,7 @@ export interface AdminStats {
   totalCases: number
   activeSessions: number
   averageScore: number
-  /** No backend feed for activity stream yet; always [] until an endpoint exists. */
+  /** Reserved for a future audit/activity feed; overview uses `fetchAdminSessions` instead. */
   recentActivity: Array<{
     userId: string
     action: string
