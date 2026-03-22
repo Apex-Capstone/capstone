@@ -191,9 +191,67 @@ poetry run mypy src/
 
 ## Deployment
 
-1. Set production environment variables
-2. Use production database (PostgreSQL)
-3. Run with production ASGI server:
+### Render (recommended flow)
+
+**Pre-deploy command — use migrations, not `reset_and_seed`**
+
+Running `python -m src.scripts.reset_and_seed` in pre-deploy **drops the entire `core` schema** (`DROP SCHEMA IF EXISTS core CASCADE`) and re-seeds dev data. That wipes all production data on every deploy. For a **persistent** database, use Alembic instead:
+
+```bash
+# From the backend directory (set Render “Root Directory” to `backend` if the repo root is the capstone project)
+bash render_predeploy.sh
+```
+
+Equivalent one-liner:
+
+```bash
+PYTHONPATH=src poetry run alembic upgrade head
+```
+
+Reserve `reset_and_seed` for **local development** or a **one-time** bootstrap only.
+
+**Start command**
+
+Render injects `PORT`. Bind to it so the service listens correctly:
+
+```bash
+PYTHONPATH=src poetry run uvicorn src.app:app --host 0.0.0.0 --port "${PORT:-10000}"
+```
+
+**Environment variables**
+
+See [`env.render.example`](env.render.example) for a placeholder list. Copy values into the Render dashboard (secrets are not committed).
+
+- **`DATABASE_URL` / `database_url`** — Pydantic accepts either casing. For the **same PostgreSQL data** as your local machine, this value must **match** your local [`.env`](.env) connection string (host, database name, credentials).
+- **`SECRET_KEY` / `secret_key`** — Same rule: match local if you want tokens issued in one environment to be valid when debugging the other; otherwise use a production-only secret and re-login after deploys.
+- **`CORS_ORIGINS`** — Set to your deployed frontend origin (JSON array or comma-separated), e.g. `["https://your-frontend.onrender.com"]`.
+
+**Frontend (separate Render static site)**
+
+Set `VITE_API_URL` to your **backend** public URL at **build** time so the SPA calls the correct API.
+
+**Storage vs database**
+
+PostgreSQL data (sessions, users, etc.) lives in the database configured by `DATABASE_URL` and **persists** across deploys **unless** you run `reset_and_seed` or otherwise drop schema.
+
+Files under `local_storage_path` (default `./storage`) on Render’s **ephemeral filesystem** are **not** preserved across deploys. Assistant audio is also stored in **Supabase** per your settings; prefer relying on Supabase (or similar) for durable media, and treat local cache as disposable.
+
+**Verification checklist**
+
+| Check | Action |
+|--------|--------|
+| Same DB as local | Compare `DATABASE_URL` in Render with local `database_url` character-for-character. |
+| JWT parity | Compare `SECRET_KEY` with local if you expect shared token behavior. |
+| Pre-deploy | Confirm logs show `alembic upgrade head`, not `reset_and_seed`. |
+| Missing media only | If DB rows exist but files 404, check Supabase vs wiped `./storage`. |
+
+### Generic production
+
+1. Set production environment variables (see above).
+2. Use a managed PostgreSQL database.
+3. Run migrations: `poetry run alembic upgrade head`.
+4. Run with a production ASGI server, for example:
+
 ```bash
 gunicorn src.app:app -w 4 -k uvicorn.workers.UvicornWorker
 ```

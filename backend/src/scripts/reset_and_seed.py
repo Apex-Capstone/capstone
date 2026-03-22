@@ -1,6 +1,9 @@
 """
 Dev-only script to hard reset the `core` schema and seed users + cases.
 
+Do not run this as a Render (or other production) pre-deploy hook: it executes
+`DROP SCHEMA IF EXISTS core CASCADE`, which deletes all application data on every run.
+
 Usage (from backend/):
   poetry run python -m src.scripts.reset_and_seed
 """
