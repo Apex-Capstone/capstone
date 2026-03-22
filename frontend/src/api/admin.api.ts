@@ -36,11 +36,25 @@ export interface AdminStats {
   totalCases: number
   activeSessions: number
   averageScore: number
+  /** No backend feed for activity stream yet; always [] until an endpoint exists. */
   recentActivity: Array<{
     userId: string
     action: string
     timestamp: string
   }>
+  /** From `/v1/admin/aggregates` session_stats */
+  completedSessions?: number
+  totalSessions?: number
+  averageDurationSeconds?: number
+  /** From user_stats */
+  activeUsersLast30Days?: number
+  usersByRole?: Record<string, number>
+  /** From performance_stats */
+  averageEmpathyScore?: number
+  averageCommunicationScore?: number
+  averageSpikesCompletion?: number
+  /** From case_stats */
+  casesByCategory?: Record<string, number>
   userOverview?: Array<{
     id: string
     name: string
@@ -51,8 +65,11 @@ export interface AdminStats {
     lastActive: string
   }>
   analyticsData?: {
+    /** Backend aggregates omit time series; UI shows empty state when []. */
     averageScoreByMonth: Array<{ month: string; score: number }>
+    /** Share of sessions per case ID (rate = count / total_sessions). Empty if backend sends no per-case counts. */
     completionRates: Array<{ difficulty: string; rate: number }>
+    /** Mapped from case_stats.cases_by_category. */
     commonChallenges: Array<{ challenge: string; frequency: number }>
   }
 }
@@ -80,6 +97,29 @@ interface AggregatesResponse {
     total_cases: number
     cases_by_category: Record<string, number>
   }
+  generated_at?: string
+}
+
+function completionRatesFromSessionsByCase(
+  sessionsByCase: Record<string, number>,
+  totalSessions: number
+): Array<{ difficulty: string; rate: number }> {
+  if (totalSessions <= 0) return []
+  return Object.entries(sessionsByCase)
+    .map(([caseId, count]) => ({
+      difficulty: `Case ${caseId}`,
+      rate: count / totalSessions,
+    }))
+    .sort((a, b) => b.rate - a.rate)
+}
+
+function commonChallengesFromCategories(
+  casesByCategory: Record<string, number>
+): Array<{ challenge: string; frequency: number }> {
+  return Object.entries(casesByCategory).map(([challenge, frequency]) => ({
+    challenge,
+    frequency,
+  }))
 }
 
 // If your backend path is protected and versioned:
@@ -88,41 +128,9 @@ const BASE = '/v1/admin'
 export const fetchAdminStats = async (): Promise<AdminStats> => {
   const { data } = await api.get<AggregatesResponse>(`${BASE}/aggregates`)
 
-  // --- dev fallback (previously used) ---
-  // await new Promise((r) => setTimeout(r, 300))
-  // return {
-  //   totalUsers: 150,
-  //   totalCases: 342,
-  //   activeSessions: 23,
-  //   averageScore: 82.5,
-  //   recentActivity: [
-  //     { userId: 'trainee_001', action: 'Completed "Delivering a Difficult Diagnosis" case', timestamp: '2024-01-15T15:30:00Z' },
-  //     { userId: 'trainee_023', action: 'Started "Responding to Patient Distress" case', timestamp: '2024-01-15T15:25:00Z' },
-  //     { userId: 'trainee_045', action: 'Viewed SPIKES feedback for session_789', timestamp: '2024-01-15T15:20:00Z' },
-  //   ],
-  //   userOverview: [
-  //     { id: 'trainee_001', name: 'Dr. Sarah Johnson', email: 'sarah.johnson@medical.edu', role: 'trainee', averageScore: 87.2, completedCases: 12, lastActive: '2024-01-15T15:30:00Z' },
-  //     { id: 'trainee_023', name: 'Dr. Michael Chen', email: 'michael.chen@medical.edu', role: 'trainee', averageScore: 79.5, completedCases: 8, lastActive: '2024-01-15T15:25:00Z' },
-  //     { id: 'trainee_045', name: 'Dr. Emma Williams', email: 'emma.williams@medical.edu', role: 'trainee', averageScore: 91.3, completedCases: 15, lastActive: '2024-01-15T15:20:00Z' },
-  //   ],
-  //   analyticsData: {
-  //     averageScoreByMonth: [
-  //       { month: 'Oct 2024', score: 82.5 },
-  //       { month: 'Nov 2024', score: 84.1 },
-  //       { month: 'Dec 2024', score: 83.8 },
-  //     ],
-  //     completionRates: [
-  //       { difficulty: 'beginner', rate: 0.95 },
-  //       { difficulty: 'intermediate', rate: 0.87 },
-  //       { difficulty: 'advanced', rate: 0.72 },
-  //     ],
-  //     commonChallenges: [
-  //       { challenge: 'SPIKES: Emotions stage', frequency: 45 },
-  //       { challenge: 'Patient reassurance techniques', frequency: 32 },
-  //       { challenge: 'Breaking bad news timing', frequency: 28 },
-  //     ],
-  //   },
-  // }
+  const totalSessions = data.session_stats.total_sessions
+  const sessionsByCase = data.session_stats.sessions_by_case ?? {}
+  const casesByCategory = data.case_stats.cases_by_category ?? {}
 
   return {
     totalUsers: data.user_stats.total_users,
@@ -130,6 +138,20 @@ export const fetchAdminStats = async (): Promise<AdminStats> => {
     activeSessions: data.session_stats.active_sessions,
     averageScore: data.performance_stats.average_overall_score,
     recentActivity: [],
+    completedSessions: data.session_stats.completed_sessions,
+    totalSessions: data.session_stats.total_sessions,
+    averageDurationSeconds: data.session_stats.average_duration_seconds,
+    activeUsersLast30Days: data.user_stats.active_users_last_30_days,
+    usersByRole: data.user_stats.users_by_role,
+    averageEmpathyScore: data.performance_stats.average_empathy_score,
+    averageCommunicationScore: data.performance_stats.average_communication_score,
+    averageSpikesCompletion: data.performance_stats.average_spikes_completion,
+    casesByCategory,
+    analyticsData: {
+      averageScoreByMonth: [],
+      completionRates: completionRatesFromSessionsByCase(sessionsByCase, totalSessions),
+      commonChallenges: commonChallengesFromCategories(casesByCategory),
+    },
   }
 }
 

@@ -13,7 +13,7 @@ import { MetricCard } from '@/components/MetricCard'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
-import { Users, FileText, Activity, TrendingUp, Download, Plus, BarChart3, MessageSquare, Puzzle, ExternalLink } from 'lucide-react'
+import { Users, FileText, Activity, TrendingUp, Download, Plus, BarChart3, MessageSquare, Puzzle, ExternalLink, Clock, UserCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
@@ -324,24 +324,62 @@ export const Admin = () => {
               <MetricCard title="Total Users" value={stats.totalUsers} icon={Users} description="Registered trainees" />
               <MetricCard title="Total Cases" value={stats.totalCases} icon={FileText} description="Available training cases" />
               <MetricCard title="Active Sessions" value={stats.activeSessions} icon={Activity} description="Currently in progress" />
-              <MetricCard title="Average Score" value={`${stats.averageScore}%`} icon={TrendingUp} description="Across all sessions" />
+              <MetricCard title="Average Score" value={`${(Number.parseFloat(stats.averageScore.toString())).toFixed(2)}%`} icon={TrendingUp} description="Across all sessions" />
+            </div>
+
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <MetricCard
+                title="Completed Sessions"
+                value={stats.completedSessions ?? '—'}
+                icon={BarChart3}
+                description="Sessions marked completed"
+              />
+              <MetricCard
+                title="Total Sessions"
+                value={stats.totalSessions ?? '—'}
+                icon={MessageSquare}
+                description="All sessions in the system"
+              />
+              <MetricCard
+                title="Active users (30d)"
+                value={stats.activeUsersLast30Days ?? '—'}
+                icon={UserCheck}
+                description="Users with session activity"
+              />
+              <MetricCard
+                title="Avg. session duration"
+                value={
+                  typeof stats.averageDurationSeconds === 'number'
+                    ? `${Math.round(stats.averageDurationSeconds / 60)} min`
+                    : '—'
+                }
+                icon={Clock}
+                description="Mean length of sessions"
+              />
             </div>
 
             <Card>
               <CardHeader>
                 <CardTitle>Recent Activity</CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Live activity feed is not provided by the API; use Session Logs for history.
+                </p>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {stats.recentActivity.map((activity, index) => (
-                    <div key={index} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{activity.action}</p>
-                        <p className="text-xs text-gray-500">User: {activity.userId}</p>
+                  {stats.recentActivity.length === 0 ? (
+                    <p className="text-sm text-gray-500">No recent activity entries.</p>
+                  ) : (
+                    stats.recentActivity.map((activity, index) => (
+                      <div key={index} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{activity.action}</p>
+                          <p className="text-xs text-gray-500">User: {activity.userId}</p>
+                        </div>
+                        <p className="text-xs text-gray-500">{new Date(activity.timestamp).toLocaleString()}</p>
                       </div>
-                      <p className="text-xs text-gray-500">{new Date(activity.timestamp).toLocaleString()}</p>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -490,19 +528,25 @@ export const Admin = () => {
                     <div className="space-y-4">
                       <div>
                         <h4 className="font-medium mb-2">Average Score by Month</h4>
-                        <div className="space-y-2">
-                          {stats.analyticsData.averageScoreByMonth.map((data, index) => (
-                            <div key={index} className="flex items-center justify-between">
-                              <span className="text-sm">{data.month}</span>
-                              <div className="flex items-center gap-2">
-                                <div className="w-20 h-2 bg-gray-200 rounded-full">
-                                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${data.score}%` }} />
+                        {stats.analyticsData.averageScoreByMonth.length === 0 ? (
+                          <p className="text-sm text-gray-500">
+                            Monthly score trends are not included in the admin aggregates API.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {stats.analyticsData.averageScoreByMonth.map((data, index) => (
+                              <div key={index} className="flex items-center justify-between">
+                                <span className="text-sm">{data.month}</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-20 h-2 bg-gray-200 rounded-full">
+                                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${data.score}%` }} />
+                                  </div>
+                                  <span className="text-sm font-medium">{data.score}%</span>
                                 </div>
-                                <span className="text-sm font-medium">{data.score}%</span>
                               </div>
-                            </div>
-                          ))}
-                        </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -511,38 +555,52 @@ export const Admin = () => {
                 <div className="grid gap-6 lg:grid-cols-2">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Completion Rates by Difficulty</CardTitle>
+                      <CardTitle>Session share by case</CardTitle>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Share of all sessions per case (from admin aggregates).
+                      </p>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-3">
-                        {stats.analyticsData.completionRates.map((data, index) => (
-                          <div key={index} className="flex items-center justify-between">
-                            <span className="text-sm capitalize">{data.difficulty}</span>
-                            <div className="flex items-center gap-2">
-                              <div className="w-16 h-2 bg-gray-200 rounded-full">
-                                <div className="h-full bg-green-500 rounded-full" style={{ width: `${data.rate * 100}%` }} />
+                      {stats.analyticsData.completionRates.length === 0 ? (
+                        <p className="text-sm text-gray-500">
+                          No per-case session counts yet (backend may return an empty breakdown).
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {stats.analyticsData.completionRates.map((data, index) => (
+                            <div key={index} className="flex items-center justify-between">
+                              <span className="text-sm capitalize">{data.difficulty}</span>
+                              <div className="flex items-center gap-2">
+                                <div className="w-16 h-2 bg-gray-200 rounded-full">
+                                  <div className="h-full bg-green-500 rounded-full" style={{ width: `${data.rate * 100}%` }} />
+                                </div>
+                                <span className="text-sm font-medium">{Math.round(data.rate * 100)}%</span>
                               </div>
-                              <span className="text-sm font-medium">{Math.round(data.rate * 100)}%</span>
                             </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
                   <Card>
                     <CardHeader>
-                      <CardTitle>Common Challenges</CardTitle>
+                      <CardTitle>Cases by category</CardTitle>
+                      <p className="text-sm text-gray-500 mt-1">From cohort case statistics.</p>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-2">
-                        {stats.analyticsData.commonChallenges.map((challenge, index) => (
-                          <div key={index} className="flex items-center justify-between text-sm">
-                            <span>{challenge.challenge}</span>
-                            <span className="font-medium">{challenge.frequency} instances</span>
-                          </div>
-                        ))}
-                      </div>
+                      {stats.analyticsData.commonChallenges.length === 0 ? (
+                        <p className="text-sm text-gray-500">No category breakdown available.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {stats.analyticsData.commonChallenges.map((challenge, index) => (
+                            <div key={index} className="flex items-center justify-between text-sm">
+                              <span>{challenge.challenge}</span>
+                              <span className="font-medium">{challenge.frequency} cases</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
