@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card'
 import type { Case } from '@/types/case'
 import { cn } from '@/lib/utils'
@@ -9,12 +8,20 @@ const difficultyConfig: Record<string, { label: string; color: string }> = {
   advanced: { label: 'Advanced', color: 'text-rose-700 bg-rose-100' },
 }
 
-export const CaseCard = ({ caseData }: { caseData: Case }) => {
+interface CaseCardProps {
+  caseData: Case
+  onClick?: (caseId: number) => void
+}
+
+export const CaseCard = ({ caseData, onClick }: CaseCardProps) => {
   const difficultyKey = caseData.difficultyLevel?.toLowerCase()
   const difficulty = difficultyKey ? difficultyConfig[difficultyKey] : null
 
   return (
-    <Link to={`/case/${caseData.id}`}>
+    <div
+      className="cursor-pointer"
+      onClick={() => onClick?.(caseData.id)}
+    >
       <Card className="h-full transition-shadow hover:shadow-md hover:border-emerald-300">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between mb-2">
@@ -47,6 +54,6 @@ export const CaseCard = ({ caseData }: { caseData: Case }) => {
           </div>
         </CardContent>
       </Card>
-    </Link>
+    </div>
   )
 }

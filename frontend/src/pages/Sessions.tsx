@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { listSessions } from '@/api/sessions.api'
+import { listActiveSessions, listCompletedSessions } from '@/api/sessions.api'
 import { getCase } from '@/api/cases.api'
 import type { Session } from '@/types/session'
 import type { Case } from '@/types/case'
@@ -51,10 +51,16 @@ export const Sessions = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const sessionData = await listSessions()
-        setSessions(sessionData.sessions)
+        const [activeResult, completedResult] = await Promise.allSettled([
+          listActiveSessions(),
+          listCompletedSessions(),
+        ])
+        const all: Session[] = []
+        if (activeResult.status === 'fulfilled') all.push(...activeResult.value.sessions)
+        if (completedResult.status === 'fulfilled') all.push(...completedResult.value.sessions)
+        setSessions(all)
 
-        const caseIds = [...new Set(sessionData.sessions.map((s) => s.caseId))]
+        const caseIds = [...new Set(all.map((s) => s.caseId))]
         const cases = await Promise.all(
           caseIds.map((id) => getCase(id).catch(() => null))
         )

@@ -24,15 +24,20 @@ class SessionRepository:
         user_id: int,
         skip: int = 0,
         limit: int = 100,
+        state: str | None = None,
     ) -> list[SessionEntity]:
-        """Get all sessions for a user."""
+        """Get sessions for a user, optionally filtered by state."""
+        q = self.db.query(SessionEntity).filter(SessionEntity.user_id == user_id)
+        if state:
+            q = q.filter(SessionEntity.state == state)
+        return q.order_by(SessionEntity.started_at.desc()).offset(skip).limit(limit).all()
+
+    def count_by_user_and_state(self, user_id: int, state: str) -> int:
+        """Count sessions for a user in a given state."""
         return (
             self.db.query(SessionEntity)
-            .filter(SessionEntity.user_id == user_id)
-            .order_by(SessionEntity.started_at.desc())
-            .offset(skip)
-            .limit(limit)
-            .all()
+            .filter(SessionEntity.user_id == user_id, SessionEntity.state == state)
+            .count()
         )
     
     def get_by_case(

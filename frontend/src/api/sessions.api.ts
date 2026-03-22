@@ -57,15 +57,29 @@ export const getSession = async (sessionId: number): Promise<SessionDetail> => {
 }
 
 /**
- * List sessions for the current user
+ * List the current user's active sessions.
  */
-export const listUserSessions = async (opts?: {
+export const listActiveSessions = async (opts?: {
   skip?: number
   limit?: number
 }): Promise<SessionListResponse> => {
   const { skip = 0, limit = 10 } = opts ?? {}
   const res = await api.get<SessionListResponseDTO>(BASE, {
-    params: { skip, limit },
+    params: { state: 'active', skip, limit },
+  })
+  return sessionListFromDTO(res.data)
+}
+
+/**
+ * List the current user's completed (previous) sessions.
+ */
+export const listCompletedSessions = async (opts?: {
+  skip?: number
+  limit?: number
+}): Promise<SessionListResponse> => {
+  const { skip = 0, limit = 100 } = opts ?? {}
+  const res = await api.get<SessionListResponseDTO>(BASE, {
+    params: { state: 'completed', skip, limit },
   })
   return sessionListFromDTO(res.data)
 }

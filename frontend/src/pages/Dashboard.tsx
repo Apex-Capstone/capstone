@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { listCases } from '@/api/cases.api'
-import { createSession, listUserSessions } from '@/api/sessions.api'
+import { createSession, closeSession, listActiveSessions, listCompletedSessions } from '@/api/sessions.api'
 import type { Case } from '@/types/case'
 import type { Session } from '@/types/session'
 import { Button } from '@/components/ui/button'
@@ -9,31 +9,48 @@ import { CaseCard } from '@/components/CaseCard'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { useAuthStore } from '@/store/authStore'
+import { toast } from 'sonner'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 
 export const Dashboard = () => {
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
-  const [sessions, setSessions] = useState<Session[]>([])
+  const [activeSessions, setActiveSessions] = useState<Session[]>([])
+  const [completedSessions, setCompletedSessions] = useState<Session[]>([])
   const [creatingSessionForCase, setCreatingSessionForCase] = useState<number | null>(null)
+  const [closingSessionId, setClosingSessionId] = useState<number | null>(null)
+  const [confirmCloseSession, setConfirmCloseSession] = useState<Session | null>(null)
   const { user } = useAuthStore()
   const navigate = useNavigate()
 
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
-        const [casesResult, sessionsResult] = await Promise.allSettled([
+        const [casesResult, activeResult, completedResult] = await Promise.allSettled([
           listCases(),
-          listUserSessions({ limit: 6 }),
+          listActiveSessions(),
+          listCompletedSessions({ limit: 3 }),
         ])
         if (casesResult.status === 'fulfilled') {
           setCases(casesResult.value.items)
         } else {
           console.error('Failed to fetch cases:', casesResult.reason)
         }
-        if (sessionsResult.status === 'fulfilled') {
-          setSessions(sessionsResult.value.sessions)
+        if (activeResult.status === 'fulfilled') {
+          setActiveSessions(activeResult.value.sessions)
         } else {
-          console.error('Failed to fetch sessions:', sessionsResult.reason)
+          console.error('Failed to fetch active sessions:', activeResult.reason)
+        }
+        if (completedResult.status === 'fulfilled') {
+          setCompletedSessions(completedResult.value.sessions)
+        } else {
+          console.error('Failed to fetch completed sessions:', completedResult.reason)
         }
       } finally {
         setLoading(false)
@@ -52,19 +69,43 @@ export const Dashboard = () => {
   }
 
   const handleStartNewSession = async (caseId: number) => {
+    if (creatingSessionForCase) return
     setCreatingSessionForCase(caseId)
     try {
       const session = await createSession(caseId, { forceNew: true })
       navigate(`/case/${caseId}?sessionId=${session.id}`)
-    } catch (error) {
-      console.error('Failed to start a new session:', error)
+    } catch (error: any) {
+      if (error?.response?.status === 409) {
+        toast.error(
+          error.response.data?.detail ??
+            'Maximum active sessions reached (6). Please close or complete a session before starting a new one.'
+        )
+      } else {
+        console.error('Failed to start a new session:', error)
+        toast.error('Failed to start session. Please try again.')
+      }
     } finally {
       setCreatingSessionForCase(null)
     }
   }
 
-  const activeSessions = sessions.filter((s) => s.status === 'active')
-  const closedSessions = sessions.filter((s) => s.status === 'closed')
+  const handleCloseSession = async () => {
+    if (!confirmCloseSession) return
+    const session = confirmCloseSession
+    setConfirmCloseSession(null)
+    setClosingSessionId(session.id)
+    try {
+      await closeSession(session.id)
+      setActiveSessions((prev) => prev.filter((s) => s.id !== session.id))
+      setCompletedSessions((prev) => [{ ...session, status: 'closed' as const, state: 'completed' }, ...prev].slice(0, 3))
+      toast.success(`Session ${session.id} closed — ${session.caseTitle ?? `Case #${session.caseId}`}`)
+    } catch (error) {
+      console.error('Failed to close session:', error)
+      toast.error('Failed to close session. Please try again.')
+    } finally {
+      setClosingSessionId(null)
+    }
+  }
 
   // derive soft status counts (since BE Case has no status)
   const statusCounts = cases.reduce(
@@ -76,73 +117,75 @@ export const Dashboard = () => {
     {} as Record<'completed' | 'in_progress' | 'pending' | string, number>
   )
 
-  const sessionCardGrid = (sessionList: Session[]) => (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {sessionList.map((session) => {
-        const isClosed = session.status === 'closed'
-        const badgeText = isClosed ? 'Closed' : 'Active'
-        const badgeStyles = isClosed
-          ? 'bg-gray-100 border border-gray-200 text-gray-600'
-          : 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-        return (
-          <div key={session.id} className="rounded-lg border border-gray-200 bg-white p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Session {session.id}
-                </p>
-                <p className="text-base font-semibold text-gray-900">
-                  {session.caseTitle ?? `Case #${session.caseId}`}
-                </p>
-                <p className="text-xs text-gray-500">
-                  Started {new Date(session.startedAt).toLocaleString()}
-                </p>
-              </div>
-              <span
-                className={`px-3 py-1 text-[10px] font-semibold uppercase rounded-full ${badgeStyles}`}
-              >
-                {badgeText}
-              </span>
-            </div>
-            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-              <span className="capitalize">{session.state.replace('_', ' ')}</span>
-              {session.endedAt ? (
-                <span>Duration: {formatDurationLabel(session.durationSeconds)}</span>
-              ) : (
-                <span>Live</span>
-              )}
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {!isClosed && (
-                <Button
-                  size="sm"
-                  variant="success"
-                  onClick={() => navigate(`/case/${session.caseId}?sessionId=${session.id}`)}
-                >
-                  Continue
-                </Button>
-              )}
-              {isClosed && (
-                <Button
-                  size="sm"
-                  variant="success"
-                  onClick={() => navigate(`/feedback/${session.id}`)}
-                >
-                  View Feedback
-                </Button>
-              )}
-              <Button
-                size="sm"
-                variant="neutral"
-                onClick={() => handleStartNewSession(session.caseId)}
-                disabled={creatingSessionForCase === session.caseId}
-              >
-                Start new session
-              </Button>
-            </div>
-          </div>
-        )
-      })}
+  const activeSessionCard = (session: Session) => (
+    <div key={session.id} className="rounded-lg border border-gray-200 bg-white p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Session {session.id}
+          </p>
+          <p className="text-base font-semibold text-gray-900">
+            {session.caseTitle ?? `Case #${session.caseId}`}
+          </p>
+          <p className="text-xs text-gray-500">
+            Started {new Date(session.startedAt).toLocaleString()}
+          </p>
+        </div>
+        <span className="px-3 py-1 text-[10px] font-semibold uppercase rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">
+          Active
+        </span>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant="success"
+          onClick={() => navigate(`/case/${session.caseId}?sessionId=${session.id}`)}
+        >
+          Continue
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+          onClick={() => setConfirmCloseSession(session)}
+          disabled={closingSessionId === session.id}
+        >
+          {closingSessionId === session.id ? 'Closing...' : 'Close Session'}
+        </Button>
+      </div>
+    </div>
+  )
+
+  const completedSessionCard = (session: Session) => (
+    <div key={session.id} className="rounded-lg border border-gray-200 bg-white p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Session {session.id}
+          </p>
+          <p className="text-base font-semibold text-gray-900">
+            {session.caseTitle ?? `Case #${session.caseId}`}
+          </p>
+          <p className="text-xs text-gray-500">
+            Started {new Date(session.startedAt).toLocaleString()}
+          </p>
+        </div>
+        <span className="px-3 py-1 text-[10px] font-semibold uppercase rounded-full bg-gray-100 border border-gray-200 text-gray-600">
+          Completed
+        </span>
+      </div>
+      <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+        <span>Duration: {formatDurationLabel(session.durationSeconds)}</span>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant="success"
+          onClick={() => navigate(`/feedback/${session.id}`)}
+        >
+          View Feedback
+        </Button>
+      </div>
     </div>
   )
 
@@ -220,31 +263,37 @@ export const Dashboard = () => {
                       No active sessions. Start a new one.
                     </div>
                   ) : (
-                    sessionCardGrid(activeSessions)
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {activeSessions.map(activeSessionCard)}
+                    </div>
                   )}
                 </div>
 
-                {/* Closed Sessions */}
+                {/* Previous Sessions */}
                 <div className="mb-8">
                   <div className="flex items-start justify-between gap-6 mb-4">
                     <div>
-                      <h2 className="text-xl font-semibold text-gray-900 mb-1">Closed Sessions</h2>
+                      <h2 className="text-xl font-semibold text-gray-900 mb-1">Previous Sessions</h2>
                       <p className="text-sm text-gray-600">
-                        Completed simulation runs. Review feedback to improve your practice.
+                        Your most recent completed sessions. Review feedback to improve your practice.
                       </p>
                     </div>
-                    {closedSessions.length > 0 && (
-                      <span className="text-sm font-medium text-gray-500">
-                        {closedSessions.length} {closedSessions.length === 1 ? 'session' : 'sessions'}
-                      </span>
-                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate('/sessions')}
+                    >
+                      View all
+                    </Button>
                   </div>
-                  {closedSessions.length === 0 ? (
+                  {completedSessions.length === 0 ? (
                     <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-                      No closed sessions yet.
+                      No completed sessions yet.
                     </div>
                   ) : (
-                    sessionCardGrid(closedSessions)
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {completedSessions.map(completedSessionCard)}
+                    </div>
                   )}
                 </div>
 
@@ -263,7 +312,7 @@ export const Dashboard = () => {
 
                     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                       {cases.map((caseItem) => (
-                        <CaseCard key={caseItem.id} caseData={caseItem as any} />
+                        <CaseCard key={caseItem.id} caseData={caseItem as any} onClick={handleStartNewSession} />
                       ))}
                     </div>
 
@@ -295,6 +344,37 @@ export const Dashboard = () => {
           </div>
         </main>
       </div>
+
+      <Dialog open={!!confirmCloseSession} onOpenChange={(open) => { if (!open) setConfirmCloseSession(null) }}>
+        <DialogContent className="sm:max-w-md [&>button:last-child]:hidden">
+          <DialogHeader>
+            <DialogTitle>Close Session?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to close{' '}
+              <span className="font-medium text-gray-900">
+                Session {confirmCloseSession?.id}
+              </span>
+              {' '}of{' '}
+              <span className="font-medium text-gray-900">
+                {confirmCloseSession?.caseTitle ?? `Case #${confirmCloseSession?.caseId}`}
+              </span>
+              ? This will end the session and generate feedback. You won't be able to continue it afterward.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex justify-end gap-3">
+            <Button variant="outline" size="sm" onClick={() => setConfirmCloseSession(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleCloseSession}
+            >
+              Close Session
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
