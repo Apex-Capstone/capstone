@@ -1,10 +1,20 @@
+/**
+ * Bar-style summary of empathy, SPIKES completion, and overall scores.
+ */
 import type { Feedback } from '@/api/feedback.api'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 
+/** Props for {@link FeedbackChart}. */
 interface FeedbackChartProps {
   feedback: Feedback
 }
 
+/**
+ * Renders three horizontal bars and a footer with the overall score.
+ *
+ * @param props - {@link FeedbackChartProps}
+ * @returns Card with metric bars
+ */
 export const FeedbackChart = ({ feedback }: FeedbackChartProps) => {
   const metrics = [
     { label: 'Empathy Score', value: feedback.empathyScore, max: 100 },

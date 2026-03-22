@@ -1,9 +1,20 @@
+/**
+ * Top navigation bar: branding, optional developer docs link (admin), user chip, and logout.
+ */
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { Button } from './ui/button'
 import { LogOut, Menu } from 'lucide-react'
 import { useState } from 'react'
 
+/**
+ * Renders the authenticated header or `null` when logged out.
+ *
+ * @remarks
+ * Mobile layout toggles `mobileMenuOpen` for a collapsible drawer with the same links/actions.
+ *
+ * @returns Navbar JSX or null
+ */
 export const Navbar = () => {
   const { user, logout, isAuthenticated } = useAuthStore()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -91,4 +102,3 @@ export const Navbar = () => {
     </nav>
   )
 }
-

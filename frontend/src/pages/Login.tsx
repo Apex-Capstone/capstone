@@ -1,3 +1,6 @@
+/**
+ * Email/password login that persists JWT + user via the Zustand auth store.
+ */
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -7,6 +10,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
+/**
+ * Credential form calling {@link loginUser} then navigating to `/dashboard`.
+ *
+ * @returns Login card UI
+ */
 export const Login = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -15,6 +23,11 @@ export const Login = () => {
   const navigate = useNavigate()
   const { login } = useAuthStore()
 
+  /**
+   * Posts credentials, updates auth store, and routes to the dashboard on success.
+   *
+   * @param e - Form submit event
+   */
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')

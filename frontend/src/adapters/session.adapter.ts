@@ -1,3 +1,6 @@
+/**
+ * Maps session and turn DTOs to domain models and builds request payloads for `/v1/sessions`.
+ */
 import type {
   Session,
   SessionDTO,
@@ -11,7 +14,12 @@ import type {
   SessionListResponseDTO,
 } from '@/types/session'
 
-// Convert backend DTO to frontend model
+/**
+ * Converts a session DTO to the camelCase {@link Session} model.
+ *
+ * @param dto - Wire-format session row
+ * @returns Domain session
+ */
 export function sessionFromDTO(dto: SessionDTO): Session {
   return {
     id: dto.id,
@@ -28,6 +36,15 @@ export function sessionFromDTO(dto: SessionDTO): Session {
   }
 }
 
+/**
+ * Converts a single turn DTO to {@link Turn}.
+ *
+ * @remarks
+ * Reads optional `spans_json` via a loose cast when present on the DTO.
+ *
+ * @param dto - Wire-format turn
+ * @returns Domain turn
+ */
 export function turnFromDTO(dto: TurnDTO): Turn {
   return {
     id: dto.id,
@@ -43,6 +60,12 @@ export function turnFromDTO(dto: TurnDTO): Turn {
   }
 }
 
+/**
+ * Maps a turn response DTO including nested turn + audio fields.
+ *
+ * @param dto - API response for `POST .../turns` or audio endpoints
+ * @returns {@link TurnResponseWithAudio}
+ */
 export function turnResponseWithAudioFromDTO(dto: TurnResponseWithAudioDTO): TurnResponseWithAudio {
   return {
     turn: turnFromDTO(dto.turn),
@@ -54,6 +77,12 @@ export function turnResponseWithAudioFromDTO(dto: TurnResponseWithAudioDTO): Tur
   }
 }
 
+/**
+ * Maps session detail DTO including mapped `turns` array.
+ *
+ * @param dto - Wire-format session with turns
+ * @returns {@link SessionDetail}
+ */
 export function sessionDetailFromDTO(dto: SessionDetailDTO): SessionDetail {
   return {
     ...sessionFromDTO(dto),
@@ -61,6 +90,12 @@ export function sessionDetailFromDTO(dto: SessionDetailDTO): SessionDetail {
   }
 }
 
+/**
+ * Maps a paginated list of session DTOs.
+ *
+ * @param dto - Wire list response
+ * @returns {@link SessionListResponse}
+ */
 export function sessionListFromDTO(dto: SessionListResponseDTO): SessionListResponse {
   return {
     sessions: dto.sessions.map(sessionFromDTO),
@@ -68,7 +103,13 @@ export function sessionListFromDTO(dto: SessionListResponseDTO): SessionListResp
   }
 }
 
-// Convert frontend model to backend create payload
+/**
+ * JSON body for `POST /v1/sessions` when starting a session.
+ *
+ * @param caseId - Case to bind
+ * @param forceNew - When true, discard in-progress session for this case if supported
+ * @returns Serialized create payload
+ */
 export function toSessionCreatePayload(caseId: number, forceNew?: boolean) {
   return {
     case_id: caseId,
@@ -76,6 +117,14 @@ export function toSessionCreatePayload(caseId: number, forceNew?: boolean) {
   }
 }
 
+/**
+ * JSON body for submitting a text turn.
+ *
+ * @param text - Trainee message
+ * @param audioUrl - Optional audio URL reference
+ * @param enableTts - Request TTS audio for assistant reply
+ * @returns Serialized turn payload
+ */
 export function toTurnCreatePayload(text: string, audioUrl?: string, enableTts = false) {
   return {
     text,
@@ -83,4 +132,3 @@ export function toTurnCreatePayload(text: string, audioUrl?: string, enableTts =
     enable_tts: enableTts,
   }
 }
-

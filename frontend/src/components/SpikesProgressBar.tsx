@@ -1,8 +1,12 @@
+/**
+ * Horizontal SPIKES stage indicator for session UI.
+ */
 import { CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type SpikesStageId = 'setting' | 'perception' | 'invitation' | 'knowledge' | 'emotion' | 'strategy'
 
+/** Ordered SPIKES stages for the progress visualization. */
 const STAGES: { id: SpikesStageId; label: string }[] = [
   { id: 'setting', label: 'Setting' },
   { id: 'perception', label: 'Perception' },
@@ -12,10 +16,18 @@ const STAGES: { id: SpikesStageId; label: string }[] = [
   { id: 'strategy', label: 'Strategy' },
 ]
 
+/** Props for {@link SpikesProgressBar}. */
 interface SpikesProgressBarProps {
+  /** Raw stage string from the backend (matched case-insensitively). */
   currentStage?: string
 }
 
+/**
+ * Shows six SPIKES checkpoints with completion/current/empty styling.
+ *
+ * @param props - {@link SpikesProgressBarProps}
+ * @returns Progress bar JSX
+ */
 export const SpikesProgressBar = ({ currentStage }: SpikesProgressBarProps) => {
   const normalizedStage = currentStage?.toLowerCase() as SpikesStageId | undefined
   const currentIndex = STAGES.findIndex((s) => s.id === normalizedStage)

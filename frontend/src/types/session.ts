@@ -1,15 +1,25 @@
-// Common chat message type
+/**
+ * Session, turn, and chat message types for the training UI and API adapters.
+ *
+ * @remarks
+ * {@link SessionDTO} and related `*DTO` types mirror backend JSON (`snake_case`).
+ * Domain types such as {@link Session} use `camelCase` in the app.
+ */
+
+/** Single chat message in the research or session UI. */
 export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
   timestamp: string
+  /** Whether the message came from typed text or audio. */
   source?: 'text' | 'audio'
+  /** Delivery state for optimistic UI. */
   status?: 'pending' | 'sent' | 'error'
   assistantAudioUrl?: string
 }
 
-// Wire types that match backend responses (snake_case)
+/** Wire shape for a session row as returned by the API (`snake_case`). */
 export interface SessionDTO {
   id: number
   user_id: number
@@ -28,6 +38,7 @@ export interface SessionDTO {
   status: 'active' | 'closed'
 }
 
+/** Wire shape for one turn in a session. */
 export interface TurnDTO {
   id: number
   session_id: number
@@ -41,6 +52,7 @@ export interface TurnDTO {
   spans_json?: string | null
 }
 
+/** API response when submitting a turn that may include TTS audio. */
 export interface TurnResponseWithAudioDTO {
   turn: TurnDTO
   patient_reply: string
@@ -50,11 +62,12 @@ export interface TurnResponseWithAudioDTO {
   spikes_stage?: string | null
 }
 
+/** Session detail including full turn list (`snake_case` wire type). */
 export interface SessionDetailDTO extends SessionDTO {
   turns: TurnDTO[]
 }
 
-// UI types (camelCase for the app)
+/** Session row in camelCase for React state and components. */
 export interface Session {
   id: number
   userId: number
@@ -72,6 +85,7 @@ export interface Session {
   status: 'active' | 'closed'
 }
 
+/** One conversational turn in the UI domain model. */
 export interface Turn {
   id: number
   sessionId: number
@@ -85,6 +99,7 @@ export interface Turn {
   spansJson?: string
 }
 
+/** Patient reply and optional audio after the trainee submits a turn. */
 export interface TurnResponseWithAudio {
   turn: Turn
   patientReply: string
@@ -94,17 +109,19 @@ export interface TurnResponseWithAudio {
   spikesStage?: string
 }
 
+/** Session with embedded turns for detail views. */
 export interface SessionDetail extends Session {
   turns: Turn[]
 }
 
+/** Paginated session list wire response. */
 export interface SessionListResponseDTO {
   sessions: SessionDTO[]
   total: number
 }
 
+/** Paginated session list for the UI. */
 export interface SessionListResponse {
   sessions: Session[]
   total: number
 }
-

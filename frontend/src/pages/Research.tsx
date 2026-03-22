@@ -1,3 +1,6 @@
+/**
+ * Admin research dashboard: anonymized session analytics, score trends, and JSON exports.
+ */
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { fetchResearchData, type ResearchData } from '@/api/research.api'
@@ -29,18 +32,35 @@ const DAILY_ROLLING_WINDOW_DAYS = 7
 /** Minimum width per bucket for horizontal scroll in hourly view (px). */
 const HOURLY_POINT_WIDTH_PX = 44
 
+/**
+ * Clamps a nullable numeric score to the inclusive 0–100 range for charts.
+ *
+ * @param value - Raw score or null/undefined
+ * @returns Finite percent 0–100
+ */
 const safePercent = (value: number | null | undefined) => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 0
   return Math.max(0, Math.min(100, value))
 }
 
-/** Percent string for chart tooltips: clamped 0–100, max 2 decimal places. */
+/**
+ * Percent string for chart tooltips: clamped 0–100, max 2 decimal places.
+ *
+ * @param value - Tooltip payload value
+ * @returns Percentage string
+ */
 const formatScoreTooltipPercent = (value: unknown) => {
   const n = typeof value === 'number' ? value : Number.parseFloat(String(value))
   const clamped = safePercent(Number.isFinite(n) ? n : 0)
   return `${Number.parseFloat(String(clamped)).toFixed(2)}%`
 }
 
+/**
+ * Formats session timestamps for tables; falls back to em dash when invalid.
+ *
+ * @param value - ISO string or empty
+ * @returns Locale string or `—`
+ */
 const formatTimestamp = (value: string | null | undefined) => {
   if (!value) return '—'
   const date = new Date(value)
@@ -48,12 +68,24 @@ const formatTimestamp = (value: string | null | undefined) => {
   return date.toLocaleString()
 }
 
+/**
+ * X-axis tick label for daily trend charts.
+ *
+ * @param ms - Epoch ms for the bucket
+ * @returns Short date label
+ */
 const formatTrendAxisTick = (ms: number) => {
   const d = new Date(ms)
   if (Number.isNaN(d.getTime())) return ''
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+/**
+ * X-axis tick label for hourly trend charts.
+ *
+ * @param ms - Epoch ms
+ * @returns Date + hour label
+ */
 const formatTrendAxisTickHourly = (ms: number) => {
   const d = new Date(ms)
   if (Number.isNaN(d.getTime())) return ''
@@ -64,7 +96,12 @@ const formatTrendAxisTickHourly = (ms: number) => {
   })
 }
 
-/** Tooltip title for day-level trend points (local calendar date only). */
+/**
+ * Tooltip title for day-level trend points (local calendar date only).
+ *
+ * @param label - Recharts label (epoch ms)
+ * @returns Long-form date string
+ */
 const formatScoreTrendTooltipLabel = (label: unknown) => {
   const ms = typeof label === 'number' ? label : Number(label)
   if (!Number.isFinite(ms)) return ''
@@ -78,6 +115,12 @@ const formatScoreTrendTooltipLabel = (label: unknown) => {
   })
 }
 
+/**
+ * Tooltip title for hourly trend points.
+ *
+ * @param label - Recharts label (epoch ms)
+ * @returns Date + time string
+ */
 const formatScoreTrendHourlyTooltipLabel = (label: unknown) => {
   const ms = typeof label === 'number' ? label : Number(label)
   if (!Number.isFinite(ms)) return ''
@@ -91,6 +134,12 @@ const formatScoreTrendHourlyTooltipLabel = (label: unknown) => {
   })
 }
 
+/**
+ * Tooltip title for weekly buckets (week-of range).
+ *
+ * @param label - Week start epoch ms
+ * @returns Range string
+ */
 const formatScoreTrendWeeklyTooltipLabel = (label: unknown) => {
   const ms = typeof label === 'number' ? label : Number(label)
   if (!Number.isFinite(ms)) return ''
@@ -102,6 +151,12 @@ const formatScoreTrendWeeklyTooltipLabel = (label: unknown) => {
   return `Week of ${start.toLocaleDateString(undefined, { ...opts, year: 'numeric' })} – ${end.toLocaleDateString(undefined, opts)}`
 }
 
+/**
+ * Builds a local calendar `YYYY-MM-DD` key for grouping.
+ *
+ * @param timestamp - ISO timestamp
+ * @returns Day key or null
+ */
 const localDayKeyFromTimestamp = (timestamp: string): string | null => {
   const d = new Date(timestamp)
   if (Number.isNaN(d.getTime())) return null
@@ -111,6 +166,12 @@ const localDayKeyFromTimestamp = (timestamp: string): string | null => {
   return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
+/**
+ * Converts a day key to epoch ms at local midnight.
+ *
+ * @param dayKey - `YYYY-MM-DD`
+ * @returns Epoch ms or NaN
+ */
 const localMidnightMsFromDayKey = (dayKey: string): number => {
   const [ys, ms, ds] = dayKey.split('-').map((x) => Number(x))
   if (![ys, ms, ds].every((n) => Number.isFinite(n))) return NaN
@@ -140,6 +201,12 @@ type TrendPoint = {
   clinical: number
 }
 
+/**
+ * Hourly bucket key including local hour for intraday aggregation.
+ *
+ * @param timestamp - ISO timestamp
+ * @returns `YYYY-MM-DD-HH` or null
+ */
 const localHourKeyFromTimestamp = (timestamp: string): string | null => {
   const d = new Date(timestamp)
   if (Number.isNaN(d.getTime())) return null
@@ -150,6 +217,12 @@ const localHourKeyFromTimestamp = (timestamp: string): string | null => {
   return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}-${String(h).padStart(2, '0')}`
 }
 
+/**
+ * Parses an hourly bucket key to epoch ms at the hour start.
+ *
+ * @param hourKey - Four-part key from {@link localHourKeyFromTimestamp}
+ * @returns Epoch ms or NaN
+ */
 const localHourStartMsFromHourKey = (hourKey: string): number => {
   const parts = hourKey.split('-')
   if (parts.length !== 4) return NaN
@@ -161,6 +234,12 @@ const localHourStartMsFromHourKey = (hourKey: string): number => {
   return new Date(ys, mo - 1, ds, hs, 0, 0, 0).getTime()
 }
 
+/**
+ * Sunday start-of-week (local) for weekly aggregation buckets.
+ *
+ * @param timestamp - ISO timestamp
+ * @returns Week start epoch ms or null
+ */
 const startOfWeekSundayLocalMs = (timestamp: string): number | null => {
   const d = new Date(timestamp)
   if (Number.isNaN(d.getTime())) return null
@@ -170,6 +249,12 @@ const startOfWeekSundayLocalMs = (timestamp: string): number | null => {
   return start.getTime()
 }
 
+/**
+ * Aggregates sessions into hourly mean score points.
+ *
+ * @param sessions - Anonymized sessions with scores
+ * @returns Sorted trend points
+ */
 const buildHourlyTrendData = (sessions: TrendSession[]): TrendPoint[] => {
   const buckets = new Map<
     string,
@@ -214,6 +299,12 @@ const buildHourlyTrendData = (sessions: TrendSession[]): TrendPoint[] => {
     .filter((row) => Number.isFinite(row.time))
 }
 
+/**
+ * Aggregates sessions into weekly mean score points (week starts Sunday local).
+ *
+ * @param sessions - Anonymized sessions with scores
+ * @returns Sorted weekly trend points
+ */
 const buildWeeklyTrendData = (sessions: TrendSession[]): TrendPoint[] => {
   const buckets = new Map<
     number,
@@ -255,6 +346,13 @@ const buildWeeklyTrendData = (sessions: TrendSession[]): TrendPoint[] => {
   })
 }
 
+/**
+ * Builds per-day rolling averages over `rollingWindowDays` for smoother trend lines.
+ *
+ * @param sessions - Anonymized sessions with scores
+ * @param rollingWindowDays - Trailing window size in days
+ * @returns Daily points with rolling means
+ */
 const buildDailyRollingTrendData = (
   sessions: TrendSession[],
   rollingWindowDays: number
@@ -321,9 +419,21 @@ type ScoreTrendTooltipBodyProps = {
 }
 
 /**
- * Hourly view uses a wide, horizontally scrollable chart; the default Recharts tooltip
- * is clipped by overflow and its positioning can fight the scroll container. Portal the
- * tooltip to document.body with fixed positioning when usePortal is true.
+ * Custom Recharts tooltip body; optionally portaled for horizontally scrolled charts.
+ *
+ * @remarks
+ * Hourly view uses a wide, scrollable chart: default tooltips are clipped, so `usePortal`
+ * renders fixed-position content in `document.body`.
+ *
+ * @param props - Recharts tooltip props plus chart ref and portal mode
+ * @param props.active - Whether the tooltip is visible
+ * @param props.payload - Series rows for the hovered point
+ * @param props.label - Axis value (epoch ms)
+ * @param props.coordinate - Pointer position inside the chart SVG
+ * @param props.chartRef - Container used to convert coordinates when portaling
+ * @param props.usePortal - When true, render via `createPortal` to `document.body`
+ * @param props.labelFormatter - Formats the tooltip title from `label`
+ * @returns Tooltip content or null
  */
 function ScoreTrendTooltipBody({
   active,
@@ -336,8 +446,12 @@ function ScoreTrendTooltipBody({
 }: ScoreTrendTooltipBodyProps) {
   if (!active || !payload?.length) return null
 
+  /** Formatted hover title (date/time) for the tooltip header. */
   const title = labelFormatter(label)
 
+  /**
+   * Tooltip card: title row plus one line per series with {@link formatScoreTooltipPercent} values.
+   */
   const inner = (
     <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-lg max-w-[min(100vw-2rem,16rem)]">
       <div className="font-medium text-gray-900 mb-1 border-b border-gray-100 pb-1">{title}</div>
@@ -357,11 +471,14 @@ function ScoreTrendTooltipBody({
   )
 
   if (usePortal && coordinate != null && chartRef.current) {
+    /** Chart container bounding rect for mapping SVG coords to viewport-fixed tooltip position. */
     const rect = chartRef.current.getBoundingClientRect()
     const x = rect.left + coordinate.x
     const y = rect.top + coordinate.y
     const margin = 8
+    /** Half estimated tooltip width for horizontal clamping. */
     const approxHalfWidth = 110
+    /** Clamped left offset so the tooltip stays on-screen horizontally. */
     const clampedLeft = Math.min(
       Math.max(x, approxHalfWidth + margin),
       window.innerWidth - approxHalfWidth - margin
@@ -387,6 +504,11 @@ function ScoreTrendTooltipBody({
 
 type ScoreTrendGranularity = 'hourly' | 'daily' | 'weekly'
 
+/**
+ * Admin research page: dataset summary, fairness placeholders, exports, and score trend charts.
+ *
+ * @returns Research dashboard layout
+ */
 export const Research = () => {
   const { user } = useAuthStore()
   const [data, setData] = useState<ResearchData | null>(null)
@@ -398,6 +520,11 @@ export const Research = () => {
   const [exportingTranscripts, setExportingTranscripts] = useState(false)
   const [exportingSessionId, setExportingSessionId] = useState<string | null>(null)
 
+  /**
+   * Reads JWT from persisted `auth-storage` for authenticated downloads.
+   *
+   * @returns Bearer token or null
+   */
   const getToken = (): string | null => {
     try {
       const raw = localStorage.getItem('auth-storage')
@@ -409,6 +536,12 @@ export const Research = () => {
     }
   }
 
+  /**
+   * Triggers a browser download for an in-memory blob.
+   *
+   * @param blob - File contents
+   * @param filename - Suggested download name
+   */
   const downloadBlob = (blob: Blob, filename: string) => {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -418,6 +551,12 @@ export const Research = () => {
     window.URL.revokeObjectURL(url)
   }
 
+  /**
+   * Fetches anonymized session metrics as CSV (Bearer auth) and triggers download.
+   *
+   * @remarks
+   * No-op when `getToken()` returns null.
+   */
   const handleDownloadMetricsCsv = async () => {
     const token = getToken()
     if (!token) return
@@ -436,6 +575,12 @@ export const Research = () => {
     }
   }
 
+  /**
+   * Fetches all transcript rows as CSV (Bearer auth) and triggers download.
+   *
+   * @remarks
+   * No-op when `getToken()` returns null.
+   */
   const handleDownloadTranscriptsCsv = async () => {
     const token = getToken()
     if (!token) return
@@ -454,6 +599,13 @@ export const Research = () => {
     }
   }
 
+  /**
+   * Downloads a single anonymized session transcript CSV by `anonSessionId`.
+   *
+   * @param anonSessionId - Session identifier from the anonymized list
+   * @remarks
+   * Sanitizes the id for the filename; no-op when `getToken()` returns null.
+   */
   const handleExportSessionTranscript = async (anonSessionId: string) => {
     const token = getToken()
     if (!token) return
@@ -474,6 +626,12 @@ export const Research = () => {
     }
   }
 
+  /**
+   * Trend series for the score chart: hourly, weekly, or daily rolling means per {@link scoreTrendGranularity}.
+   *
+   * @remarks
+   * Delegates to {@link buildHourlyTrendData}, {@link buildWeeklyTrendData}, or {@link buildDailyRollingTrendData}.
+   */
   const trendChartData = useMemo((): TrendPoint[] => {
     if (!data?.anonymizedSessions?.length) return []
     const sessions = data.anonymizedSessions
@@ -488,12 +646,20 @@ export const Research = () => {
     }
   }, [data?.anonymizedSessions, scoreTrendGranularity])
 
+  /**
+   * Minimum chart width for hourly view so horizontal scroll has room per bucket.
+   *
+   * @returns Pixel width or `undefined` when not hourly
+   */
   const scoreTrendChartWidthPx = useMemo(() => {
     if (scoreTrendGranularity !== 'hourly') return undefined
     const n = trendChartData.length
     return Math.max(640, n * HOURLY_POINT_WIDTH_PX)
   }, [scoreTrendGranularity, trendChartData.length])
 
+  /**
+   * Tooltip title formatter for the score trend chart, chosen by granularity.
+   */
   const scoreTrendTooltipLabelFormatter = useMemo(() => {
     switch (scoreTrendGranularity) {
       case 'hourly':
@@ -506,6 +672,9 @@ export const Research = () => {
     }
   }, [scoreTrendGranularity])
 
+  /**
+   * X-axis tick formatter for the score trend chart (hourly vs day/week labels).
+   */
   const scoreTrendAxisTickFormatter = useMemo(() => {
     switch (scoreTrendGranularity) {
       case 'hourly':
@@ -517,6 +686,9 @@ export const Research = () => {
     }
   }, [scoreTrendGranularity])
 
+  /**
+   * Bar chart data: mean empathy, communication, and clinical scores across anonymized sessions.
+   */
   const averageScoresChartData = useMemo(() => {
     if (!data?.anonymizedSessions?.length) return []
     const empathyValues = data.anonymizedSessions
@@ -566,6 +738,9 @@ export const Research = () => {
   }, [data?.anonymizedSessions])
 
   useEffect(() => {
+    /**
+     * Fetches anonymized research data on mount for charts and tables.
+     */
     const loadData = async () => {
       try {
         const researchData = await fetchResearchData()

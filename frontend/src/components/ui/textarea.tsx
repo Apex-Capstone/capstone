@@ -1,11 +1,22 @@
 "use client"
 
+/**
+ * Multi-line text area with shared focus styles.
+ */
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
+/** Props for {@link Textarea}. */
 export interface TextareaProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
 
+/**
+ * Styled `textarea` for forms and long-form input.
+ *
+ * @param props - {@link TextareaProps}
+ * @param ref - Forwarded to the `textarea` element
+ * @returns Textarea element
+ */
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, ...props }, ref) => {
     return (

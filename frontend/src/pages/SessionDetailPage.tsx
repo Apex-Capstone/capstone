@@ -1,3 +1,6 @@
+/**
+ * Read-only session overview: metadata, scores when closed, transcript preview, actions.
+ */
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { getSession } from '@/api/sessions.api'
@@ -23,6 +26,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+/** SPIKES stage labels for display chips. */
 const SPIKES_DISPLAY: Record<string, string> = {
   setting: 'Setting',
   perception: 'Perception',
@@ -33,6 +37,12 @@ const SPIKES_DISPLAY: Record<string, string> = {
   summary: 'Strategy',
 }
 
+/**
+ * Formats duration for stats; shows em dash when zero or invalid.
+ *
+ * @param seconds - Session duration
+ * @returns Label like `3m 12s`
+ */
 function formatDuration(seconds: number): string {
   if (seconds <= 0) return '—'
   const m = Math.floor(seconds / 60)
@@ -41,6 +51,12 @@ function formatDuration(seconds: number): string {
   return `${m}m ${s}s`
 }
 
+/**
+ * Formats ISO timestamps for the header area.
+ *
+ * @param iso - ISO string
+ * @returns Localized date/time
+ */
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
     year: 'numeric',
@@ -51,6 +67,13 @@ function formatDate(iso: string): string {
   })
 }
 
+/**
+ * Renders a horizontal score bar with numeric label.
+ *
+ * @param score - 0–100 style score
+ * @param colorClass - Tailwind classes for the fill
+ * @returns Bar row JSX
+ */
 function scoreBar(score: number, colorClass: string) {
   const pct = Math.min(100, Math.max(0, Math.round(score)))
   return (
@@ -65,11 +88,22 @@ function scoreBar(score: number, colorClass: string) {
   )
 }
 
+/**
+ * Splits multiline strings into trimmed lines for bullet lists.
+ *
+ * @param text - Raw text
+ * @returns Non-empty lines
+ */
 function splitLines(text: string | null | undefined): string[] {
   if (!text) return []
   return text.split('\n').map((s) => s.trim()).filter(Boolean)
 }
 
+/**
+ * Detail route for `/sessions/:sessionId` with optional feedback when completed.
+ *
+ * @returns Session overview page
+ */
 export const SessionDetailPage = () => {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
@@ -83,6 +117,9 @@ export const SessionDetailPage = () => {
   useEffect(() => {
     if (!sessionId) return
 
+    /**
+     * Loads session + case; fetches feedback only when state is `completed`.
+     */
     const load = async () => {
       try {
         const sessionDetail = await getSession(Number(sessionId))

@@ -1,13 +1,24 @@
+/**
+ * Single chat message row with optional assistant audio replay.
+ */
 import type { Message } from '@/types/session'
 import { cn } from '@/lib/utils'
 import { User, Bot, Volume2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
+/** Props for {@link ChatBubble}. */
 interface ChatBubbleProps {
   message: Message
+  /** Invoked when the user taps replay on assistant audio. */
   onReplayAudio?: (audioUrl: string) => void
 }
 
+/**
+ * Renders a user or assistant bubble with timestamp and source label.
+ *
+ * @param props - {@link ChatBubbleProps}
+ * @returns Message row JSX
+ */
 export const ChatBubble = ({ message, onReplayAudio }: ChatBubbleProps) => {
   const isUser = message.role === 'user'
   const assistantAudioUrl = message.assistantAudioUrl

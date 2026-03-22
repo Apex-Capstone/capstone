@@ -1,18 +1,24 @@
+/**
+ * Conversation transcript with per-turn SPIKES labels, metric badges, and empathy span highlights.
+ */
 import type React from 'react'
 import type { Turn } from '@/types/session'
 import type { Feedback } from '@/api/feedback.api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
+/** Props for {@link FeedbackConversationTimeline}. */
 interface FeedbackConversationTimelineProps {
   turns: Turn[]
   feedback: Feedback
 }
 
+/** Parsed heuristic labels derived from `metrics_json`. */
 type MetricsBadges = {
   labels: string[]
 }
 
+/** Normalized text span for underline rendering. */
 type Span = {
   id?: string | number
   span_type?: string
@@ -20,6 +26,12 @@ type Span = {
   end: number
 }
 
+/**
+ * Parses `metrics_json` into human-readable badge strings (empathy, questions, tone).
+ *
+ * @param metricsJson - JSON string or undefined from a turn
+ * @returns Collected label strings for chips
+ */
 const parseMetricsBadges = (metricsJson?: string): MetricsBadges => {
   if (!metricsJson) {
     return { labels: [] }
@@ -80,6 +92,12 @@ const parseMetricsBadges = (metricsJson?: string): MetricsBadges => {
   }
 }
 
+/**
+ * Maps backend role strings to a display label for the transcript.
+ *
+ * @param role - Raw role from the turn
+ * @returns Doctor or Patient
+ */
 const formatRoleLabel = (role: string): 'Doctor' | 'Patient' => {
   const normalized = role.toLowerCase()
   if (['user', 'trainee', 'doctor', 'physician', 'clinician'].includes(normalized)) {
@@ -88,6 +106,12 @@ const formatRoleLabel = (role: string): 'Doctor' | 'Patient' => {
   return 'Patient'
 }
 
+/**
+ * Places clinician turns on the right and patient on the left (chat layout).
+ *
+ * @param role - Raw role from the turn
+ * @returns Horizontal alignment side
+ */
 const mapRoleToSide = (role: string): 'left' | 'right' => {
   const normalized = role.toLowerCase()
   if (['user', 'trainee', 'doctor', 'physician', 'clinician'].includes(normalized)) {
@@ -105,6 +129,12 @@ type EmpathyMarkersByTurn = Record<
   }
 >
 
+/**
+ * Parses `spans_json` into validated start/end spans for highlighting.
+ *
+ * @param spansJson - JSON string or parsed array
+ * @returns Sorted valid spans
+ */
 const parseSpans = (spansJson?: unknown): Span[] => {
   if (!spansJson) return []
 
@@ -153,6 +183,13 @@ const parseSpans = (spansJson?: unknown): Span[] => {
   }
 }
 
+/**
+ * Builds per-turn empathy marker flags from span types and missed-opportunity summaries.
+ *
+ * @param feedback - Session feedback containing link maps and missed rows
+ * @param turns - Turns with optional `spansJson`
+ * @returns Map of turn number to marker type list
+ */
 const buildEmpathyTimelineMarkers = (
   feedback: Feedback,
   turns: Array<Turn & { spansJson?: string }>,
@@ -224,6 +261,14 @@ const buildEmpathyTimelineMarkers = (
   return markers
 }
 
+/**
+ * Splits turn text and injects underlined spans for EO/response/missed/elicitation styling.
+ *
+ * @param text - Full turn text
+ * @param spansJson - Optional spans payload
+ * @param feedback - Used for link maps and missed id sets
+ * @returns Plain string or array of text/React nodes
+ */
 const renderTextWithSpans = (
   text: string,
   spansJson: string | undefined,
@@ -326,6 +371,12 @@ const renderTextWithSpans = (
   return pieces
 }
 
+/**
+ * Full conversation analysis card: sorted turns with empathy overlays and metric chips.
+ *
+ * @param props - {@link FeedbackConversationTimelineProps}
+ * @returns Card with transcript timeline
+ */
 export const FeedbackConversationTimeline = ({
   turns,
   feedback,

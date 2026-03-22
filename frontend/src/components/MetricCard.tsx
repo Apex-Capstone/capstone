@@ -1,8 +1,10 @@
+/**
+ * Compact KPI tile with optional icon and trend line.
+ */
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import type { ComponentType } from 'react'
-// import { LucideIcon } from 'lucide-react'
 
-
+/** Props for {@link MetricCard}. */
 interface MetricCardProps {
   title: string
   value: string | number
@@ -14,6 +16,12 @@ interface MetricCardProps {
   }
 }
 
+/**
+ * Displays a titled metric value with optional description and trend percentage.
+ *
+ * @param props - {@link MetricCardProps}
+ * @returns Card with metric content
+ */
 export const MetricCard = ({
   title,
   value,

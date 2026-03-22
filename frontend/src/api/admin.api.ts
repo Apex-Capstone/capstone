@@ -1,8 +1,10 @@
-// src/api/admin.api.ts
+/**
+ * Admin dashboard API: aggregates, session review, plugin configuration, and user overview.
+ */
 import api from '@/api/client'
 import type { SessionDetailDTO } from '@/types/session'
 
-// Wire types matching backend admin responses (snake_case)
+/** One point on the per-turn metrics timeline (wire `snake_case`). */
 export interface MetricsTimelineDTO {
   turn_number: number
   timestamp: string
@@ -11,6 +13,7 @@ export interface MetricsTimelineDTO {
   spikes_stage: string
 }
 
+/** Paginated admin session list (each row may include transcript fields). */
 export interface AdminSessionListResponse {
   sessions: SessionDetailDTO[]
   total: number
@@ -18,6 +21,7 @@ export interface AdminSessionListResponse {
   limit: number
 }
 
+/** Short feedback summary block for admin session cards. */
 export interface AdminFeedbackSummaryDTO {
   empathy_score: number
   overall_score: number
@@ -25,12 +29,16 @@ export interface AdminFeedbackSummaryDTO {
   areas_for_improvement?: string | null
 }
 
+/** Session detail bundle with optional feedback and timeline. */
 export interface AdminSessionDetailResponse {
   session: SessionDetailDTO
   feedback: AdminFeedbackSummaryDTO | null
   metrics_timeline: MetricsTimelineDTO[]
 }
 
+/**
+ * Overview metrics and chart placeholders for the admin home dashboard.
+ */
 export interface AdminStats {
   totalUsers: number
   totalCases: number
@@ -65,6 +73,7 @@ export interface AdminStats {
   }
 }
 
+/** Raw `/v1/admin/aggregates` response used by {@link fetchAdminStats}. */
 interface AggregatesResponse {
   user_stats: {
     total_users: number
@@ -91,6 +100,13 @@ interface AggregatesResponse {
   generated_at?: string
 }
 
+/**
+ * Derives completion rate rows from per-case session counts.
+ *
+ * @param sessionsByCase - Map of case title to session count
+ * @param totalSessions - Denominator for rates
+ * @returns Sorted rows with `rate = count / totalSessions`
+ */
 function completionRatesFromSessionsByCase(
   sessionsByCase: Record<string, number>,
   totalSessions: number
@@ -104,6 +120,12 @@ function completionRatesFromSessionsByCase(
     .sort((a, b) => b.rate - a.rate)
 }
 
+/**
+ * Maps category histogram into `{ challenge, frequency }` rows for charts.
+ *
+ * @param casesByCategory - Backend map of category name to count
+ * @returns Array for admin “common challenges” visualization
+ */
 function commonChallengesFromCategories(
   casesByCategory: Record<string, number>
 ): Array<{ challenge: string; frequency: number }> {
@@ -113,10 +135,9 @@ function commonChallengesFromCategories(
   }))
 }
 
-// If your backend path is protected and versioned:
 const BASE = '/v1/admin'
 
-/** Per-user aggregates from `GET /v1/admin/users/overview` (snake_case wire). */
+/** One row from `GET /v1/admin/users/overview` (snake_case wire). */
 export interface AdminUserOverviewRowDTO {
   id: number
   email: string
@@ -130,6 +151,7 @@ export interface AdminUserOverviewRowDTO {
   average_empathy_score: number | null
 }
 
+/** Paginated user overview for admin tables. */
 export interface AdminUserOverviewResponseDTO {
   users: AdminUserOverviewRowDTO[]
   total: number
@@ -137,11 +159,20 @@ export interface AdminUserOverviewResponseDTO {
   limit: number
 }
 
+/** Allowed sort modes for the user overview endpoint. */
 export type AdminUserOverviewSort =
   | 'last_active_desc'
   | 'avg_score_desc'
   | 'email_asc'
 
+/**
+ * Fetches paginated user overview rows for admin reporting.
+ *
+ * @param skip - Pagination offset
+ * @param limit - Page size
+ * @param params - Optional `sort`, `role` filter, and search `q`
+ * @returns Wire-format overview response
+ */
 export async function fetchAdminUserOverview(
   skip = 0,
   limit = 20,
@@ -166,6 +197,14 @@ export async function fetchAdminUserOverview(
   return data
 }
 
+/**
+ * Loads global admin aggregates and maps them into {@link AdminStats}.
+ *
+ * @remarks
+ * Derives `completionRates` and `commonChallenges` from session/case stats; leaves monthly scores empty when absent.
+ *
+ * @returns Normalized stats for dashboard widgets
+ */
 export const fetchAdminStats = async (): Promise<AdminStats> => {
   const { data } = await api.get<AggregatesResponse>(`${BASE}/aggregates`)
 
@@ -197,8 +236,14 @@ export const fetchAdminStats = async (): Promise<AdminStats> => {
 }
 
 /**
- * Fetch admin session list (user transcripts).
- * Requires admin auth; JWT is sent via Authorization header by api client.
+ * Lists sessions for admin review (transcripts, metadata).
+ *
+ * @remarks
+ * JWT is sent via the shared API client. Requires admin role server-side.
+ *
+ * @param skip - Pagination offset
+ * @param limit - Page size
+ * @returns Paginated session rows
  */
 export async function fetchAdminSessions(
   skip = 0,
@@ -211,8 +256,10 @@ export async function fetchAdminSessions(
 }
 
 /**
- * Fetch admin session detail with transcript and metrics timeline.
- * Requires admin auth; JWT is sent via Authorization header by api client.
+ * Loads one session with feedback summary and metrics timeline.
+ *
+ * @param sessionId - Session id as string (URL segment)
+ * @returns Detail bundle for the admin session page
  */
 export async function fetchAdminSessionDetail(
   sessionId: string
@@ -223,7 +270,7 @@ export async function fetchAdminSessionDetail(
   return data
 }
 
-/** Active plugins (module:ClassName) for admin Developer Tools. */
+/** Active plugin identifiers returned by `GET /v1/admin/plugins`. */
 export interface PluginsResponse {
   patient_model: string
   evaluator: string
@@ -231,19 +278,22 @@ export interface PluginsResponse {
 }
 
 /**
- * Fetch active plugin paths. Admin only.
+ * Fetches which plugin implementations are currently active on the server.
+ *
+ * @returns Module paths or class names per plugin slot
  */
 export async function fetchAdminPlugins(): Promise<PluginsResponse> {
   const { data } = await api.get<PluginsResponse>(`${BASE}/plugins`)
   return data
 }
 
-/** Plugin discovery: name + version for dropdowns (e.g. case evaluator). */
+/** One discovered plugin with semantic version. */
 export interface PluginInfo {
   name: string
   version: string
 }
 
+/** Registry response for evaluator / patient / metrics plugins. */
 export interface PluginDiscoveryResponse {
   evaluators: PluginInfo[]
   patient_models: PluginInfo[]
@@ -251,7 +301,9 @@ export interface PluginDiscoveryResponse {
 }
 
 /**
- * Fetch registered plugins (name + version). Admin only. Use for case evaluator dropdown.
+ * Lists all registered plugins (name + version) for admin dropdowns (e.g. case form).
+ *
+ * @returns Discovery groups from `/v1/admin/plugin-registry`
  */
 export async function fetchAdminPluginRegistry(): Promise<PluginDiscoveryResponse> {
   const { data } = await api.get<PluginDiscoveryResponse>(`${BASE}/plugin-registry`)

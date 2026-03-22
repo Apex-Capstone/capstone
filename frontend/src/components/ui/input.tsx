@@ -1,10 +1,21 @@
+/**
+ * Single-line text input with shared focus ring styles.
+ */
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+/** Props for {@link Input} (standard HTML input attributes). */
 export interface InputProps
   extends React.InputHTMLAttributes<HTMLInputElement> {}
 
+/**
+ * Accessible text input with theme-aligned borders and focus ring.
+ *
+ * @param props - {@link InputProps}
+ * @param ref - Forwarded to the `input` element
+ * @returns Input element
+ */
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, ...props }, ref) => {
     return (
