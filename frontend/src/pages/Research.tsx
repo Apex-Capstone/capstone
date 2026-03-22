@@ -446,8 +446,12 @@ function ScoreTrendTooltipBody({
 }: ScoreTrendTooltipBodyProps) {
   if (!active || !payload?.length) return null
 
+  /** Formatted hover title (date/time) for the tooltip header. */
   const title = labelFormatter(label)
 
+  /**
+   * Tooltip card: title row plus one line per series with {@link formatScoreTooltipPercent} values.
+   */
   const inner = (
     <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-lg max-w-[min(100vw-2rem,16rem)]">
       <div className="font-medium text-gray-900 mb-1 border-b border-gray-100 pb-1">{title}</div>
@@ -467,11 +471,14 @@ function ScoreTrendTooltipBody({
   )
 
   if (usePortal && coordinate != null && chartRef.current) {
+    /** Chart container bounding rect for mapping SVG coords to viewport-fixed tooltip position. */
     const rect = chartRef.current.getBoundingClientRect()
     const x = rect.left + coordinate.x
     const y = rect.top + coordinate.y
     const margin = 8
+    /** Half estimated tooltip width for horizontal clamping. */
     const approxHalfWidth = 110
+    /** Clamped left offset so the tooltip stays on-screen horizontally. */
     const clampedLeft = Math.min(
       Math.max(x, approxHalfWidth + margin),
       window.innerWidth - approxHalfWidth - margin
@@ -544,6 +551,12 @@ export const Research = () => {
     window.URL.revokeObjectURL(url)
   }
 
+  /**
+   * Fetches anonymized session metrics as CSV (Bearer auth) and triggers download.
+   *
+   * @remarks
+   * No-op when `getToken()` returns null.
+   */
   const handleDownloadMetricsCsv = async () => {
     const token = getToken()
     if (!token) return
@@ -562,6 +575,12 @@ export const Research = () => {
     }
   }
 
+  /**
+   * Fetches all transcript rows as CSV (Bearer auth) and triggers download.
+   *
+   * @remarks
+   * No-op when `getToken()` returns null.
+   */
   const handleDownloadTranscriptsCsv = async () => {
     const token = getToken()
     if (!token) return
@@ -580,6 +599,13 @@ export const Research = () => {
     }
   }
 
+  /**
+   * Downloads a single anonymized session transcript CSV by `anonSessionId`.
+   *
+   * @param anonSessionId - Session identifier from the anonymized list
+   * @remarks
+   * Sanitizes the id for the filename; no-op when `getToken()` returns null.
+   */
   const handleExportSessionTranscript = async (anonSessionId: string) => {
     const token = getToken()
     if (!token) return
@@ -600,6 +626,12 @@ export const Research = () => {
     }
   }
 
+  /**
+   * Trend series for the score chart: hourly, weekly, or daily rolling means per {@link scoreTrendGranularity}.
+   *
+   * @remarks
+   * Delegates to {@link buildHourlyTrendData}, {@link buildWeeklyTrendData}, or {@link buildDailyRollingTrendData}.
+   */
   const trendChartData = useMemo((): TrendPoint[] => {
     if (!data?.anonymizedSessions?.length) return []
     const sessions = data.anonymizedSessions
@@ -614,12 +646,20 @@ export const Research = () => {
     }
   }, [data?.anonymizedSessions, scoreTrendGranularity])
 
+  /**
+   * Minimum chart width for hourly view so horizontal scroll has room per bucket.
+   *
+   * @returns Pixel width or `undefined` when not hourly
+   */
   const scoreTrendChartWidthPx = useMemo(() => {
     if (scoreTrendGranularity !== 'hourly') return undefined
     const n = trendChartData.length
     return Math.max(640, n * HOURLY_POINT_WIDTH_PX)
   }, [scoreTrendGranularity, trendChartData.length])
 
+  /**
+   * Tooltip title formatter for the score trend chart, chosen by granularity.
+   */
   const scoreTrendTooltipLabelFormatter = useMemo(() => {
     switch (scoreTrendGranularity) {
       case 'hourly':
@@ -632,6 +672,9 @@ export const Research = () => {
     }
   }, [scoreTrendGranularity])
 
+  /**
+   * X-axis tick formatter for the score trend chart (hourly vs day/week labels).
+   */
   const scoreTrendAxisTickFormatter = useMemo(() => {
     switch (scoreTrendGranularity) {
       case 'hourly':
@@ -643,6 +686,9 @@ export const Research = () => {
     }
   }, [scoreTrendGranularity])
 
+  /**
+   * Bar chart data: mean empathy, communication, and clinical scores across anonymized sessions.
+   */
   const averageScoresChartData = useMemo(() => {
     if (!data?.anonymizedSessions?.length) return []
     const empathyValues = data.anonymizedSessions
@@ -692,6 +738,9 @@ export const Research = () => {
   }, [data?.anonymizedSessions])
 
   useEffect(() => {
+    /**
+     * Fetches anonymized research data on mount for charts and tables.
+     */
     const loadData = async () => {
       try {
         const researchData = await fetchResearchData()

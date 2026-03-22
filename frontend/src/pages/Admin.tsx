@@ -207,6 +207,9 @@ export const Admin = () => {
   const [usersSort, setUsersSort] = useState<AdminUserOverviewSort>('last_active_desc')
 
   useEffect(() => {
+    /**
+     * Loads aggregate stats and recent sessions for the Overview tab on mount.
+     */
     const loadOverview = async () => {
       setOverviewSessionsLoading(true)
       setOverviewSessionsError(null)
@@ -237,6 +240,9 @@ export const Admin = () => {
   }, [])
 
   // ---- NEW: fetch cases when switching to the Cases tab ----
+  /**
+   * Refetches the case list from the API and updates `caseItems`.
+   */
   const refreshCases = async () => {
     setCaseLoading(true)
     try {
@@ -255,6 +261,9 @@ export const Admin = () => {
     }
   }, [activeTab])
 
+  /**
+   * Refetches admin session logs (first page) for the Session Logs tab.
+   */
   const refreshSessions = async () => {
     setSessionsLoading(true)
     setSessionsError(null)
@@ -275,6 +284,9 @@ export const Admin = () => {
     }
   }, [activeTab])
 
+  /**
+   * Loads the plugin registry (evaluators, patient models, metrics) for the Plugins tab.
+   */
   const loadPlugins = async () => {
     setPluginsLoading(true)
     setPluginsError(null)
@@ -298,7 +310,11 @@ export const Admin = () => {
   useEffect(() => {
     if (activeTab !== 'users') return
     let cancelled = false
-    ;(async () => {
+
+    /**
+     * Loads paginated user overview rows; skips state updates when `cancelled` (tab change/unmount).
+     */
+    const loadUserOverview = async () => {
       setUserOverviewLoading(true)
       setUserOverviewError(null)
       try {
@@ -315,12 +331,19 @@ export const Admin = () => {
       } finally {
         if (!cancelled) setUserOverviewLoading(false)
       }
-    })()
+    }
+
+    void loadUserOverview()
     return () => {
       cancelled = true
     }
   }, [activeTab, usersSkip, usersSort])
 
+  /**
+   * Fetches full session detail (transcript, feedback, timeline) for the side panel.
+   *
+   * @param sessionId - Session primary key
+   */
   const handleSessionRowClick = async (sessionId: number) => {
     setSelectedDetail(null)
     setDetailError(null)
@@ -336,11 +359,17 @@ export const Admin = () => {
     }
   }
 
+  /**
+   * Clears the session detail panel and any load error.
+   */
   const clearSelectedSession = () => {
     setSelectedDetail(null)
     setDetailError(null)
   }
 
+  /**
+   * Downloads current admin stats and metadata as a dated JSON file in the browser.
+   */
   const handleExportData = () => {
     const dataToExport = {
       stats,
@@ -358,6 +387,7 @@ export const Admin = () => {
     URL.revokeObjectURL(url)
   }
 
+  /** Tab definitions: id, label, and icon for the admin sub-navigation. */
   const tabs = [
     { id: 'overview', label: 'Overview', icon: BarChart3 },
     { id: 'users', label: 'User Management', icon: Users },
@@ -384,24 +414,42 @@ export const Admin = () => {
   }
 
   // ---- NEW: cases handlers ----
+  /**
+   * Opens the case form in create mode with no initial values.
+   */
   const onCreateClick = () => {
     setEditing(null)
     setFormMode('create')
     setFormOpen(true)
   }
 
+  /**
+   * Opens the case form prefilled for editing the given case.
+   *
+   * @param c - Case to edit
+   */
   const onEdit = (c: Case) => {
     setEditing(c)
     setFormMode('edit')
     setFormOpen(true)
   }
 
+  /**
+   * Prompts for confirmation, deletes the case, and refreshes the list.
+   *
+   * @param id - Case id to delete
+   */
   const onDelete = async (id: number) => {
     if (!confirm('Delete this case?')) return
     await deleteCase(id)
     await refreshCases()
   }
 
+  /**
+   * Creates or updates a case from the modal form, then closes and refreshes.
+   *
+   * @param vals - Partial case fields from the admin case form modal
+   */
   const onSubmitForm = async (vals: Partial<Case>) => {
     setSubmitting(true)
     try {
@@ -417,6 +465,11 @@ export const Admin = () => {
     }
   }
 
+  /**
+   * Renders the active tab’s body (overview, users, sessions, analytics, cases, plugins).
+   *
+   * @returns Tab panel JSX or null when stats are missing
+   */
   const renderTabContent = () => {
     if (!stats) return null
 
