@@ -29,6 +29,18 @@ from services.session_service import SessionService
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
+def _with_session_user_info(detail: SessionDetailResponse, row: User | None) -> SessionDetailResponse:
+    """Attach email/name from the users table for admin UI (not stored on session)."""
+    if not row:
+        return detail
+    return detail.model_copy(
+        update={
+            "user_email": row.email,
+            "user_full_name": row.full_name,
+        }
+    )
+
+
 class AdminSessionListResponse(BaseModel):
     """Admin session list with filters."""
     sessions: list[SessionDetailResponse]
@@ -150,14 +162,21 @@ async def list_all_sessions(
         sessions = session_repo.get_by_case(case_id, skip, limit)
     else:
         sessions = session_repo.get_all(skip, limit)
-    
+
+    user_ids = list({s.user_id for s in sessions})
+    users_by_id: dict[int, User] = {}
+    if user_ids:
+        for u in db.query(User).filter(User.id.in_(user_ids)).all():
+            users_by_id[u.id] = u
+
     # Convert to detailed responses
     session_service = SessionService(db)
     detailed_sessions = []
     for sess in sessions:
         detailed = await session_service.get_session(sess.id)
+        detailed = _with_session_user_info(detailed, users_by_id.get(sess.user_id))
         detailed_sessions.append(detailed)
-    
+
     return AdminSessionListResponse(
         sessions=detailed_sessions,
         total=len(sessions),
@@ -175,6 +194,8 @@ async def get_admin_session_detail(
     """Get transcript, feedback summary, and metrics timeline for a session (admin only)."""
     session_service = SessionService(db)
     session_detail = await session_service.get_session(session_id)
+    owner = db.query(User).filter(User.id == session_detail.user_id).first()
+    session_detail = _with_session_user_info(session_detail, owner)
 
     # Fetch feedback (no ownership restriction for admin)
     feedback_repo = FeedbackRepository(db)

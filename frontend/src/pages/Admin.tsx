@@ -32,7 +32,12 @@ function SessionDetailPanel({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Session {session.id} – Transcript & Feedback</CardTitle>
+        <div>
+          <CardTitle>Session {session.id} – Transcript & Feedback</CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            {formatSessionUserLabel(session)}
+          </p>
+        </div>
         <Button variant="outline" size="sm" onClick={onClose}>
           Close
         </Button>
@@ -128,6 +133,19 @@ const USERS_PAGE_SIZE = 20
 function formatAdminScore(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return '—'
   return `${value.toFixed(1)} / 100`
+}
+
+/** Prefer full name, then email; fallback to numeric id (admin API adds user_* from users table). */
+function formatSessionUserLabel(s: {
+  user_id: number
+  user_full_name?: string | null
+  user_email?: string | null
+}): string {
+  const name = s.user_full_name?.trim()
+  if (name) return name
+  const email = s.user_email?.trim()
+  if (email) return email
+  return `User #${s.user_id}`
 }
 
 export const Admin = () => {
@@ -455,7 +473,7 @@ export const Admin = () => {
                             {session.case_title?.trim() || `Session ${session.id}`}
                           </p>
                           <p className="text-xs text-gray-500">
-                            User {session.user_id} · {session.status} · {session.state}
+                            {formatSessionUserLabel(session)} · {session.status} · {session.state}
                           </p>
                         </div>
                         <p className="text-xs text-gray-500 shrink-0">
@@ -639,7 +657,7 @@ export const Admin = () => {
                       <thead>
                         <tr className="border-b">
                           <th className="text-left py-2 font-medium">Session ID</th>
-                          <th className="text-left py-2 font-medium">User ID</th>
+                          <th className="text-left py-2 font-medium">User</th>
                           <th className="text-left py-2 font-medium">Case ID</th>
                           <th className="text-left py-2 font-medium">Started</th>
                         </tr>
@@ -657,7 +675,7 @@ export const Admin = () => {
                             )}
                           >
                             <td className="py-2">{s.id}</td>
-                            <td className="py-2">{s.user_id}</td>
+                            <td className="py-2">{formatSessionUserLabel(s)}</td>
                             <td className="py-2">{s.case_id}</td>
                             <td className="py-2">{new Date(s.started_at).toLocaleString()}</td>
                           </tr>
