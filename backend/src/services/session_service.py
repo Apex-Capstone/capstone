@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
 from config.settings import get_settings
-from core.errors import ConflictError, NotFoundError
+from core.errors import NotFoundError
 from core.plugin_manager import _load_class_from_path
 from domain.entities.session import Session as SessionEntity
 from domain.models.sessions import (
@@ -71,20 +71,10 @@ class SessionService:
         - force_new=True: always create a new session (callers must only use this when they
           truly want a new run, e.g. "Start New Session" in the UI).
         """
-        MAX_ACTIVE_SESSIONS = 6
-
         # Verify case exists
         case = self.case_repo.get_by_id(session_data.case_id)
         if not case:
             raise NotFoundError(f"Case with ID {session_data.case_id} not found")
-
-        # Enforce active session cap
-        active_count = self.session_repo.count_by_user_and_state(user_id, "active")
-        if active_count >= MAX_ACTIVE_SESSIONS:
-            raise ConflictError(
-                f"Maximum active sessions reached ({MAX_ACTIVE_SESSIONS}). "
-                "Please close or complete a session before starting a new one."
-            )
 
         # Reuse any existing open session for this case/user
         if not session_data.force_new:

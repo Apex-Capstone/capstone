@@ -174,13 +174,9 @@ export const CaseDetail = () => {
             throw creationError
           }
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('Failed to initialize session:', error)
-        if (error?.response?.status === 409) {
-          navigate('/dashboard')
-        } else {
-          setError('Failed to start session. Please try again.')
-        }
+        setError('Failed to start session. Please try again.')
       } finally {
         initializingRef.current = false
         setLoading(false)
