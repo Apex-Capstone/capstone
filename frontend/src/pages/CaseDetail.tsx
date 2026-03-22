@@ -149,7 +149,7 @@ export const CaseDetail = () => {
         } else {
           createdSessionForCase.current = numericCaseId
           try {
-            const session = await createSession(numericCaseId)
+            const session = await createSession(numericCaseId, { forceNew: true })
             setSessionId(session.id)
             setCurrentSpikesStage(session.currentSpikesStage || 'setting')
 
@@ -174,9 +174,13 @@ export const CaseDetail = () => {
             throw creationError
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to initialize session:', error)
-        setError('Failed to start session. Please try again.')
+        if (error?.response?.status === 409) {
+          navigate('/dashboard')
+        } else {
+          setError('Failed to start session. Please try again.')
+        }
       } finally {
         initializingRef.current = false
         setLoading(false)

@@ -2,6 +2,7 @@
  * Root router: public routes, role-protected trainee/admin pages, and login redirect.
  */
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import { useAuthStore } from './store/authStore'
 import { Home } from './pages/Home'
 import { Login } from './pages/Login'
@@ -40,6 +41,7 @@ const LoginRoute = () => {
 function App() {
   return (
     <BrowserRouter>
+      <Toaster position="top-center" richColors />
       <Routes>
         {/* Public */}
         <Route path="/" element={<Home />} />
