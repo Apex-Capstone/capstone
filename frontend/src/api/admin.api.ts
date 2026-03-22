@@ -67,7 +67,7 @@ export interface AdminStats {
   analyticsData?: {
     /** Backend aggregates omit time series; UI shows empty state when []. */
     averageScoreByMonth: Array<{ month: string; score: number }>
-    /** Share of sessions per case ID (rate = count / total_sessions). Empty if backend sends no per-case counts. */
+    /** Share of sessions per case title (rate = count / total_sessions). Empty if backend sends no per-case counts. */
     completionRates: Array<{ difficulty: string; rate: number }>
     /** Mapped from case_stats.cases_by_category. */
     commonChallenges: Array<{ challenge: string; frequency: number }>
@@ -106,8 +106,8 @@ function completionRatesFromSessionsByCase(
 ): Array<{ difficulty: string; rate: number }> {
   if (totalSessions <= 0) return []
   return Object.entries(sessionsByCase)
-    .map(([caseId, count]) => ({
-      difficulty: `Case ${caseId}`,
+    .map(([caseTitle, count]) => ({
+      difficulty: caseTitle,
       rate: count / totalSessions,
     }))
     .sort((a, b) => b.rate - a.rate)
