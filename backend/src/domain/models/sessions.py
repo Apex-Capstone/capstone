@@ -92,6 +92,9 @@ class SessionResponse(BaseModel):
     patient_model_version: Optional[str] = None
     metrics_plugins: Optional[list] = None  # JSON array of plugin names
     case_title: Optional[str] = None
+    # Populated on admin session endpoints for display (not stored on session row)
+    user_email: Optional[str] = None
+    user_full_name: Optional[str] = None
     # Computed: "closed" when ended_at is set, else "active"
     status: Literal["active", "closed"]
 

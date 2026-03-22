@@ -6,6 +6,7 @@ from typing import Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from domain.entities.case import Case as CaseEntity
 from domain.entities.session import Session as SessionEntity
 
 
@@ -108,7 +109,18 @@ class SessionRepository:
             .all()
         )
         return {state: count for state, count in results}
-    
+
+    def count_by_case(self) -> dict[str, int]:
+        """Count sessions per case, keyed by case title (joins cases for labels)."""
+        results = (
+            self.db.query(CaseEntity.title, func.count(SessionEntity.id))
+            .select_from(SessionEntity)
+            .join(CaseEntity, SessionEntity.case_id == CaseEntity.id)
+            .group_by(CaseEntity.title)
+            .all()
+        )
+        return {title: count for title, count in results}
+
     def get_average_duration(self) -> float:
         """Get average session duration in seconds."""
         result = self.db.query(func.avg(SessionEntity.duration_seconds)).scalar()

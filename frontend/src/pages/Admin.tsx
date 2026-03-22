@@ -4,16 +4,19 @@ import {
   fetchAdminSessions,
   fetchAdminSessionDetail,
   fetchAdminPluginRegistry,
+  fetchAdminUserOverview,
   type AdminStats,
   type AdminSessionListResponse,
   type AdminSessionDetailResponse,
+  type AdminUserOverviewResponseDTO,
+  type AdminUserOverviewSort,
 } from '@/api/admin.api'
 import type { PluginsResponse } from '@/types/plugins'
 import { MetricCard } from '@/components/MetricCard'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
-import { Users, FileText, Activity, TrendingUp, Download, Plus, BarChart3, MessageSquare, Puzzle, ExternalLink } from 'lucide-react'
+import { Users, FileText, Activity, TrendingUp, Download, Plus, BarChart3, MessageSquare, Puzzle, ExternalLink, Clock, UserCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
@@ -29,7 +32,12 @@ function SessionDetailPanel({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Session {session.id} – Transcript & Feedback</CardTitle>
+        <div>
+          <CardTitle>Session {session.id} – Transcript & Feedback</CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            {formatSessionUserLabel(session)}
+          </p>
+        </div>
         <Button variant="outline" size="sm" onClick={onClose}>
           Close
         </Button>
@@ -117,10 +125,35 @@ import { CasesTable } from '@/components/admin/CasesTable'
 import { CaseForm } from '@/components/admin/CaseForm'
 import { listCases, createCase, updateCase, deleteCase } from '@/api/cases.api'
 import type { Case } from '@/types/case'
+import type { SessionDetailDTO } from '@/types/session'
+
+const OVERVIEW_RECENT_SESSIONS_LIMIT = 8
+const USERS_PAGE_SIZE = 20
+
+function formatAdminScore(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return '—'
+  return `${value.toFixed(1)} / 100`
+}
+
+/** Prefer full name, then email; fallback to numeric id (admin API adds user_* from users table). */
+function formatSessionUserLabel(s: {
+  user_id: number
+  user_full_name?: string | null
+  user_email?: string | null
+}): string {
+  const name = s.user_full_name?.trim()
+  if (name) return name
+  const email = s.user_email?.trim()
+  if (email) return email
+  return `User #${s.user_id}`
+}
 
 export const Admin = () => {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [overviewRecentSessions, setOverviewRecentSessions] = useState<SessionDetailDTO[]>([])
+  const [overviewSessionsLoading, setOverviewSessionsLoading] = useState(true)
+  const [overviewSessionsError, setOverviewSessionsError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'sessions' | 'analytics' | 'cases' | 'plugins'>('overview')
 
   // ---- NEW: cases state ----
@@ -144,18 +177,40 @@ export const Admin = () => {
   const [pluginsLoading, setPluginsLoading] = useState(false)
   const [pluginsError, setPluginsError] = useState<string | null>(null)
 
+  const [userOverviewData, setUserOverviewData] = useState<AdminUserOverviewResponseDTO | null>(null)
+  const [userOverviewLoading, setUserOverviewLoading] = useState(false)
+  const [userOverviewError, setUserOverviewError] = useState<string | null>(null)
+  const [usersSkip, setUsersSkip] = useState(0)
+  const [usersSort, setUsersSort] = useState<AdminUserOverviewSort>('last_active_desc')
+
   useEffect(() => {
-    const loadStats = async () => {
-      try {
-        const data = await fetchAdminStats()
-        setStats(data)
-      } catch (error) {
-        console.error('Failed to fetch admin stats:', error)
-      } finally {
-        setLoading(false)
+    const loadOverview = async () => {
+      setOverviewSessionsLoading(true)
+      setOverviewSessionsError(null)
+      const [statsResult, sessionsResult] = await Promise.allSettled([
+        fetchAdminStats(),
+        fetchAdminSessions(0, OVERVIEW_RECENT_SESSIONS_LIMIT),
+      ])
+
+      if (statsResult.status === 'fulfilled') {
+        setStats(statsResult.value)
+      } else {
+        console.error('Failed to fetch admin stats:', statsResult.reason)
       }
+
+      if (sessionsResult.status === 'fulfilled') {
+        setOverviewRecentSessions(sessionsResult.value.sessions)
+        setOverviewSessionsError(null)
+      } else {
+        console.error('Failed to fetch overview sessions:', sessionsResult.reason)
+        setOverviewRecentSessions([])
+        setOverviewSessionsError('Could not load recent sessions.')
+      }
+
+      setLoading(false)
+      setOverviewSessionsLoading(false)
     }
-    loadStats()
+    void loadOverview()
   }, [])
 
   // ---- NEW: fetch cases when switching to the Cases tab ----
@@ -216,6 +271,32 @@ export const Admin = () => {
       void loadPlugins()
     }
   }, [activeTab])
+
+  useEffect(() => {
+    if (activeTab !== 'users') return
+    let cancelled = false
+    ;(async () => {
+      setUserOverviewLoading(true)
+      setUserOverviewError(null)
+      try {
+        const data = await fetchAdminUserOverview(usersSkip, USERS_PAGE_SIZE, {
+          sort: usersSort,
+        })
+        if (!cancelled) setUserOverviewData(data)
+      } catch (e) {
+        console.error('Failed to fetch user overview:', e)
+        if (!cancelled) {
+          setUserOverviewError('Failed to load user overview')
+          setUserOverviewData(null)
+        }
+      } finally {
+        if (!cancelled) setUserOverviewLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [activeTab, usersSkip, usersSort])
 
   const handleSessionRowClick = async (sessionId: number) => {
     setSelectedDetail(null)
@@ -324,24 +405,83 @@ export const Admin = () => {
               <MetricCard title="Total Users" value={stats.totalUsers} icon={Users} description="Registered trainees" />
               <MetricCard title="Total Cases" value={stats.totalCases} icon={FileText} description="Available training cases" />
               <MetricCard title="Active Sessions" value={stats.activeSessions} icon={Activity} description="Currently in progress" />
-              <MetricCard title="Average Score" value={`${stats.averageScore}%`} icon={TrendingUp} description="Across all sessions" />
+              <MetricCard title="Average Score" value={`${(Number.parseFloat(stats.averageScore.toString())).toFixed(2)}%`} icon={TrendingUp} description="Across all sessions" />
+            </div>
+
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <MetricCard
+                title="Completed Sessions"
+                value={stats.completedSessions ?? '—'}
+                icon={BarChart3}
+                description="Sessions marked completed"
+              />
+              <MetricCard
+                title="Total Sessions"
+                value={stats.totalSessions ?? '—'}
+                icon={MessageSquare}
+                description="All sessions in the system"
+              />
+              <MetricCard
+                title="Active users (30d)"
+                value={stats.activeUsersLast30Days ?? '—'}
+                icon={UserCheck}
+                description="Users with session activity"
+              />
+              <MetricCard
+                title="Avg. session duration"
+                value={
+                  typeof stats.averageDurationSeconds === 'number'
+                    ? `${Math.round(stats.averageDurationSeconds / 60)} min`
+                    : '—'
+                }
+                icon={Clock}
+                description="Mean length of sessions"
+              />
             </div>
 
             <Card>
               <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
+                <CardTitle>Recent sessions</CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Latest sessions by start time.{' '}
+                  <button
+                    type="button"
+                    className="text-primary underline-offset-4 hover:underline font-medium"
+                    onClick={() => setActiveTab('sessions')}
+                  >
+                    Session Logs
+                  </button>{' '}
+                  has the full list and transcripts.
+                </p>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {stats.recentActivity.map((activity, index) => (
-                    <div key={index} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{activity.action}</p>
-                        <p className="text-xs text-gray-500">User: {activity.userId}</p>
+                  {overviewSessionsLoading ? (
+                    <p className="text-sm text-gray-500">Loading recent sessions…</p>
+                  ) : overviewSessionsError ? (
+                    <p className="text-sm text-destructive">{overviewSessionsError}</p>
+                  ) : overviewRecentSessions.length === 0 ? (
+                    <p className="text-sm text-gray-500">No sessions yet.</p>
+                  ) : (
+                    overviewRecentSessions.map((session) => (
+                      <div
+                        key={session.id}
+                        className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0 gap-4"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {session.case_title?.trim() || `Session ${session.id}`}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {formatSessionUserLabel(session)} · {session.status} · {session.state}
+                          </p>
+                        </div>
+                        <p className="text-xs text-gray-500 shrink-0">
+                          {new Date(session.started_at).toLocaleString()}
+                        </p>
                       </div>
-                      <p className="text-xs text-gray-500">{new Date(activity.timestamp).toLocaleString()}</p>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -352,48 +492,142 @@ export const Admin = () => {
         return (
           <div className="space-y-6">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle>User Overview</CardTitle>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="text-sm text-gray-600 flex items-center gap-2">
+                    Sort
+                    <select
+                      className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+                      value={usersSort}
+                      onChange={(e) => {
+                        setUsersSort(e.target.value as AdminUserOverviewSort)
+                        setUsersSkip(0)
+                      }}
+                    >
+                      <option value="last_active_desc">Last active (newest)</option>
+                      <option value="avg_score_desc">Avg overall score (high)</option>
+                      <option value="email_asc">Email (A–Z)</option>
+                    </select>
+                  </label>
+                </div>
               </CardHeader>
               <CardContent>
-                {stats.userOverview ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-2">Name</th>
-                          <th className="text-left py-2">Email</th>
-                          <th className="text-left py-2">Role</th>
-                          <th className="text-left py-2">Avg Score</th>
-                          <th className="text-left py-2">Cases Completed</th>
-                          <th className="text-left py-2">Last Active</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {stats.userOverview.map((user) => (
-                          <tr key={user.id} className="border-b">
-                            <td className="py-2">{user.name}</td>
-                            <td className="py-2">{user.email}</td>
-                            <td className="py-2">
-                              <span
-                                className={cn(
-                                  'px-2 py-1 rounded-full text-xs font-medium',
-                                  user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-emerald-100 text-emerald-800'
-                                )}
-                              >
-                                {user.role}
-                              </span>
-                            </td>
-                            <td className="py-2">{user.averageScore.toFixed(1)}%</td>
-                            <td className="py-2">{user.completedCases}</td>
-                            <td className="py-2">{new Date(user.lastActive).toLocaleDateString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                {userOverviewLoading ? (
+                  <p className="text-gray-500 py-8 text-center">Loading users…</p>
+                ) : userOverviewError ? (
+                  <p className="text-destructive py-8 text-center">{userOverviewError}</p>
+                ) : !userOverviewData || userOverviewData.users.length === 0 ? (
+                  <p className="text-gray-500 py-8 text-center">No users found</p>
                 ) : (
-                  <p className="text-gray-500">User overview data not available</p>
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-separate border-spacing-0 text-sm">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="px-4 py-2.5 text-left font-medium whitespace-nowrap">
+                              Name
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium whitespace-nowrap">
+                              Email
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium whitespace-nowrap">
+                              Role
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium tabular-nums whitespace-nowrap">
+                              Sessions
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium tabular-nums whitespace-nowrap">
+                              Completed
+                            </th>
+                            <th className="px-4 py-2.5 pl-6 text-left font-medium whitespace-nowrap">
+                              Avg overall
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium whitespace-nowrap">
+                              Avg empathy
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium whitespace-nowrap">
+                              Last active
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium whitespace-nowrap">
+                              Registered
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {userOverviewData.users.map((user) => (
+                            <tr key={user.id} className="border-b">
+                              <td className="px-4 py-2.5 align-top">{user.full_name?.trim() || '—'}</td>
+                              <td className="px-4 py-2.5 align-top">{user.email}</td>
+                              <td className="px-4 py-2.5 align-top">
+                                <span
+                                  className={cn(
+                                    'inline-flex px-2 py-1 rounded-full text-xs font-medium',
+                                    user.role === 'admin'
+                                      ? 'bg-purple-100 text-purple-800'
+                                      : 'bg-emerald-100 text-emerald-800'
+                                  )}
+                                >
+                                  {user.role}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 text-left tabular-nums whitespace-nowrap">
+                                {user.session_count}
+                              </td>
+                              <td className="px-4 py-2.5 text-left tabular-nums whitespace-nowrap">
+                                {user.completed_session_count}
+                              </td>
+                              <td className="px-4 py-2.5 pl-6 text-left tabular-nums whitespace-nowrap">
+                                {formatAdminScore(user.average_overall_score)}
+                              </td>
+                              <td className="px-4 py-2.5 text-left tabular-nums whitespace-nowrap">
+                                {formatAdminScore(user.average_empathy_score)}
+                              </td>
+                              <td className="px-4 py-2.5 text-left whitespace-nowrap">
+                                {user.last_session_at
+                                  ? new Date(user.last_session_at).toLocaleString()
+                                  : '—'}
+                              </td>
+                              <td className="px-4 py-2.5 text-left whitespace-nowrap text-gray-600">
+                                {new Date(user.created_at).toLocaleDateString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
+                      <span>
+                        Showing{' '}
+                        {userOverviewData.total === 0
+                          ? 0
+                          : usersSkip + 1}
+                        –
+                        {usersSkip + userOverviewData.users.length} of {userOverviewData.total}
+                      </span>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={usersSkip <= 0 || userOverviewLoading}
+                          onClick={() => setUsersSkip((s) => Math.max(0, s - USERS_PAGE_SIZE))}
+                        >
+                          Previous
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            userOverviewLoading ||
+                            usersSkip + userOverviewData.users.length >= userOverviewData.total
+                          }
+                          onClick={() => setUsersSkip((s) => s + USERS_PAGE_SIZE)}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -423,7 +657,7 @@ export const Admin = () => {
                       <thead>
                         <tr className="border-b">
                           <th className="text-left py-2 font-medium">Session ID</th>
-                          <th className="text-left py-2 font-medium">User ID</th>
+                          <th className="text-left py-2 font-medium">User</th>
                           <th className="text-left py-2 font-medium">Case ID</th>
                           <th className="text-left py-2 font-medium">Started</th>
                         </tr>
@@ -441,7 +675,7 @@ export const Admin = () => {
                             )}
                           >
                             <td className="py-2">{s.id}</td>
-                            <td className="py-2">{s.user_id}</td>
+                            <td className="py-2">{formatSessionUserLabel(s)}</td>
                             <td className="py-2">{s.case_id}</td>
                             <td className="py-2">{new Date(s.started_at).toLocaleString()}</td>
                           </tr>
@@ -490,19 +724,25 @@ export const Admin = () => {
                     <div className="space-y-4">
                       <div>
                         <h4 className="font-medium mb-2">Average Score by Month</h4>
-                        <div className="space-y-2">
-                          {stats.analyticsData.averageScoreByMonth.map((data, index) => (
-                            <div key={index} className="flex items-center justify-between">
-                              <span className="text-sm">{data.month}</span>
-                              <div className="flex items-center gap-2">
-                                <div className="w-20 h-2 bg-gray-200 rounded-full">
-                                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${data.score}%` }} />
+                        {stats.analyticsData.averageScoreByMonth.length === 0 ? (
+                          <p className="text-sm text-gray-500">
+                            Monthly score trends are not included in the admin aggregates API.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {stats.analyticsData.averageScoreByMonth.map((data, index) => (
+                              <div key={index} className="flex items-center justify-between">
+                                <span className="text-sm">{data.month}</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-20 h-2 bg-gray-200 rounded-full">
+                                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${data.score}%` }} />
+                                  </div>
+                                  <span className="text-sm font-medium">{data.score}%</span>
                                 </div>
-                                <span className="text-sm font-medium">{data.score}%</span>
                               </div>
-                            </div>
-                          ))}
-                        </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -511,38 +751,52 @@ export const Admin = () => {
                 <div className="grid gap-6 lg:grid-cols-2">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Completion Rates by Difficulty</CardTitle>
+                      <CardTitle>Session share by case</CardTitle>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Share of all sessions per case (from admin aggregates).
+                      </p>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-3">
-                        {stats.analyticsData.completionRates.map((data, index) => (
-                          <div key={index} className="flex items-center justify-between">
-                            <span className="text-sm capitalize">{data.difficulty}</span>
-                            <div className="flex items-center gap-2">
-                              <div className="w-16 h-2 bg-gray-200 rounded-full">
-                                <div className="h-full bg-green-500 rounded-full" style={{ width: `${data.rate * 100}%` }} />
+                      {stats.analyticsData.completionRates.length === 0 ? (
+                        <p className="text-sm text-gray-500">
+                          No per-case session counts yet (backend may return an empty breakdown).
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {stats.analyticsData.completionRates.map((data, index) => (
+                            <div key={index} className="flex items-center justify-between">
+                              <span className="text-sm capitalize">{data.difficulty}</span>
+                              <div className="flex items-center gap-2">
+                                <div className="w-16 h-2 bg-gray-200 rounded-full">
+                                  <div className="h-full bg-green-500 rounded-full" style={{ width: `${data.rate * 100}%` }} />
+                                </div>
+                                <span className="text-sm font-medium">{Math.round(data.rate * 100)}%</span>
                               </div>
-                              <span className="text-sm font-medium">{Math.round(data.rate * 100)}%</span>
                             </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
                   <Card>
                     <CardHeader>
-                      <CardTitle>Common Challenges</CardTitle>
+                      <CardTitle>Cases by category</CardTitle>
+                      <p className="text-sm text-gray-500 mt-1">From cohort case statistics.</p>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-2">
-                        {stats.analyticsData.commonChallenges.map((challenge, index) => (
-                          <div key={index} className="flex items-center justify-between text-sm">
-                            <span>{challenge.challenge}</span>
-                            <span className="font-medium">{challenge.frequency} instances</span>
-                          </div>
-                        ))}
-                      </div>
+                      {stats.analyticsData.commonChallenges.length === 0 ? (
+                        <p className="text-sm text-gray-500">No category breakdown available.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {stats.analyticsData.commonChallenges.map((challenge, index) => (
+                            <div key={index} className="flex items-center justify-between text-sm">
+                              <span>{challenge.challenge}</span>
+                              <span className="font-medium">{challenge.frequency} cases</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>

@@ -52,14 +52,14 @@ function formatDate(iso: string): string {
 }
 
 function scoreBar(score: number, colorClass: string) {
-  const pct = Math.round((score / 10) * 100)
+  const pct = Math.min(100, Math.max(0, Math.round(score)))
   return (
     <div className="flex items-center gap-3">
       <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
         <div className={cn('h-full rounded-full', colorClass)} style={{ width: `${pct}%` }} />
       </div>
-      <span className="w-12 text-right text-sm font-bold text-gray-900">
-        {score.toFixed(1)}/10
+      <span className="w-14 text-right text-sm font-bold text-gray-900">
+        {score.toFixed(1)}/100
       </span>
     </div>
   )

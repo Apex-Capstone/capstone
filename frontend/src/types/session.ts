@@ -21,6 +21,9 @@ export interface SessionDTO {
   duration_seconds: number
   meta?: string | null
   case_title?: string | null
+  /** Set on admin session endpoints from the users table */
+  user_email?: string | null
+  user_full_name?: string | null
   /** Computed by API: "active" | "closed" (closed when ended_at is set) */
   status: 'active' | 'closed'
 }
@@ -63,6 +66,8 @@ export interface Session {
   durationSeconds: number
   meta?: string
   caseTitle?: string
+  userEmail?: string
+  userFullName?: string
   /** From API: "active" | "closed" */
   status: 'active' | 'closed'
 }
