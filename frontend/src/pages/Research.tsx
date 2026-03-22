@@ -34,6 +34,13 @@ const safePercent = (value: number | null | undefined) => {
   return Math.max(0, Math.min(100, value))
 }
 
+/** Percent string for chart tooltips: clamped 0–100, max 2 decimal places. */
+const formatScoreTooltipPercent = (value: unknown) => {
+  const n = typeof value === 'number' ? value : Number.parseFloat(String(value))
+  const clamped = safePercent(Number.isFinite(n) ? n : 0)
+  return `${Number.parseFloat(String(clamped)).toFixed(2)}%`
+}
+
 const formatTimestamp = (value: string | null | undefined) => {
   if (!value) return '—'
   const date = new Date(value)
@@ -341,7 +348,7 @@ function ScoreTrendTooltipBody({
           return (
             <div key={i} className="flex justify-between gap-4" style={{ color: entry.color }}>
               <span>{entry.name != null ? String(entry.name) : ''}</span>
-              <span>{`${safePercent(num)}%`}</span>
+              <span>{formatScoreTooltipPercent(num)}</span>
             </div>
           )
         })}
@@ -1020,7 +1027,11 @@ export const Research = () => {
                           <CartesianGrid strokeDasharray="3 3" className="stroke-gray-100" />
                           <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                           <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
-                          <Tooltip formatter={(value: unknown) => [`${Number(value)}%`, 'Average'] as [React.ReactNode, string]} />
+                          <Tooltip
+                            formatter={(value: unknown) =>
+                              [formatScoreTooltipPercent(value), 'Average'] as [React.ReactNode, string]
+                            }
+                          />
                           <Bar dataKey="value" fill="#7c3aed" name="Average %" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>

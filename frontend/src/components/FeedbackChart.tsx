@@ -7,9 +7,9 @@ interface FeedbackChartProps {
 
 export const FeedbackChart = ({ feedback }: FeedbackChartProps) => {
   const metrics = [
-    { label: 'Empathy Score', value: feedback.empathyScore, max: 10 },
-    { label: 'SPIKES Completion', value: feedback.spikesCompletionScore, max: 10 },
-    { label: 'Overall Score', value: feedback.overallScore, max: 10 },
+    { label: 'Empathy Score', value: feedback.empathyScore, max: 100 },
+    { label: 'SPIKES Completion', value: feedback.spikesCompletionScore, max: 100 },
+    { label: 'Overall Score', value: feedback.overallScore, max: 100 },
   ]
 
   return (
@@ -20,7 +20,10 @@ export const FeedbackChart = ({ feedback }: FeedbackChartProps) => {
       <CardContent>
         <div className="space-y-4">
           {metrics.map((metric) => {
-            const percent = Math.round((metric.value / metric.max) * 100)
+            const percent = Math.min(
+              100,
+              Math.max(0, Math.round((metric.value / metric.max) * 100)),
+            )
             return (
               <div key={metric.label}>
                 <div className="flex items-center justify-between mb-1">
@@ -45,7 +48,7 @@ export const FeedbackChart = ({ feedback }: FeedbackChartProps) => {
           <div className="flex items-center justify-between">
             <span className="text-lg font-semibold">Overall Score</span>
             <span className="text-2xl font-bold text-emerald-600">
-              {feedback.overallScore.toFixed(1)}/10
+              {feedback.overallScore.toFixed(1)}/100
             </span>
           </div>
         </div>

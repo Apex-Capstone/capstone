@@ -22,7 +22,7 @@ class Feedback(Base):
     communication_score = Column(Float, nullable=True)      # UI communication score (0-100)
     clinical_reasoning_score = Column(Float, nullable=True) # UI clinical reasoning score (0-100)
     professionalism_score = Column(Float, nullable=True)    # UI professionalism score (0-100)
-    spikes_completion_score = Column(Float, default=0.0)    # SPIKES completion metric (0-10)
+    spikes_completion_score = Column(Float, default=0.0)    # SPIKES completion metric (0-100)
     overall_score = Column(Float, default=0.0)              # weighted blend (0-100)
 
     # ---- AFCE-structured empathy metrics

@@ -48,7 +48,7 @@ function splitLines(text: string | null | undefined): string[] {
 }
 
 function scoreToPercent(score: number): number {
-  return Math.round((score / 10) * 100)
+  return Math.min(100, Math.max(0, Math.round(score)))
 }
 
 export const Feedback = () => {
@@ -181,7 +181,7 @@ export const Feedback = () => {
                       />
                     </div>
                     <span className="text-lg font-bold text-gray-900">
-                      {feedback.overallScore.toFixed(1)}/10
+                      {feedback.overallScore.toFixed(1)}/100
                     </span>
                   </div>
                 </div>
@@ -192,7 +192,7 @@ export const Feedback = () => {
                 <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-6 text-center">
                   <div className="text-sm font-medium text-emerald-800 uppercase tracking-wide">Empathy Score</div>
                   <div className="text-4xl font-bold text-emerald-600 mt-1">
-                    {feedback.empathyScore.toFixed(1)}<span className="text-xl font-semibold text-emerald-500">/10</span>
+                    {feedback.empathyScore.toFixed(1)}<span className="text-xl font-semibold text-emerald-500">/100</span>
                   </div>
                   <p className="text-xs text-emerald-700 mt-1">Session empathy recognition</p>
                 </div>
@@ -295,7 +295,7 @@ export const Feedback = () => {
                         </div>
 
                         <div className="text-xs text-gray-500 pt-2 border-t">
-                          SPIKES Completion Score: {feedback.spikesCompletionScore.toFixed(1)}/10
+                          SPIKES Completion Score: {feedback.spikesCompletionScore.toFixed(1)}/100
                         </div>
                       </div>
                     )}
@@ -312,7 +312,7 @@ export const Feedback = () => {
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">Empathy Score</span>
                           <span className="text-xl font-bold text-emerald-600">
-                            {feedback.empathyScore.toFixed(1)}/10
+                            {feedback.empathyScore.toFixed(1)}/100
                           </span>
                         </div>
                         <div className="w-full h-4 bg-gray-200 rounded-full mt-2 overflow-hidden">
@@ -425,7 +425,7 @@ export const Feedback = () => {
                       </div>
                       <div>
                         <span className="font-medium">Overall Score:</span>{' '}
-                        <span className="font-bold">{feedback.overallScore.toFixed(1)}/10</span>
+                        <span className="font-bold">{feedback.overallScore.toFixed(1)}/100</span>
                       </div>
                       {feedback.latencyMsAvg > 0 && (
                         <div>
