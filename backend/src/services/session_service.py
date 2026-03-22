@@ -231,7 +231,7 @@ class SessionService:
     ) -> SessionListResponse:
         """List sessions for a user, optionally filtered by state."""
         sessions = self.session_repo.get_by_user(user_id, skip, limit, state=state)
-        total = len(sessions)
+        total = self.session_repo.count_by_user_and_state(user_id, state) if state else len(sessions)
         
         return SessionListResponse(
             sessions=[self._session_to_response(s) for s in sessions],
