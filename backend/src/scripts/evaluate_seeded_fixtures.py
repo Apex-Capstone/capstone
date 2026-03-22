@@ -80,13 +80,29 @@ async def main() -> None:
             print(f"=== {label} ===")
             print(f"  empathy_score:           {feedback.empathy_score}")
             print(f"  communication_score:     {feedback.communication_score}")
-            print(f"  clinical_reasoning_score:{feedback.clinical_reasoning_score}")
-            print(f"  professionalism_score:   {feedback.professionalism_score}")
             print(f"  overall_score:           {feedback.overall_score}")
             print(f"  spikes_completion_score: {feedback.spikes_completion_score}")
             print(f"  missed_opportunities:    {missed_count}")
             print(f"  suggested_responses:     {suggested_count}")
             print()
+
+            reviewer_meta = feedback.evaluator_meta or {}
+            if reviewer_meta:
+                print("=== Hybrid LLM evaluator meta ===")
+                print(f"  phase:                  {reviewer_meta.get('phase')}")
+                print(f"  status:                 {reviewer_meta.get('status')}")
+                rs = reviewer_meta.get("rule_scores") or {}
+                ls = reviewer_meta.get("llm_scores") or {}
+                ms = reviewer_meta.get("merged_scores") or {}
+                if rs:
+                    print(f"  rule empathy/comm/spikes: {rs.get('empathy_score')}, {rs.get('communication_score')}, {rs.get('spikes_completion_score')}")
+                if ls:
+                    print(f"  llm  empathy/comm/spikes: {ls.get('empathy_score')}, {ls.get('communication_score')}, {ls.get('spikes_completion_score')}")
+                if ms:
+                    print(f"  merged overall:         {ms.get('overall_score')}")
+                if reviewer_meta.get("status") == "failed":
+                    print(f"  failure_error:          {reviewer_meta.get('error')}")
+                print()
 
             for entry in turn_debug:
                 print(format_turn_debug_entry(entry))

@@ -17,10 +17,22 @@ from domain.models.sessions import SessionCreate
 from services.session_service import SessionService
 
 
+@pytest.fixture(autouse=True)
+def _ensure_plugin_registry_for_session_service(test_db):
+    """After SQLite schema is prepared, load plugins so create_session validation matches production."""
+    import plugins.evaluators.apex_baseline_evaluator  # noqa: F401
+    import plugins.evaluators.apex_hybrid_evaluator  # noqa: F401
+    import plugins.metrics.apex_metrics  # noqa: F401
+    import plugins.patient_models.default_llm_patient  # noqa: F401
+
+
 @pytest.fixture
 def test_db():
     """Create a test database session."""
     engine = create_engine("sqlite:///:memory:")
+    if engine.dialect.name == "sqlite":
+        for table in Base.metadata.tables.values():
+            table.schema = None
     Base.metadata.create_all(engine)
     TestingSessionLocal = sessionmaker(bind=engine)
     db = TestingSessionLocal()

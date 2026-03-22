@@ -1,6 +1,8 @@
 """Scoring service for empathy, communication, and SPIKES metrics."""
 
 import json
+import os
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from sqlalchemy.orm import Session
@@ -14,6 +16,109 @@ from plugins.registry import PluginRegistry
 from repositories.feedback_repo import FeedbackRepository
 from repositories.session_repo import SessionRepository
 from repositories.turn_repo import TurnRepository
+
+
+def _truncate_meta_str(value: str | None, max_len: int) -> str | None:
+    if value is None:
+        return None
+    if len(value) <= max_len:
+        return value
+    return value[: max_len - 1] + "…"
+
+
+def _compact_llm_output_for_evaluator_meta(llm_out: Any) -> dict[str, Any]:
+    """Persist a structured LLM summary without storing an unbounded raw dump."""
+    d = llm_out.model_dump(mode="json")
+    truncated = False
+    max_mo, max_ann = 40, 60
+    str_cap = 500
+
+    mos_raw = list(d.get("missed_opportunities") or [])
+    if len(mos_raw) > max_mo:
+        mos_raw = mos_raw[:max_mo]
+        truncated = True
+    new_mos: list[dict[str, Any]] = []
+    for m in mos_raw:
+        if not isinstance(m, dict):
+            continue
+        mm = dict(m)
+        for k in (
+            "patient_emotional_cue",
+            "clinician_response_summary",
+            "why_missed_or_weak",
+            "suggested_response",
+        ):
+            if isinstance(mm.get(k), str):
+                t = _truncate_meta_str(mm[k], str_cap)
+                if t != mm[k]:
+                    truncated = True
+                mm[k] = t
+        new_mos.append(mm)
+    d["missed_opportunities"] = new_mos
+
+    ann_raw = list(d.get("spikes_annotations") or [])
+    if len(ann_raw) > max_ann:
+        ann_raw = ann_raw[:max_ann]
+        truncated = True
+    new_ann: list[dict[str, Any]] = []
+    for a in ann_raw:
+        if not isinstance(a, dict):
+            continue
+        aa = dict(a)
+        if isinstance(aa.get("evidence_snippet"), str):
+            t = _truncate_meta_str(aa["evidence_snippet"], str_cap)
+            if t != aa["evidence_snippet"]:
+                truncated = True
+            aa["evidence_snippet"] = t
+        new_ann.append(aa)
+    d["spikes_annotations"] = new_ann
+
+    strengths = list(d.get("strengths") or [])
+    if len(strengths) > 25:
+        d["strengths"] = strengths[:25]
+        truncated = True
+    areas = list(d.get("areas_for_improvement") or [])
+    if len(areas) > 25:
+        d["areas_for_improvement"] = areas[:25]
+        truncated = True
+
+    if truncated:
+        d["_meta_truncated"] = True
+    return d
+
+
+@dataclass
+class _RuleFeedbackState:
+    """Rule-only computation snapshot before persistence (no LLM)."""
+
+    session_id: int
+    session: Any
+    turns: list
+    eo_spans: list[dict[str, Any]]
+    elicitation_spans: list[dict[str, Any]]
+    response_spans: list[dict[str, Any]]
+    eo_counts_by_dimension: dict[str, Any]
+    elicitation_counts_by_type: dict[str, Any]
+    response_counts_by_type: dict[str, Any]
+    spikes_coverage: dict[str, Any] | None
+    spikes_timestamps: dict[str, Any] | None
+    spikes_strategies: dict[str, Any] | None
+    question_breakdown: dict[str, Any]
+    eo_to_response_links: Any
+    missed_opportunities: Any
+    linkage_stats: Any
+    eo_to_elicitation_links: Any
+    missed_opportunities_by_dimension: Any
+    latency_ms_avg: float
+    empathy_score: float
+    communication_score: float
+    spikes_score: float
+    overall_score: float
+    rule_scores_for_textual_feedback: tuple[float, float, float]
+    strengths: str | None
+    improvements: str | None
+    timeline_events: list[TimelineEvent]
+    suggested_responses: list[SuggestedResponse]
 
 
 class ScoringService:
@@ -57,33 +162,195 @@ class ScoringService:
         score = round(float(score), 2)
         return max(0.0, min(100.0, score))
 
-    async def _generate_feedback_impl(self, session_id: int) -> FeedbackResponse:
-        """Internal implementation of feedback generation used by the default Evaluator."""
+    def _merge_rule_and_llm_component_scores(
+        self,
+        rule_empathy: float,
+        rule_communication: float,
+        rule_spikes: float,
+        llm_empathy: float,
+        llm_communication: float,
+        llm_spikes: float,
+    ) -> tuple[float, float, float, float]:
+        """Blend rule vs LLM component scores and recompute overall from merged components."""
+        e = 0.7 * rule_empathy + 0.3 * llm_empathy
+        c = 0.7 * rule_communication + 0.3 * llm_communication
+        s = 0.7 * rule_spikes + 0.3 * llm_spikes
+        o = 0.5 * e + 0.2 * c + 0.3 * s
+        return (
+            self._clamp_score(e),
+            self._clamp_score(c),
+            self._clamp_score(s),
+            self._clamp_score(o),
+        )
+
+    # Subscores use this when a component has no usable signal (missing metrics/spans),
+    # so the aggregate is not pulled toward 0 by absence of data.
+    _COMMUNICATION_MISSING_SUBSCORE = 50.0
+
+    # SPIKES strategy buckets from `_identify_spikes_strategies` that indicate signposting /
+    # structure. We intentionally omit "empathize" here: those phrases overlap strongly with
+    # empathy response detection and would double-count themes already reflected in empathy_score.
+    _COMMUNICATION_STRUCTURE_STRATEGIES = frozenset(
+        {"summarize", "acknowledge", "explore", "validate", "clarify"}
+    )
+
+    # Among classified (open+closed) questions, treat ~65% open as "enough" for full credit on
+    # the open-question term (empathy-oriented dialogue favors exploration over symmetry).
+    _QUESTION_OPEN_RATIO_TARGET = 0.65
+
+    def _compute_communication_score(
+        self,
+        turns: list,
+        question_breakdown: dict[str, Any],
+        spikes_strategies: dict[str, list[dict[str, Any]]],
+        all_spans: list[dict[str, Any]],
+    ) -> float:
+        """Deterministic communication quality score (0-100, pre-clamp).
+
+        Combines only rule/NLU signals we already persist: tone clarity/calmness,
+        question mix + AFCE elicitation spans, and SPIKES-adjacent signposting keywords.
+
+        Final formula (interpretable weights on 0-100 subscores):
+            communication_score =
+              0.40 * clarity_subscore +
+              0.35 * question_quality_subscore +
+              0.25 * structure_subscore
+
+        This deliberately does **not** reuse spikes_completion_score, SPIKES stage coverage
+        fractions, or the legacy (SPIKES coverage + open-question ratio) blend.
+
+        Subscore definitions:
+        - clarity_subscore: primarily ``tone.clear`` per clinician turn; ``tone.calm`` is a
+          smaller positive factor (85% / 15%). Turns without parseable ``tone`` are excluded
+          from the average; if none qualify, clarity_subscore = neutral (50).
+        - question_quality_subscore: rewards a **high** share of open questions (vs 50/50
+          symmetry) plus AFCE elicitation span density. Uses smoothed open ratio for small
+          question counts and a target threshold so closed questions are not implicitly ideal.
+        - structure_subscore: diversity of non-empathize signposting strategies from
+          ``_identify_spikes_strategies`` (summarize/clarify/explore/…); if none detected,
+          neutral (50).
+        """
+        clinician_turns = max(1, sum(1 for t in turns if t.role == "user"))
+
+        clarity_subscore = self._communication_clarity_subscore(turns)
+        question_quality_subscore = self._communication_question_quality_subscore(
+            question_breakdown, clinician_turns, all_spans
+        )
+        structure_subscore = self._communication_structure_subscore(spikes_strategies)
+
+        return (
+            0.40 * clarity_subscore
+            + 0.35 * question_quality_subscore
+            + 0.25 * structure_subscore
+        )
+
+    def _communication_clarity_subscore(self, turns: list) -> float:
+        """Tone clarity (primary) and calmness (secondary) over clinician turns with tone data."""
+        clear_vals: list[float] = []
+        calm_vals: list[float] = []
+        for turn in turns:
+            if turn.role != "user" or not turn.metrics_json:
+                continue
+            metrics = self._parse_metrics_json(turn.metrics_json)
+            if not metrics:
+                continue
+            tone = metrics.get("tone")
+            if not isinstance(tone, dict):
+                continue
+            # Require explicit booleans so we do not treat missing keys as False.
+            if "clear" not in tone or "calm" not in tone:
+                continue
+            if tone.get("clear") is True:
+                clear_vals.append(1.0)
+            elif tone.get("clear") is False:
+                clear_vals.append(0.0)
+            if tone.get("calm") is True:
+                calm_vals.append(1.0)
+            elif tone.get("calm") is False:
+                calm_vals.append(0.0)
+
+        if not clear_vals:
+            return self._COMMUNICATION_MISSING_SUBSCORE
+
+        clear_frac = sum(clear_vals) / len(clear_vals)
+        calm_frac = sum(calm_vals) / len(calm_vals) if calm_vals else clear_frac
+        return 100.0 * (0.85 * clear_frac + 0.15 * calm_frac)
+
+    def _communication_question_quality_subscore(
+        self,
+        question_breakdown: dict[str, Any],
+        clinician_turns: int,
+        all_spans: list[dict[str, Any]],
+    ) -> float:
+        """Open-question emphasis + elicitation span density (AFCE), capped and normalized.
+
+        Open share uses Beta-style smoothing (open+0.5)/(total+1) so very small question
+        counts are not all-or-nothing. The open term is min(1, r_smooth / target); target
+        is ``_QUESTION_OPEN_RATIO_TARGET`` (~0.65), i.e. rewards higher open ratio without
+        requiring 100% open and without treating 50/50 as ideal.
+        """
+        open_count = int(question_breakdown.get("open") or 0)
+        closed_count = int(question_breakdown.get("closed") or 0)
+        total_classified = open_count + closed_count
+
+        elicitation_count = sum(
+            1 for s in all_spans if s.get("span_type") == "elicitation"
+        )
+        density = elicitation_count / float(clinician_turns)
+        # Cap typical density (~0.25 elicitation spans per clinician turn) at full credit.
+        elicitation_part = min(1.0, density / 0.25)
+
+        if total_classified > 0:
+            # Smoothed fraction open in (0,1); stabilizes 1–2 question sessions.
+            ratio_open_smooth = (open_count + 0.5) / float(total_classified + 1.0)
+            open_part = min(
+                1.0,
+                ratio_open_smooth / self._QUESTION_OPEN_RATIO_TARGET,
+            )
+            return 100.0 * (0.55 * open_part + 0.45 * elicitation_part)
+
+        if elicitation_count > 0:
+            return 100.0 * elicitation_part
+
+        return self._COMMUNICATION_MISSING_SUBSCORE
+
+    def _communication_structure_subscore(
+        self,
+        spikes_strategies: dict[str, list[dict[str, Any]]],
+    ) -> float:
+        """Signposting / structure from SPIKES-stage keyword buckets (not stage completion)."""
+        seen: set[str] = set()
+        for _stage, events in (spikes_strategies or {}).items():
+            for ev in events or []:
+                name = ev.get("strategy")
+                if isinstance(name, str) and name in self._COMMUNICATION_STRUCTURE_STRATEGIES:
+                    seen.add(name)
+        if not seen:
+            return self._COMMUNICATION_MISSING_SUBSCORE
+        return 100.0 * (len(seen) / len(self._COMMUNICATION_STRUCTURE_STRATEGIES))
+
+    async def _compute_rule_feedback_state(self, session_id: int) -> _RuleFeedbackState:
+        """Compute rule-only metrics, scores, textual feedback, and timeline (no LLM, no env checks)."""
         session = self.session_repo.get_by_id(session_id)
         if not session:
             raise NotFoundError(f"Session {session_id} not found")
-        
+
         turns = self.turn_repo.get_by_session(session_id)
-        
-        # Extract spans from all turns
+
         all_spans = self._extract_spans_from_turns(turns)
-        
-        # Calculate AFCE-structured metrics from spans
+
         eo_counts_by_dimension = self._calculate_eo_counts_by_dimension(all_spans)
         elicitation_counts_by_type = self._calculate_elicitation_counts_by_type(all_spans)
         response_counts_by_type = self._calculate_response_counts_by_type(all_spans)
-        
-        # Calculate AFCE / SPIKES-based components
+
         spikes_coverage = self._analyze_spikes_coverage(turns)
         spikes_timestamps = self._calculate_spikes_timestamps(turns)
         spikes_strategies = self._identify_spikes_strategies(turns)
-        
-        # Calculate questioning metrics
+
         question_breakdown = self._calculate_question_breakdown(turns)
-        
-        # EO→response linking (for UI empathy + coverage metrics)
+
         eo_spans, elicitation_spans, response_spans = self._collect_span_lists(all_spans)
-        eo_to_response_links, missed_opportunities, linkage_stats = self._compute_eo_linking(
+        eo_to_response_links, missed_opportunities, linkage_stats, _eo_id_to_span = self._compute_eo_linking(
             eo_spans, response_spans, elicitation_spans, turns
         )
         eo_to_elicitation_links = self._compute_eo_to_elicitation_links(
@@ -93,12 +360,8 @@ class ScoringService:
             missed_opportunities, eo_spans
         )
 
-        # Calculate performance metrics
         latency_ms_avg = self._calculate_latency_ms_avg(turns)
 
-        # ---- UI-facing composite scores (0-100)
-        
-        # Empathy score: EO coverage + empathy response frequency
         total_eos = linkage_stats.get("total_eos", 0) if linkage_stats else 0
         addressed_count = linkage_stats.get("addressed_count", 0) if linkage_stats else 0
         empathy_response_count = sum(response_counts_by_type.values()) if response_counts_by_type else 0
@@ -106,158 +369,271 @@ class ScoringService:
         eo_coverage = (addressed_count / total_eos) if total_eos > 0 else 0.0
         empathy_frequency = (empathy_response_count / total_clinician_turns) if total_clinician_turns > 0 else 0.0
         empathy_score = (0.7 * eo_coverage + 0.3 * empathy_frequency) * 100.0
-        
-        # Addressed rate for EO→response performance; if no EOs, treat as fully addressed.
-        addressed_rate = (addressed_count / total_eos) if total_eos > 0 else 1.0
 
-        # Communication score: SPIKES coverage + open-question ratio (with safety handling)
-        spikes_coverage_percent = 0.0
-        if spikes_coverage and isinstance(spikes_coverage, dict):
-            spikes_coverage_percent = float(spikes_coverage.get("percent", 0.0)) * 100.0
-        ratio_open = 0.0
-        if question_breakdown and isinstance(question_breakdown, dict):
-            ratio_open = float(question_breakdown.get("ratio_open", 0.0)) * 100.0
-        communication_score = (0.7 * spikes_coverage_percent) + (0.3 * ratio_open)
+        spikes_score = self._calculate_spikes_completion(session, turns, all_spans)
 
-        # Clinical reasoning score: SPIKES reasoning stages modulated by empathy performance
-        stages_reached = set()
-        for turn in turns:
-            if turn.spikes_stage:
-                stage = str(turn.spikes_stage).lower()
-                if stage in ["knowledge", "k"]:
-                    stages_reached.add("knowledge")
-                if stage in ["strategy", "summary", "s2"]:
-                    stages_reached.add("strategy")
-                if stage in ["perception", "p"]:
-                    stages_reached.add("perception")
-        
-        # Stage presence indicators
-        knowledge_detected = 1.0 if "knowledge" in stages_reached else 0.0
-        strategy_detected = 1.0 if "strategy" in stages_reached else 0.0
-        perception_detected = 1.0 if "perception" in stages_reached else 0.0
-
-        # Stage score: perception (20), knowledge (40), strategy (40) → max 100
-        stage_score = (
-            perception_detected * 20.0
-            + knowledge_detected * 40.0
-            + strategy_detected * 40.0
+        communication_score = self._compute_communication_score(
+            turns, question_breakdown, spikes_strategies, all_spans
         )
-        
-        # Empathy modifier: 0.5–1.0 based on addressed_rate
-        empathy_modifier = 0.5 + 0.5 * max(0.0, min(1.0, addressed_rate))
-        clinical_reasoning_score = stage_score * empathy_modifier
 
-        # Professionalism score: calm clinician turns, penalty for unclear tone
-        total_tone_turns = 0
-        calm_turns = 0
-        unclear_turns = 0
-        for turn in turns:
-            if turn.role != "user" or not turn.metrics_json:
-                continue
-            metrics = self._parse_metrics_json(turn.metrics_json)
-            if not metrics:
-                continue
-            total_tone_turns += 1
-            tone = metrics.get("tone") or {}
-            if tone.get("calm"):
-                calm_turns += 1
-            if tone.get("clear") is False:
-                unclear_turns += 1
-        base_prof = (calm_turns / total_tone_turns) * 100.0 if total_tone_turns > 0 else 0.0
-        professionalism_score = base_prof - (unclear_turns * 5.0)
-
-        # Overall score: weighted combination
-        overall_score = (
-            0.35 * communication_score
-            + 0.35 * empathy_score
-            + 0.20 * clinical_reasoning_score
-            + 0.10 * professionalism_score
-        )
-        
-        # Clamp all scores to [0, 100]
         empathy_score = self._clamp_score(empathy_score)
         communication_score = self._clamp_score(communication_score)
-        clinical_reasoning_score = self._clamp_score(clinical_reasoning_score)
-        professionalism_score = self._clamp_score(professionalism_score)
-        overall_score = self._clamp_score(round(overall_score, 2))
+        spikes_score = self._clamp_score(spikes_score)
+        overall_score = self._clamp_score(
+            round(
+                0.5 * empathy_score + 0.2 * communication_score + 0.3 * spikes_score,
+                2,
+            )
+        )
 
-        # SPIKES completion score (0-100, UI-facing)
-        spikes_score = self._calculate_spikes_completion(session, turns, all_spans)
-        
-        # Placeholder fields for fairness/reliability (only include if populated)
-        bias_probe_info = None  # Would be populated by bias testing framework
-        evaluator_meta = None  # Would be populated by evaluation system
-        
-        # Generate textual feedback
-        strengths, improvements = self._generate_textual_feedback(
+        rule_scores_for_textual_feedback = (
             empathy_score,
             communication_score,
-            clinical_reasoning_score,
+            spikes_score,
+        )
+
+        strengths, improvements = self._generate_textual_feedback(
+            rule_scores_for_textual_feedback[0],
+            rule_scores_for_textual_feedback[1],
+            rule_scores_for_textual_feedback[2],
             eo_spans,
         )
 
-        # Generate timeline events and suggested responses
         timeline_events = self._build_timeline_events(
             eo_spans, missed_opportunities, response_spans, turns
         )
         suggested_responses = self._build_suggested_responses(missed_opportunities, turns)
-        
-        # Create or update feedback
+
+        return _RuleFeedbackState(
+            session_id=session_id,
+            session=session,
+            turns=turns,
+            eo_spans=eo_spans,
+            elicitation_spans=elicitation_spans,
+            response_spans=response_spans,
+            eo_counts_by_dimension=eo_counts_by_dimension,
+            elicitation_counts_by_type=elicitation_counts_by_type,
+            response_counts_by_type=response_counts_by_type,
+            spikes_coverage=spikes_coverage,
+            spikes_timestamps=spikes_timestamps,
+            spikes_strategies=spikes_strategies,
+            question_breakdown=question_breakdown,
+            eo_to_response_links=eo_to_response_links,
+            missed_opportunities=missed_opportunities,
+            linkage_stats=linkage_stats,
+            eo_to_elicitation_links=eo_to_elicitation_links,
+            missed_opportunities_by_dimension=missed_opportunities_by_dimension,
+            latency_ms_avg=latency_ms_avg,
+            empathy_score=empathy_score,
+            communication_score=communication_score,
+            spikes_score=spikes_score,
+            overall_score=overall_score,
+            rule_scores_for_textual_feedback=rule_scores_for_textual_feedback,
+            strengths=strengths,
+            improvements=improvements,
+            timeline_events=timeline_events,
+            suggested_responses=suggested_responses,
+        )
+
+    async def _hybrid_llm_merge_scores(
+        self,
+        state: _RuleFeedbackState,
+        session_id: int,
+    ) -> tuple[float, float, float, float, dict[str, Any] | None]:
+        """LLM transcript review + 70/30 merge. LLM imports only run inside this method."""
+        rule_snapshot = {
+            "empathy_score": float(state.empathy_score),
+            "communication_score": float(state.communication_score),
+            "spikes_completion_score": float(state.spikes_score),
+            "overall_score": float(state.overall_score),
+        }
+        real_llm_enabled = os.getenv("LLM_REVIEWER_REAL_CALLS", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        if not real_llm_enabled:
+            return (
+                state.empathy_score,
+                state.communication_score,
+                state.spikes_score,
+                state.overall_score,
+                None,
+            )
+
+        from schemas.llm_reviewer import LLMReviewerInput, TranscriptTurnLite
+        from services.llm_reviewer_service import LLMReviewerService
+        from adapters.llm.openai_adapter import OpenAIAdapter
+
+        try:
+            transcript_context: list[Any] = []
+            for t in state.turns:
+                speaker = "clinician" if t.role == "user" else "patient"
+                transcript_context.append(
+                    TranscriptTurnLite(
+                        turn_number=t.turn_number,
+                        speaker=speaker,
+                        text=t.text or "",
+                    )
+                )
+
+            payload = LLMReviewerInput(
+                session_id=session_id,
+                case_id=getattr(state.session, "case_id", None),
+                transcript_context=transcript_context,
+                reviewer_version="v1",
+            )
+
+            reviewer = LLMReviewerService(OpenAIAdapter())
+            llm_output = await reviewer.review(payload)
+
+            if llm_output is None:
+                return (
+                    state.empathy_score,
+                    state.communication_score,
+                    state.spikes_score,
+                    state.overall_score,
+                    {
+                        "phase": "hybrid_llm_v1",
+                        "status": "failed",
+                        "error": "llm_reviewer_returned_none",
+                        "rule_scores": rule_snapshot,
+                        "llm_scores": None,
+                        "merged_scores": None,
+                    },
+                )
+
+            llm_snapshot = {
+                "empathy_score": float(llm_output.empathy_score),
+                "communication_score": float(llm_output.communication_score),
+                "spikes_completion_score": float(llm_output.spikes_completion_score),
+                "overall_score": float(llm_output.overall_score),
+            }
+            me, mc, ms, mo = self._merge_rule_and_llm_component_scores(
+                rule_snapshot["empathy_score"],
+                rule_snapshot["communication_score"],
+                rule_snapshot["spikes_completion_score"],
+                llm_snapshot["empathy_score"],
+                llm_snapshot["communication_score"],
+                llm_snapshot["spikes_completion_score"],
+            )
+            merged_snapshot = {
+                "empathy_score": me,
+                "communication_score": mc,
+                "spikes_completion_score": ms,
+                "overall_score": mo,
+            }
+            evaluator_meta = {
+                "phase": "hybrid_llm_v1",
+                "status": "success",
+                "merge_policy": {
+                    "components": "0.7 * rule + 0.3 * llm",
+                    "overall": "0.5 * merged_empathy + 0.2 * merged_communication + 0.3 * merged_spikes",
+                },
+                "rule_scores": rule_snapshot,
+                "llm_scores": llm_snapshot,
+                "merged_scores": merged_snapshot,
+                "llm_output": _compact_llm_output_for_evaluator_meta(llm_output),
+            }
+            return (me, mc, ms, mo, evaluator_meta)
+        except Exception as e:
+            return (
+                state.empathy_score,
+                state.communication_score,
+                state.spikes_score,
+                state.overall_score,
+                {
+                    "phase": "hybrid_llm_v1",
+                    "status": "failed",
+                    "error": str(e)[:500],
+                    "rule_scores": rule_snapshot,
+                    "llm_scores": None,
+                    "merged_scores": None,
+                },
+            )
+
+    async def _persist_feedback_from_rule_state(
+        self,
+        state: _RuleFeedbackState,
+        *,
+        empathy_score: float,
+        communication_score: float,
+        spikes_score: float,
+        overall_score: float,
+        evaluator_meta: dict[str, Any] | None,
+    ) -> FeedbackResponse:
+        """Persist feedback row and return FeedbackResponse (shared by baseline and hybrid)."""
+        session_id = state.session_id
+        bias_probe_info = None
+
         existing_feedback = self.feedback_repo.get_by_session(session_id)
         if existing_feedback:
             feedback = existing_feedback
         else:
             feedback = Feedback(session_id=session_id)
-        
-        # Set aggregate scores
+
         feedback.empathy_score = empathy_score
         feedback.communication_score = communication_score
-        feedback.clinical_reasoning_score = clinical_reasoning_score
-        feedback.professionalism_score = professionalism_score
+        feedback.clinical_reasoning_score = None
+        feedback.professionalism_score = None
         feedback.spikes_completion_score = spikes_score
         feedback.overall_score = overall_score
-        
-        # Set AFCE-structured metrics (only if data exists)
-        feedback.eo_counts_by_dimension = json.dumps(eo_counts_by_dimension) if eo_counts_by_dimension is not None else None
-        feedback.elicitation_counts_by_type = json.dumps(elicitation_counts_by_type) if elicitation_counts_by_type is not None else None
-        feedback.response_counts_by_type = json.dumps(response_counts_by_type) if response_counts_by_type is not None else None
-        
-        # Placeholders for Part 2 (only set if data exists)
-        feedback.linkage_stats = json.dumps(linkage_stats) if linkage_stats is not None else None
-        feedback.missed_opportunities_by_dimension = json.dumps(missed_opportunities_by_dimension) if missed_opportunities_by_dimension is not None else None
-        feedback.eo_to_elicitation_links = json.dumps(eo_to_elicitation_links) if eo_to_elicitation_links is not None else None
-        feedback.eo_to_response_links = json.dumps(eo_to_response_links) if eo_to_response_links is not None else None
-        feedback.missed_opportunities = json.dumps(missed_opportunities) if missed_opportunities is not None else None
 
-        # Set SPIKES metrics (only if data exists)
-        feedback.spikes_coverage = json.dumps(spikes_coverage) if spikes_coverage is not None else None
-        feedback.spikes_timestamps = json.dumps(spikes_timestamps) if spikes_timestamps is not None else None
-        feedback.spikes_strategies = json.dumps(spikes_strategies) if spikes_strategies is not None else None
+        feedback.eo_counts_by_dimension = (
+            json.dumps(state.eo_counts_by_dimension) if state.eo_counts_by_dimension is not None else None
+        )
+        feedback.elicitation_counts_by_type = (
+            json.dumps(state.elicitation_counts_by_type) if state.elicitation_counts_by_type is not None else None
+        )
+        feedback.response_counts_by_type = (
+            json.dumps(state.response_counts_by_type) if state.response_counts_by_type is not None else None
+        )
 
-        # Set questioning metrics (only if data exists)
-        feedback.question_breakdown = json.dumps(question_breakdown) if question_breakdown is not None else None
+        feedback.linkage_stats = json.dumps(state.linkage_stats) if state.linkage_stats is not None else None
+        feedback.missed_opportunities_by_dimension = (
+            json.dumps(state.missed_opportunities_by_dimension)
+            if state.missed_opportunities_by_dimension is not None
+            else None
+        )
+        feedback.eo_to_elicitation_links = (
+            json.dumps(state.eo_to_elicitation_links) if state.eo_to_elicitation_links is not None else None
+        )
+        feedback.eo_to_response_links = (
+            json.dumps(state.eo_to_response_links) if state.eo_to_response_links is not None else None
+        )
+        feedback.missed_opportunities = (
+            json.dumps(state.missed_opportunities) if state.missed_opportunities is not None else None
+        )
 
-        # Set metadata (only if data exists)
+        feedback.spikes_coverage = json.dumps(state.spikes_coverage) if state.spikes_coverage is not None else None
+        feedback.spikes_timestamps = json.dumps(state.spikes_timestamps) if state.spikes_timestamps is not None else None
+        feedback.spikes_strategies = json.dumps(state.spikes_strategies) if state.spikes_strategies is not None else None
+
+        feedback.question_breakdown = json.dumps(state.question_breakdown) if state.question_breakdown is not None else None
+
         feedback.bias_probe_info = json.dumps(bias_probe_info) if bias_probe_info is not None else None
         feedback.evaluator_meta = json.dumps(evaluator_meta) if evaluator_meta is not None else None
-        feedback.latency_ms_avg = latency_ms_avg  # Always include (0.0 is valid)
-        
-        # Set textual feedback (only if data exists)
-        feedback.strengths = strengths if strengths and strengths.strip() else None
-        feedback.areas_for_improvement = improvements if improvements and improvements.strip() else None
+        feedback.latency_ms_avg = state.latency_ms_avg
+
+        feedback.strengths = state.strengths if state.strengths and state.strengths.strip() else None
+        feedback.areas_for_improvement = (
+            state.improvements if state.improvements and state.improvements.strip() else None
+        )
         feedback.detailed_feedback = f"Overall Score: {overall_score:.1f}/100" if overall_score >= 0 else None
-        
+
         if existing_feedback:
             saved_feedback = self.feedback_repo.update(feedback)
         else:
             saved_feedback = self.feedback_repo.create(feedback)
-        
-        # Deserialize JSON fields before creating response (only AFCE + SPIKES + approved metadata)
+
         saved_feedback.eo_counts_by_dimension = self._deserialize_json_field(saved_feedback.eo_counts_by_dimension)
         saved_feedback.elicitation_counts_by_type = self._deserialize_json_field(saved_feedback.elicitation_counts_by_type)
         saved_feedback.response_counts_by_type = self._deserialize_json_field(saved_feedback.response_counts_by_type)
         saved_feedback.linkage_stats = self._deserialize_json_field(saved_feedback.linkage_stats)
-        saved_feedback.missed_opportunities_by_dimension = self._deserialize_json_field(saved_feedback.missed_opportunities_by_dimension)
+        saved_feedback.missed_opportunities_by_dimension = self._deserialize_json_field(
+            saved_feedback.missed_opportunities_by_dimension
+        )
         saved_feedback.eo_to_elicitation_links = self._deserialize_json_field(saved_feedback.eo_to_elicitation_links)
         saved_feedback.eo_to_response_links = self._deserialize_json_field(saved_feedback.eo_to_response_links)
         saved_feedback.missed_opportunities = self._deserialize_json_field(saved_feedback.missed_opportunities)
@@ -267,32 +643,50 @@ class ScoringService:
         saved_feedback.question_breakdown = self._deserialize_json_field(saved_feedback.question_breakdown)
         saved_feedback.bias_probe_info = self._deserialize_json_field(saved_feedback.bias_probe_info)
         saved_feedback.evaluator_meta = self._deserialize_json_field(saved_feedback.evaluator_meta)
-        
-        # Add span-level data for turn-level analysis (already collected above)
-        saved_feedback.eo_spans = eo_spans
-        saved_feedback.elicitation_spans = elicitation_spans
-        saved_feedback.response_spans = response_spans
-        
-        # Add relations placeholder (will be populated in Part 2)
-        saved_feedback.relations = None  # Will be computed from relations_json in Part 2
 
-        # Create response with timeline and suggestions
+        saved_feedback.eo_spans = state.eo_spans
+        saved_feedback.elicitation_spans = state.elicitation_spans
+        saved_feedback.response_spans = state.response_spans
+
+        saved_feedback.relations = None
+
         response = FeedbackResponse.model_validate(saved_feedback)
 
-        # Detach the ORM instance so that deserialized JSON fields (dict/list)
-        # on saved_feedback do not get re-flushed on later commits in the same
-        # SQLAlchemy session (important for SQLite test/eval runs).
         try:
             self.db.expunge(saved_feedback)
         except Exception:
-            # Best-effort; if expunge fails, we still return the response.
             pass
 
         return response.model_copy(
             update={
-                "timeline_events": timeline_events or None,
-                "suggested_responses": suggested_responses or None,
+                "timeline_events": state.timeline_events or None,
+                "suggested_responses": state.suggested_responses or None,
             }
+        )
+
+    async def generate_feedback_rule_only(self, session_id: int) -> FeedbackResponse:
+        """100% rule-based feedback (baseline evaluator path). No LLM."""
+        state = await self._compute_rule_feedback_state(session_id)
+        return await self._persist_feedback_from_rule_state(
+            state,
+            empathy_score=state.empathy_score,
+            communication_score=state.communication_score,
+            spikes_score=state.spikes_score,
+            overall_score=state.overall_score,
+            evaluator_meta={"phase": "baseline_rule_v1"},
+        )
+
+    async def generate_feedback_hybrid(self, session_id: int) -> FeedbackResponse:
+        """Rule-based core then optional LLM merge + 70/30 (hybrid evaluator path)."""
+        state = await self._compute_rule_feedback_state(session_id)
+        e, c, s, o, meta = await self._hybrid_llm_merge_scores(state, session_id)
+        return await self._persist_feedback_from_rule_state(
+            state,
+            empathy_score=e,
+            communication_score=c,
+            spikes_score=s,
+            overall_score=o,
+            evaluator_meta=meta,
         )
 
     async def generate_feedback(self, session_id: int) -> FeedbackResponse:
@@ -398,10 +792,11 @@ class ScoringService:
         response_spans: list[dict],
         turns: list,
     ) -> dict[int, list[dict]]:
-        """Link EOs to responses within [eo_turn - 1, eo_turn + 2].
-        
-        Includes proactive empathy (clinician response before patient EO)
-        and responses in the next 1-2 clinician turns after the EO.
+        """Link EOs to responses in the immediate next clinician turn only.
+
+        A response span can address an EO only when it appears in the first
+        clinician turn after the EO turn. Later clinician turns are invalid and
+        cannot retroactively resolve that EO.
         
         Returns:
             dict mapping EO turn_number to list of linked response spans
@@ -418,7 +813,7 @@ class ScoringService:
                     responses_by_turn[turn_num] = []
                 responses_by_turn[turn_num].append(response_span)
         
-        # For each EO, find responses in [eo_turn - 1, eo_turn + 2]
+        # For each EO, find responses only in the next clinician turn
         eo_to_responses = {}
         
         for eo_span in eo_spans:
@@ -436,219 +831,52 @@ class ScoringService:
                 continue
             
             linked_responses = []
-            
-            # Check clinician turns in [eo_turn - 1, eo_turn + 2] (inclusive)
-            for turn_num in range(eo_turn_num - 1, eo_turn_num + 3):
-                if turn_num < 1:
+            for response_span in response_spans:
+                response_turn_num = response_span.get("turn_number")
+                if response_turn_num is None:
                     continue
-                if turn_num not in turn_map:
-                    continue
-                candidate_turn = turn_map[turn_num]
-                if candidate_turn.role != "user":
-                    continue
-                if turn_num in responses_by_turn:
-                    linked_responses.extend(responses_by_turn[turn_num])
-            
+                if self._is_temporally_valid_response_link(
+                    eo_turn_number=eo_turn_num,
+                    response_turn_number=response_turn_num,
+                    turn_map=turn_map,
+                ):
+                    linked_responses.append(response_span)
+
             eo_to_responses[eo_turn_num] = linked_responses
         
         return eo_to_responses
-    
-    def _calculate_empathy_score_from_afce(
+
+    def _is_temporally_valid_response_link(
         self,
-        eo_counts_by_dimension: dict,
-        response_counts_by_type: dict,
-        all_spans: list,
-        turns: list,
-    ) -> float:
-        """Calculate composite empathy score from AFCE-style EO→response performance.
-        
-        Components:
-        - EO Coverage Score (0-10): 50% weight
-        - Dimension Matching Score (0-10): 30% weight  
-        - Timing/Sequencing Score (0-10): 20% weight
-        """
-        # Extract EO and response spans
-        eo_spans = [s for s in all_spans if s.get("span_type") == "eo"]
-        response_spans = [s for s in all_spans if s.get("span_type") == "response"]
-        
-        # If no EOs detected, return 0.0
-        if not eo_spans:
-            return 0.0
-        
-        # Link EOs to responses
-        eo_to_responses = self._link_eos_to_responses(eo_spans, response_spans, turns)
-        
-        # 2.1 EO Coverage Score
-        addressed_explicit = 0
-        addressed_implicit = 0
-        missed_explicit = 0
-        missed_implicit = 0
-        
-        for eo_span in eo_spans:
-            eo_turn_num = eo_span.get("turn_number")
-            dimension = eo_span.get("dimension")
-            explicit_implicit = eo_span.get("explicit_or_implicit")
-            
-            if eo_turn_num is None or explicit_implicit not in ["explicit", "implicit"]:
-                continue
-            
-            # Check if this EO has at least one linked response
-            has_response = eo_turn_num in eo_to_responses and len(eo_to_responses[eo_turn_num]) > 0
-            
-            if has_response:
-                if explicit_implicit == "explicit":
-                    addressed_explicit += 1
-                else:
-                    addressed_implicit += 1
-            else:
-                if explicit_implicit == "explicit":
-                    missed_explicit += 1
-                else:
-                    missed_implicit += 1
-        
-        total_eos = len(eo_spans)
-        total_explicit = addressed_explicit + missed_explicit
-        total_implicit = addressed_implicit + missed_implicit
-        
-        if total_eos == 0:
-            eo_coverage_score = 0.0
-        else:
-            # Calculate raw coverage
-            coverage_raw = (
-                1.0 * addressed_explicit +
-                1.2 * addressed_implicit -
-                1.5 * missed_explicit -
-                1.0 * missed_implicit
-            )
-            
-            # Normalize to 0-10
-            max_possible = max(1, 1.2 * total_eos)  # best case: all implicit and addressed
-            min_possible = -(1.5 * total_explicit + 1.0 * total_implicit)  # worst case: all missed
-            
-            if max_possible - min_possible == 0:
-                coverage_norm_clamped = 0.0
-            else:
-                coverage_norm = (coverage_raw - min_possible) / (max_possible - min_possible)
-                coverage_norm_clamped = min(1.0, max(0.0, coverage_norm))
-            
-            eo_coverage_score = coverage_norm_clamped * 10.0
-        
-        # 2.2 Dimension Matching Score
-        num_addressed_eos = addressed_explicit + addressed_implicit
-        total_match_points = 0.0
-        
-        if num_addressed_eos > 0:
-            for eo_span in eo_spans:
-                eo_turn_num = eo_span.get("turn_number")
-                dimension = eo_span.get("dimension")
-                
-                if eo_turn_num is None or eo_turn_num not in eo_to_responses:
-                    continue
-                
-                linked_responses = eo_to_responses[eo_turn_num]
-                if not linked_responses:
-                    continue
-                
-                # Check if at least one response is dimension-appropriate
-                matched = False
-                partially_matched = False
-                
-                for response_span in linked_responses:
-                    response_type = response_span.get("type")
-                    
-                    if dimension == "Feeling":
-                        # Any response type counts as matched for Feeling
-                        matched = True
-                        break
-                    elif dimension == "Judgment":
-                        # sharing or understanding count as matched
-                        if response_type in ["sharing", "understanding"]:
-                            matched = True
-                            break
-                        elif response_type == "acceptance":
-                            partially_matched = True
-                    elif dimension == "Appreciation":
-                        # sharing or acceptance count as matched
-                        if response_type in ["sharing", "acceptance"]:
-                            matched = True
-                            break
-                        elif response_type == "understanding":
-                            partially_matched = True
-                
-                if matched:
-                    total_match_points += 1.0
-                elif partially_matched:
-                    total_match_points += 0.5
-                # If no response matched, already penalized in coverage, so add 0
-            
-            dimension_matching_score = (total_match_points / num_addressed_eos) * 10.0
-        else:
-            dimension_matching_score = 0.0
-        
-        # 2.3 Timing/Sequencing Score
-        total_timing_points = 0.0
-        
-        if num_addressed_eos > 0:
-            # Create a map of turn_number -> turn for quick lookup
-            turn_map = {turn.turn_number: turn for turn in turns}
-            
-            for eo_span in eo_spans:
-                eo_turn_num = eo_span.get("turn_number")
-                
-                if eo_turn_num is None or eo_turn_num not in eo_to_responses:
-                    continue
-                
-                linked_responses = eo_to_responses[eo_turn_num]
-                if not linked_responses:
-                    continue
-                
-                # Find the earliest clinician turn with a response
-                earliest_response_turn = None
-                for response_span in linked_responses:
-                    resp_turn_num = response_span.get("turn_number")
-                    if resp_turn_num and resp_turn_num in turn_map:
-                        resp_turn = turn_map[resp_turn_num]
-                        if resp_turn.role == "user":  # clinician turn
-                            if earliest_response_turn is None or resp_turn_num < earliest_response_turn:
-                                earliest_response_turn = resp_turn_num
-                
-                if earliest_response_turn is None:
-                    continue
-                
-                # Count clinician turns between EO and response (excluding response turn itself)
-                clinician_turn_count = 0
-                current_turn_num = eo_turn_num + 1
-                
-                while current_turn_num < earliest_response_turn:
-                    if current_turn_num in turn_map:
-                        turn = turn_map[current_turn_num]
-                        if turn.role == "user":  # clinician turn
-                            clinician_turn_count += 1
-                    current_turn_num += 1
-                
-                # Assign timing score
-                # If response is in first clinician turn after EO (clinician_turn_count == 0), score = 1.0
-                # If response is in second clinician turn after EO (clinician_turn_count == 1), score = 0.5
-                if clinician_turn_count == 0:
-                    total_timing_points += 1.0  # response in next clinician turn
-                elif clinician_turn_count == 1:
-                    total_timing_points += 0.5  # response in second clinician turn
-                # else: 0 (later or same turn)
-            
-            timing_sequencing_score = (total_timing_points / num_addressed_eos) * 10.0
-        else:
-            timing_sequencing_score = 0.0
-        
-        # 2.4 Final Empathy Score
-        empathy_score = (
-            0.5 * eo_coverage_score +
-            0.3 * dimension_matching_score +
-            0.2 * timing_sequencing_score
+        eo_turn_number: int,
+        response_turn_number: int,
+        turn_map: dict[int, Any],
+    ) -> bool:
+        """Return True only when response is in EO's next clinician turn."""
+        if response_turn_number <= eo_turn_number:
+            return False
+
+        next_clinician_turn = self._get_next_clinician_turn_number(
+            eo_turn_number=eo_turn_number,
+            turn_map=turn_map,
         )
-        
-        # Clamp to [0, 10] and round
-        empathy_score = min(10.0, max(0.0, empathy_score))
-        return round(empathy_score, 2)
+        if next_clinician_turn is None:
+            return False
+
+        return response_turn_number == next_clinician_turn
+
+    def _get_next_clinician_turn_number(
+        self,
+        eo_turn_number: int,
+        turn_map: dict[int, Any],
+    ) -> int | None:
+        """Find the next user/clinician turn after a given EO turn."""
+        max_turn = max(turn_map.keys(), default=0)
+        for turn_number in range(eo_turn_number + 1, max_turn + 1):
+            turn = turn_map.get(turn_number)
+            if turn and turn.role == "user":
+                return turn_number
+        return None
     
     def _compute_eo_linking(
         self,
@@ -656,11 +884,11 @@ class ScoringService:
         response_spans: list,
         elicitation_spans: list,
         turns: list,
-    ) -> tuple[list, list, dict]:
+    ) -> tuple[list, list, dict, dict]:
         """Compute EO→response links, missed opportunities, and linkage stats.
         
         Returns:
-            Tuple of (eo_to_response_links, missed_opportunities, linkage_stats)
+            Tuple of (eo_to_response_links, missed_opportunities, linkage_stats, eo_id_to_span)
         """
         # Link EOs to responses
         eo_to_responses_map = self._link_eos_to_responses(eo_spans, response_spans, turns)
@@ -674,6 +902,7 @@ class ScoringService:
         # Create span ID mapping (use turn_number + index as ID)
         span_id_map = {}
         next_id = 1
+        eo_id_to_span: dict[str, dict[str, Any]] = {}
         
         # Assign IDs to EOs
         eo_id_map = {}
@@ -681,6 +910,7 @@ class ScoringService:
             eo_id = f"eo_{next_id}"
             eo_id_map[id(eo)] = eo_id
             span_id_map[eo_id] = eo
+            eo_id_to_span[eo_id] = eo
             next_id += 1
         
         # Assign IDs to responses (use index-based matching since objects may differ)
@@ -756,7 +986,7 @@ class ScoringService:
                 eo_to_response_links_dict[source_id] = []
             eo_to_response_links_dict[source_id].append(link)
         
-        return eo_to_response_links_dict, missed_opportunities, linkage_stats
+        return eo_to_response_links_dict, missed_opportunities, linkage_stats, eo_id_to_span
     
     def _compute_eo_to_elicitation_links(
         self,
@@ -989,7 +1219,7 @@ class ScoringService:
         self,
         empathy_score: float,
         communication_score: float,
-        clinical_reasoning_score: float,
+        spikes_completion_score: float,
         eo_spans: list | None = None,
     ) -> tuple[str, str]:
         """Generate strengths and improvement areas (scores are 0-100)."""
@@ -999,23 +1229,25 @@ class ScoringService:
         if eo_spans is None:
             eo_spans = []
 
-        # Strengths if score > 70
         if empathy_score > 70:
             strengths.append("Excellent use of empathetic language")
         if communication_score > 70:
-            strengths.append("Strong communication and SPIKES coverage")
-        if clinical_reasoning_score > 70:
-            strengths.append("Good clinical reasoning and protocol adherence")
+            strengths.append("Clear communication with balanced questioning and structured delivery")
+        if spikes_completion_score > 70:
+            strengths.append("Strong coverage of SPIKES stages across the conversation")
 
-        # Improvements if score < 50
         if empathy_score < 50:
-            improvements.append("Work on responding to empathy opportunities")
+            improvements.append("Work on responding to empathy opportunities when they arise")
         elif not eo_spans and empathy_score < 70:
-            improvements.append("Consider using more empathetic phrases")
+            improvements.append("Consider recognizing and naming patient emotions more explicitly")
         if communication_score < 50:
-            improvements.append("Try asking more open-ended questions and covering SPIKES stages")
-        if clinical_reasoning_score < 50:
-            improvements.append("Work on covering SPIKES protocol stages (perception, knowledge, strategy)")
+            improvements.append(
+                "Aim for clearer explanations, a better mix of open and closed questions, and more explicit signposting"
+            )
+        if spikes_completion_score < 50:
+            improvements.append(
+                "Progress through more SPIKES stages (setting through strategy) in order"
+            )
 
         return "\n".join(strengths), "\n".join(improvements)
 

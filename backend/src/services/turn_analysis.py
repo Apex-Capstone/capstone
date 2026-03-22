@@ -17,15 +17,19 @@ async def analyze_user_input(
     empathy = analysis["empathy"]
     question_type = analysis["question_type"]
     tone = analysis["tone"]
-    empathy_response = empathy.get("has_empathy", False)
+    response_spans = analysis.get("response_spans", [])
+    # Keep response detection aligned with persisted/scored response spans.
+    empathy_response = len(response_spans) > 0
     empathy_response_type = analysis["empathy_response_type"]
+    empathy_cue_detected = empathy.get("has_empathy", False)
+    empathy_cue_score = empathy.get("empathy_score", 0.0)
 
     # Combine elicitation and response spans for backward compatibility
     all_spans: list[dict[str, Any]] = []
     for span in analysis.get("elicitation_spans", []):
         span["span_type"] = "elicitation"
         all_spans.append(span)
-    for span in analysis.get("response_spans", []):
+    for span in response_spans:
         span["span_type"] = "response"
         all_spans.append(span)
 
@@ -33,6 +37,8 @@ async def analyze_user_input(
         "empathy": empathy,
         "question_type": question_type,
         "tone": tone,
+        "empathy_cue_detected": empathy_cue_detected,
+        "empathy_cue_score": empathy_cue_score,
         "empathy_response": empathy_response,
         "empathy_response_type": empathy_response_type,
     }

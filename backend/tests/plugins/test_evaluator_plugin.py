@@ -78,12 +78,10 @@ async def test_evaluator_scores_within_expected_range(test_db, seeded_session):
 
     feedback = await evaluator.evaluate(test_db, seeded_session.id)
 
-    # All top-level scores should be in [0, 100]
+    # Documented score fields should be in [0, 100]
     for score in (
         feedback.empathy_score,
         feedback.communication_score,
-        feedback.clinical_reasoning_score,
-        feedback.professionalism_score,
         feedback.overall_score,
         feedback.spikes_completion_score,
     ):
