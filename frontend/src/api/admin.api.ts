@@ -55,15 +55,6 @@ export interface AdminStats {
   averageSpikesCompletion?: number
   /** From case_stats */
   casesByCategory?: Record<string, number>
-  userOverview?: Array<{
-    id: string
-    name: string
-    email: string
-    role: 'trainee' | 'admin'
-    averageScore: number
-    completedCases: number
-    lastActive: string
-  }>
   analyticsData?: {
     /** Backend aggregates omit time series; UI shows empty state when []. */
     averageScoreByMonth: Array<{ month: string; score: number }>
@@ -124,6 +115,56 @@ function commonChallengesFromCategories(
 
 // If your backend path is protected and versioned:
 const BASE = '/v1/admin'
+
+/** Per-user aggregates from `GET /v1/admin/users/overview` (snake_case wire). */
+export interface AdminUserOverviewRowDTO {
+  id: number
+  email: string
+  full_name: string | null
+  role: string
+  created_at: string
+  session_count: number
+  completed_session_count: number
+  last_session_at: string | null
+  average_overall_score: number | null
+  average_empathy_score: number | null
+}
+
+export interface AdminUserOverviewResponseDTO {
+  users: AdminUserOverviewRowDTO[]
+  total: number
+  skip: number
+  limit: number
+}
+
+export type AdminUserOverviewSort =
+  | 'last_active_desc'
+  | 'avg_score_desc'
+  | 'email_asc'
+
+export async function fetchAdminUserOverview(
+  skip = 0,
+  limit = 20,
+  params?: {
+    sort?: AdminUserOverviewSort
+    role?: string
+    q?: string
+  }
+): Promise<AdminUserOverviewResponseDTO> {
+  const { data } = await api.get<AdminUserOverviewResponseDTO>(
+    `${BASE}/users/overview`,
+    {
+      params: {
+        skip,
+        limit,
+        sort: params?.sort,
+        role: params?.role,
+        q: params?.q,
+      },
+    }
+  )
+  return data
+}
 
 export const fetchAdminStats = async (): Promise<AdminStats> => {
   const { data } = await api.get<AggregatesResponse>(`${BASE}/aggregates`)

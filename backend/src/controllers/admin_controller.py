@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text  
 from sqlalchemy.orm import Session
@@ -12,11 +12,16 @@ from sqlalchemy.orm import Session
 from config.settings import get_settings
 from core.deps import get_db, require_admin
 from domain.entities.user import User
-from domain.models.admin import AnalyticsDashboard
+from domain.models.admin import (
+    AdminUserOverviewResponse,
+    AdminUserOverviewRow,
+    AnalyticsDashboard,
+)
 from plugins.registry import PluginRegistry
 from domain.models.cases import CaseCreate, CaseResponse
-from domain.models.sessions import SessionDetailResponse, SessionListResponse, TurnResponse
+from domain.models.sessions import SessionDetailResponse
 from repositories.feedback_repo import FeedbackRepository
+from repositories.user_repo import UserRepository
 from services.analytics_service import AnalyticsService
 from services.case_service import CaseService
 from services.session_service import SessionService
@@ -205,6 +210,41 @@ async def get_admin_session_detail(
         session=session_detail,
         feedback=feedback_summary,
         metrics_timeline=metrics_timeline,
+    )
+
+
+ALLOWED_USER_OVERVIEW_SORT = frozenset({"last_active_desc", "avg_score_desc", "email_asc"})
+
+
+@router.get("/users/overview", response_model=AdminUserOverviewResponse)
+async def get_users_overview(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_admin)],
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    sort: str = Query("last_active_desc"),
+    role: Optional[str] = Query(None),
+    q: Optional[str] = Query(None, description="Search email or full name (substring)"),
+):
+    """Paginated per-user session and feedback aggregates (admin only)."""
+    if sort not in ALLOWED_USER_OVERVIEW_SORT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"sort must be one of: {', '.join(sorted(ALLOWED_USER_OVERVIEW_SORT))}",
+        )
+    user_repo = UserRepository(db)
+    rows, total = user_repo.list_admin_overview(
+        skip=skip,
+        limit=limit,
+        sort=sort,
+        role=role,
+        q=q,
+    )
+    return AdminUserOverviewResponse(
+        users=[AdminUserOverviewRow(**r) for r in rows],
+        total=total,
+        skip=skip,
+        limit=limit,
     )
 
 

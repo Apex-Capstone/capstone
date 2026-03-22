@@ -4,9 +4,12 @@ import {
   fetchAdminSessions,
   fetchAdminSessionDetail,
   fetchAdminPluginRegistry,
+  fetchAdminUserOverview,
   type AdminStats,
   type AdminSessionListResponse,
   type AdminSessionDetailResponse,
+  type AdminUserOverviewResponseDTO,
+  type AdminUserOverviewSort,
 } from '@/api/admin.api'
 import type { PluginsResponse } from '@/types/plugins'
 import { MetricCard } from '@/components/MetricCard'
@@ -120,6 +123,12 @@ import type { Case } from '@/types/case'
 import type { SessionDetailDTO } from '@/types/session'
 
 const OVERVIEW_RECENT_SESSIONS_LIMIT = 8
+const USERS_PAGE_SIZE = 20
+
+function formatAdminScore(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return '—'
+  return `${value.toFixed(1)} / 100`
+}
 
 export const Admin = () => {
   const [stats, setStats] = useState<AdminStats | null>(null)
@@ -149,6 +158,12 @@ export const Admin = () => {
   const [installedPlugins, setInstalledPlugins] = useState<PluginsResponse | null>(null)
   const [pluginsLoading, setPluginsLoading] = useState(false)
   const [pluginsError, setPluginsError] = useState<string | null>(null)
+
+  const [userOverviewData, setUserOverviewData] = useState<AdminUserOverviewResponseDTO | null>(null)
+  const [userOverviewLoading, setUserOverviewLoading] = useState(false)
+  const [userOverviewError, setUserOverviewError] = useState<string | null>(null)
+  const [usersSkip, setUsersSkip] = useState(0)
+  const [usersSort, setUsersSort] = useState<AdminUserOverviewSort>('last_active_desc')
 
   useEffect(() => {
     const loadOverview = async () => {
@@ -238,6 +253,32 @@ export const Admin = () => {
       void loadPlugins()
     }
   }, [activeTab])
+
+  useEffect(() => {
+    if (activeTab !== 'users') return
+    let cancelled = false
+    ;(async () => {
+      setUserOverviewLoading(true)
+      setUserOverviewError(null)
+      try {
+        const data = await fetchAdminUserOverview(usersSkip, USERS_PAGE_SIZE, {
+          sort: usersSort,
+        })
+        if (!cancelled) setUserOverviewData(data)
+      } catch (e) {
+        console.error('Failed to fetch user overview:', e)
+        if (!cancelled) {
+          setUserOverviewError('Failed to load user overview')
+          setUserOverviewData(null)
+        }
+      } finally {
+        if (!cancelled) setUserOverviewLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [activeTab, usersSkip, usersSort])
 
   const handleSessionRowClick = async (sessionId: number) => {
     setSelectedDetail(null)
@@ -433,48 +474,142 @@ export const Admin = () => {
         return (
           <div className="space-y-6">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle>User Overview</CardTitle>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="text-sm text-gray-600 flex items-center gap-2">
+                    Sort
+                    <select
+                      className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+                      value={usersSort}
+                      onChange={(e) => {
+                        setUsersSort(e.target.value as AdminUserOverviewSort)
+                        setUsersSkip(0)
+                      }}
+                    >
+                      <option value="last_active_desc">Last active (newest)</option>
+                      <option value="avg_score_desc">Avg overall score (high)</option>
+                      <option value="email_asc">Email (A–Z)</option>
+                    </select>
+                  </label>
+                </div>
               </CardHeader>
               <CardContent>
-                {stats.userOverview ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-2">Name</th>
-                          <th className="text-left py-2">Email</th>
-                          <th className="text-left py-2">Role</th>
-                          <th className="text-left py-2">Avg Score</th>
-                          <th className="text-left py-2">Cases Completed</th>
-                          <th className="text-left py-2">Last Active</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {stats.userOverview.map((user) => (
-                          <tr key={user.id} className="border-b">
-                            <td className="py-2">{user.name}</td>
-                            <td className="py-2">{user.email}</td>
-                            <td className="py-2">
-                              <span
-                                className={cn(
-                                  'px-2 py-1 rounded-full text-xs font-medium',
-                                  user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-emerald-100 text-emerald-800'
-                                )}
-                              >
-                                {user.role}
-                              </span>
-                            </td>
-                            <td className="py-2">{user.averageScore.toFixed(1)}%</td>
-                            <td className="py-2">{user.completedCases}</td>
-                            <td className="py-2">{new Date(user.lastActive).toLocaleDateString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                {userOverviewLoading ? (
+                  <p className="text-gray-500 py-8 text-center">Loading users…</p>
+                ) : userOverviewError ? (
+                  <p className="text-destructive py-8 text-center">{userOverviewError}</p>
+                ) : !userOverviewData || userOverviewData.users.length === 0 ? (
+                  <p className="text-gray-500 py-8 text-center">No users found</p>
                 ) : (
-                  <p className="text-gray-500">User overview data not available</p>
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-separate border-spacing-0 text-sm">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="px-4 py-2.5 text-left font-medium whitespace-nowrap">
+                              Name
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium whitespace-nowrap">
+                              Email
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium whitespace-nowrap">
+                              Role
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium tabular-nums whitespace-nowrap">
+                              Sessions
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium tabular-nums whitespace-nowrap">
+                              Completed
+                            </th>
+                            <th className="px-4 py-2.5 pl-6 text-left font-medium whitespace-nowrap">
+                              Avg overall
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium whitespace-nowrap">
+                              Avg empathy
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium whitespace-nowrap">
+                              Last active
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium whitespace-nowrap">
+                              Registered
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {userOverviewData.users.map((user) => (
+                            <tr key={user.id} className="border-b">
+                              <td className="px-4 py-2.5 align-top">{user.full_name?.trim() || '—'}</td>
+                              <td className="px-4 py-2.5 align-top">{user.email}</td>
+                              <td className="px-4 py-2.5 align-top">
+                                <span
+                                  className={cn(
+                                    'inline-flex px-2 py-1 rounded-full text-xs font-medium',
+                                    user.role === 'admin'
+                                      ? 'bg-purple-100 text-purple-800'
+                                      : 'bg-emerald-100 text-emerald-800'
+                                  )}
+                                >
+                                  {user.role}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 text-left tabular-nums whitespace-nowrap">
+                                {user.session_count}
+                              </td>
+                              <td className="px-4 py-2.5 text-left tabular-nums whitespace-nowrap">
+                                {user.completed_session_count}
+                              </td>
+                              <td className="px-4 py-2.5 pl-6 text-left tabular-nums whitespace-nowrap">
+                                {formatAdminScore(user.average_overall_score)}
+                              </td>
+                              <td className="px-4 py-2.5 text-left tabular-nums whitespace-nowrap">
+                                {formatAdminScore(user.average_empathy_score)}
+                              </td>
+                              <td className="px-4 py-2.5 text-left whitespace-nowrap">
+                                {user.last_session_at
+                                  ? new Date(user.last_session_at).toLocaleString()
+                                  : '—'}
+                              </td>
+                              <td className="px-4 py-2.5 text-left whitespace-nowrap text-gray-600">
+                                {new Date(user.created_at).toLocaleDateString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
+                      <span>
+                        Showing{' '}
+                        {userOverviewData.total === 0
+                          ? 0
+                          : usersSkip + 1}
+                        –
+                        {usersSkip + userOverviewData.users.length} of {userOverviewData.total}
+                      </span>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={usersSkip <= 0 || userOverviewLoading}
+                          onClick={() => setUsersSkip((s) => Math.max(0, s - USERS_PAGE_SIZE))}
+                        >
+                          Previous
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            userOverviewLoading ||
+                            usersSkip + userOverviewData.users.length >= userOverviewData.total
+                          }
+                          onClick={() => setUsersSkip((s) => s + USERS_PAGE_SIZE)}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
