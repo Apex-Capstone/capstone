@@ -1,3 +1,6 @@
+/**
+ * Interactive case simulation: text/voice turns, SPIKES progress, session timer, end session.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
@@ -39,6 +42,7 @@ const preferredMimeTypes = [
 const VOICE_ACTIVITY_RMS_THRESHOLD = 0.02
 const MIN_VOICE_ACTIVE_FRAMES = 5
 
+/** Narrow axios-style error shape for user-facing messages. */
 type ApiErrorShape = {
   response?: {
     data?: {
@@ -48,6 +52,14 @@ type ApiErrorShape = {
   }
 }
 
+/**
+ * Live case page: loads case + session, renders chat, briefing, voice pipeline, and close flow.
+ *
+ * @remarks
+ * Resumes `sessionId` from query string or creates a session; manages MediaRecorder and optional TTS playback.
+ *
+ * @returns Full case simulation layout
+ */
 export const CaseDetail = () => {
   const { caseId } = useParams<{ caseId: string }>()
   const navigate = useNavigate()
@@ -89,6 +101,9 @@ export const CaseDetail = () => {
 
   // --- Load case and create or resume session ---
   useEffect(() => {
+    /**
+     * Loads case metadata and either resumes `sessionId` from the URL or creates a new session.
+     */
     const initializeSession = async () => {
       if (initializingRef.current) return
       initializingRef.current = true
@@ -186,6 +201,11 @@ export const CaseDetail = () => {
   }, [messages, sending])
 
   // --- Message submission ---
+  /**
+   * Sends the current text input as a turn and appends assistant reply messages.
+   *
+   * @param e - Form submit from the composer
+   */
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (!inputValue.trim() || sending || isRecording || !sessionId) return
@@ -245,6 +265,9 @@ export const CaseDetail = () => {
     }
   }
 
+  /**
+   * Stops the voice activity animation frame and closes audio analysis nodes.
+   */
   const stopAudioAnalysis = useCallback(() => {
     if (audioMonitorFrameRef.current !== null) {
       cancelAnimationFrame(audioMonitorFrameRef.current)
@@ -261,12 +284,20 @@ export const CaseDetail = () => {
     }
   }, [])
 
+  /**
+   * Stops media tracks from the active recording stream.
+   */
   const stopMediaStream = useCallback(() => {
     stopAudioAnalysis()
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
     mediaStreamRef.current = null
   }, [stopAudioAnalysis])
 
+  /**
+   * Runs an RMS-based voice activity loop to reflect mic input in the UI.
+   *
+   * @param stream - Captured microphone stream
+   */
   const startVoiceActivityMonitoring = useCallback((stream: MediaStream) => {
     if (typeof window === 'undefined' || typeof window.AudioContext === 'undefined') {
       voiceActivityRef.current = { maxRms: 0, activeFrames: 0 }
@@ -287,6 +318,9 @@ export const CaseDetail = () => {
     analyserRef.current = analyser
     sourceNodeRef.current = sourceNode
 
+    /**
+     * Animation frame loop: computes RMS and updates voice activity counters.
+     */
     const monitor = () => {
       analyser.getByteTimeDomainData(samples)
 
@@ -325,6 +359,11 @@ export const CaseDetail = () => {
     }
   }, [stopMediaStream])
 
+  /**
+   * Fetches assistant audio as a blob URL and plays it, revoking previous object URLs.
+   *
+   * @param audioUrl - URL returned by the API for TTS
+   */
   const playAssistantAudio = useCallback(async (audioUrl: string) => {
     try {
       activeAssistantAudioRef.current?.pause()
@@ -353,27 +392,57 @@ export const CaseDetail = () => {
     }
   }, [])
 
+  /**
+   * Merges updates into an existing chat message by id.
+   *
+   * @param messageId - Client message id
+   * @param updates - Partial message fields
+   */
   const updateMessage = (messageId: string, updates: Partial<Message>) => {
     setMessages((prev) =>
       prev.map((message) => (message.id === messageId ? { ...message, ...updates } : message))
     )
   }
 
+  /**
+   * Picks the first supported MIME type from {@link preferredMimeTypes}.
+   *
+   * @returns MIME type string or undefined
+   */
   const getPreferredAudioMimeType = () => {
     if (typeof MediaRecorder === 'undefined') return ''
 
     return preferredMimeTypes.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? ''
   }
 
+  /**
+   * Maps a recorder MIME type to a file extension for `File` construction.
+   *
+   * @param mimeType - MIME type string
+   * @returns File extension without dot
+   */
   const getAudioExtension = (mimeType: string) => {
     return audioExtensionByMimeType[mimeType.toLowerCase()] ?? 'webm'
   }
 
+  /**
+   * Extracts API error detail/message for toast-style display.
+   *
+   * @param error - Caught error
+   * @param fallback - Default message
+   * @returns User-facing string
+   */
   const getErrorMessage = (error: unknown, fallback: string) => {
     const apiError = error as ApiErrorShape
     return apiError.response?.data?.message || apiError.response?.data?.detail || fallback
   }
 
+  /**
+   * Transcribes audio then submits the text turn, updating the pending message in place.
+   *
+   * @param audioFile - Recorded audio blob as a file
+   * @param pendingMessageId - Optimistic message id to replace content on success
+   */
   const uploadRecordedAudio = async (audioFile: File, pendingMessageId: string) => {
     if (!sessionId) return
 
@@ -427,6 +496,9 @@ export const CaseDetail = () => {
     }
   }
 
+  /**
+   * Starts mic capture, voice activity monitoring, and MediaRecorder; on stop, uploads audio.
+   */
   const startVoiceRecording = async () => {
     if (!sessionId || sending || closing) return
 
@@ -526,6 +598,9 @@ export const CaseDetail = () => {
     }
   }
 
+  /**
+   * Toggles recording: starts when idle, stops and uploads when active.
+   */
   const handleVoiceInput = () => {
     if (isRecording) {
       mediaRecorderRef.current?.stop()
@@ -536,6 +611,9 @@ export const CaseDetail = () => {
     void startVoiceRecording()
   }
 
+  /**
+   * Closes the session server-side and navigates to feedback when successful.
+   */
   const handleEndSession = async () => {
     if (!sessionId) return
     setClosing(true)
@@ -551,6 +629,12 @@ export const CaseDetail = () => {
     }
   }
 
+  /**
+   * Formats elapsed session seconds as `m:ss`.
+   *
+   * @param seconds - Elapsed seconds
+   * @returns Timer label
+   */
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60

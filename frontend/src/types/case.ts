@@ -1,4 +1,11 @@
-// Wire types that match backend responses (snake_case)
+/**
+ * Case (scenario) types for admin and trainee flows.
+ *
+ * @remarks
+ * {@link CaseDTO} matches backend JSON (`snake_case`). {@link Case} is the camelCase domain type used in the UI.
+ */
+
+/** Wire shape for a training case as returned or accepted by the API. */
 export interface CaseDTO {
   id: number
   title: string
@@ -16,12 +23,13 @@ export interface CaseDTO {
   updated_at: string
 }
 
+/** Paginated list of cases from the API. */
 export interface CaseListDTO {
   cases: CaseDTO[]
   total: number
 }
 
-// UI types (camelCase for the app)
+/** Case entity in camelCase for components and forms. */
 export interface Case {
   id: number
   title: string

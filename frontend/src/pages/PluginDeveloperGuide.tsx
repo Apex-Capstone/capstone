@@ -1,8 +1,12 @@
+/**
+ * Long-form admin documentation for plugin architecture and registration.
+ */
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { useAuthStore } from '@/store/authStore'
 import { useEffect } from 'react'
 
+/** In-page table of contents anchors. */
 const sections = [
   { id: 'overview', label: 'Overview' },
   { id: 'patient-model', label: 'PatientModel Plugins' },
@@ -13,6 +17,14 @@ const sections = [
   { id: 'best-practices', label: 'Best Practices' },
 ]
 
+/**
+ * Scrollable developer guide with section anchors and prose blocks.
+ *
+ * @remarks
+ * Scrolls to top on mount for predictable deep-link behavior.
+ *
+ * @returns Documentation layout
+ */
 export const PluginDeveloperGuide = () => {
   const { user } = useAuthStore()
 

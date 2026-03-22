@@ -1,3 +1,6 @@
+/**
+ * Admin console: overview stats, user directory, session logs, analytics, cases CRUD, plugins.
+ */
 import { useEffect, useState } from 'react'
 import {
   fetchAdminStats,
@@ -21,6 +24,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
 // ---- Session detail panel ----
+
+/**
+ * Inline transcript, feedback summary, and metrics timeline for a selected admin session.
+ *
+ * @param props - Detail payload and close handler
+ * @param props.detail - Session + feedback + timeline from admin API
+ * @param props.onClose - Clears selection in parent state
+ * @returns Card panel JSX
+ */
 function SessionDetailPanel({
   detail,
   onClose,
@@ -130,6 +142,12 @@ import type { SessionDetailDTO } from '@/types/session'
 const OVERVIEW_RECENT_SESSIONS_LIMIT = 8
 const USERS_PAGE_SIZE = 20
 
+/**
+ * Formats nullable aggregate scores as `x.x / 100` or an em dash.
+ *
+ * @param value - Score from admin aggregates
+ * @returns Display string
+ */
 function formatAdminScore(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return '—'
   return `${value.toFixed(1)} / 100`
@@ -148,6 +166,11 @@ function formatSessionUserLabel(s: {
   return `User #${s.user_id}`
 }
 
+/**
+ * Tabbed admin dashboard: loads stats, sessions, cases, plugins, and user overview on demand.
+ *
+ * @returns Full admin layout
+ */
 export const Admin = () => {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)

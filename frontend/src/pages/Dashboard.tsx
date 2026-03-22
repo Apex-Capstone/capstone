@@ -1,3 +1,6 @@
+/**
+ * Trainee home: recent sessions, case grid, and quick stats.
+ */
 import { useEffect, useState } from 'react'
 import { listCases } from '@/api/cases.api'
 import { createSession, listUserSessions } from '@/api/sessions.api'
@@ -10,6 +13,14 @@ import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { useAuthStore } from '@/store/authStore'
 
+/**
+ * Loads cases and recent sessions, then renders session cards and the case catalog.
+ *
+ * @remarks
+ * `sessionCardGrid` renders active/closed session tiles with continue, feedback, and “start new” actions.
+ *
+ * @returns Full dashboard layout with navbar and sidebar
+ */
 export const Dashboard = () => {
   const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
@@ -19,6 +30,9 @@ export const Dashboard = () => {
   const navigate = useNavigate()
 
   useEffect(() => {
+    /**
+     * Fetches cases and a page of user sessions in parallel for the dashboard.
+     */
     const loadDashboardData = async () => {
       try {
         const [casesResult, sessionsResult] = await Promise.allSettled([
@@ -42,6 +56,12 @@ export const Dashboard = () => {
     loadDashboardData()
   }, [])
 
+  /**
+   * Formats a duration in seconds as `Xm Ys` or `Ys`.
+   *
+   * @param seconds - Elapsed seconds
+   * @returns Human-readable label
+   */
   const formatDurationLabel = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
@@ -51,6 +71,11 @@ export const Dashboard = () => {
     return `${secs}s`
   }
 
+  /**
+   * Forces a new session for the given case and navigates into the case page with `sessionId`.
+   *
+   * @param caseId - Case to start
+   */
   const handleStartNewSession = async (caseId: number) => {
     setCreatingSessionForCase(caseId)
     try {
@@ -67,6 +92,7 @@ export const Dashboard = () => {
   const closedSessions = sessions.filter((s) => s.status === 'closed')
 
   // derive soft status counts (since BE Case has no status)
+  /** Soft counts keyed by optional `status` on case objects (defaults to pending). */
   const statusCounts = cases.reduce(
     (acc, c) => {
       const s = (c as any)?.status ?? 'pending'
@@ -76,6 +102,12 @@ export const Dashboard = () => {
     {} as Record<'completed' | 'in_progress' | 'pending' | string, number>
   )
 
+  /**
+   * Renders a responsive grid of session summary cards with navigation actions.
+   *
+   * @param sessionList - Active or closed sessions to display
+   * @returns Grid fragment of session cards
+   */
   const sessionCardGrid = (sessionList: Session[]) => (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {sessionList.map((session) => {

@@ -1,9 +1,17 @@
+/**
+ * Marketing landing for logged-out users; quick dashboard link when authenticated.
+ */
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Stethoscope, FileText, BarChart3, Shield, ArrowRight } from 'lucide-react'
 
+/**
+ * Public home: hero, feature cards, and CTAs to login or dashboard.
+ *
+ * @returns Landing or welcome-back screen
+ */
 export const Home = () => {
   const { isAuthenticated, user } = useAuthStore()
 

@@ -1,5 +1,9 @@
+/**
+ * Session feedback API: loads evaluator output and normalizes `snake_case` into the UI model.
+ */
 import api from '@/api/client'
 
+/** SPIKES stage coverage summary for charts and progress UI. */
 export interface SpikesCoverage {
   setting: boolean
   perception: boolean
@@ -13,6 +17,7 @@ export interface SpikesCoverage {
    percent: number
 }
 
+/** Link between empathy-opportunity spans in feedback graphs. */
 export interface EmpathyLink {
   source_span_id: string
   target_span_id: string
@@ -20,6 +25,9 @@ export interface EmpathyLink {
   confidence: number
 }
 
+/**
+ * Rich feedback record for the Feedback page (scores, SPIKES, EO stats, optional raw snake_case passthrough).
+ */
 export interface Feedback {
   id: number
   sessionId: number
@@ -81,6 +89,16 @@ export interface Feedback {
   spikes_strategies?: Record<string, unknown>
 }
 
+/**
+ * Loads feedback for a session and maps API fields into {@link Feedback}.
+ *
+ * @remarks
+ * Normalizes `spikes_coverage` (including abbreviated letter codes) into {@link SpikesCoverage}.
+ * Passes through optional snake_case fields for components that still read raw API keys.
+ *
+ * @param sessionId - Session id (string for route param compatibility)
+ * @returns Fully shaped {@link Feedback} for the UI
+ */
 export const fetchFeedback = async (sessionId: string): Promise<Feedback> => {
   const { data } = await api.get(`/v1/sessions/${sessionId}/feedback`)
 

@@ -1,3 +1,6 @@
+/**
+ * Root router: public routes, role-protected trainee/admin pages, and login redirect.
+ */
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { Home } from './pages/Home'
@@ -12,7 +15,14 @@ import { Research } from './pages/Research'
 import { PluginDeveloperGuide } from './pages/PluginDeveloperGuide'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
-// Component to handle login route with redirect if already authenticated
+/**
+ * Renders the login page or redirects authenticated users to the dashboard.
+ *
+ * @remarks
+ * Prevents logged-in users from seeing `/login` again.
+ *
+ * @returns Login screen or a client-side redirect
+ */
 const LoginRoute = () => {
   const { isAuthenticated } = useAuthStore()
 
@@ -22,6 +32,11 @@ const LoginRoute = () => {
   return <Login />
 }
 
+/**
+ * Application route tree with {@link ProtectedRoute} wrappers for auth and roles.
+ *
+ * @returns Browser router wrapping all page routes
+ */
 function App() {
   return (
     <BrowserRouter>

@@ -1,4 +1,8 @@
+/**
+ * Admin modal form to create or edit a {@link Case} with plugin pickers.
+ */
 import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,6 +15,7 @@ import type { PluginsResponse, PluginInfo } from '@/types/plugins'
 const EVALUATOR_DEFAULT = ''
 const PATIENT_MODEL_DEFAULT = ''
 
+/** Props for {@link CaseForm}. */
 type Props = {
   open: boolean
   onClose: () => void
@@ -20,11 +25,26 @@ type Props = {
   submitting?: boolean
 }
 
+/**
+ * Builds a short label for plugin `<option>` rows (name + optional version).
+ *
+ * @param p - Plugin metadata from the registry
+ * @returns Display string
+ */
 function pluginLabel(p: PluginInfo) {
   const shortName = p.name.includes(':') ? p.name.split(':').pop() ?? p.name : p.name
   return p.version ? `${shortName} (v${p.version})` : shortName
 }
 
+/**
+ * Large dialog with sections for metadata, patient, script, and AI plugin overrides.
+ *
+ * @remarks
+ * Loads {@link fetchAdminPluginRegistry} when opened. Clears empty plugin fields before submit.
+ *
+ * @param props - Open state, mode, optional `initial` case, and `onSubmit` handler
+ * @returns Dialog + form JSX
+ */
 export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }: Props) => {
   const [values, setValues] = useState<Partial<Case>>({
     title: '',
@@ -55,9 +75,20 @@ export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }:
       .finally(() => setPluginsLoading(false))
   }, [open])
 
+  /**
+   * Updates a single key in the controlled `values` state.
+   *
+   * @param k - Case field name
+   * @param v - New value
+   */
   const set = (k: keyof Case, v: unknown) => setValues((prev) => ({ ...prev, [k]: v }))
 
-  const submit = async (e: React.FormEvent) => {
+  /**
+   * Strips placeholder plugin values and invokes the parent `onSubmit` handler.
+   *
+   * @param e - Form submit event
+   */
+  const submit = async (e: FormEvent) => {
     e.preventDefault()
     const toSend = { ...values }
     if (toSend.evaluatorPlugin === EVALUATOR_DEFAULT || toSend.evaluatorPlugin === '') {

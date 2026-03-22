@@ -1,9 +1,21 @@
+/**
+ * Role-filtered left navigation for primary app sections (desktop + mobile slide-over).
+ */
 import { Link, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { LayoutDashboard, FileText, Shield, BarChart3, Menu } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
+/**
+ * Renders sidebar links filtered by the current user's role.
+ *
+ * @remarks
+ * `collapsed` hides the panel on small screens; a floating control can reopen it.
+ * The `navigation` list is filtered to items whose `roles` includes the active role (default trainee).
+ *
+ * @returns Sidebar JSX or null when logged out
+ */
 export const Sidebar = () => {
   const { user, isAuthenticated } = useAuthStore()
   const location = useLocation()
@@ -89,4 +101,3 @@ export const Sidebar = () => {
     </div>
   )
 }
-
