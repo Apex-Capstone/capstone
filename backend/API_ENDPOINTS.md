@@ -375,7 +375,11 @@ Get cohort/case aggregates (admin only).
     "average_empathy_score": 7.8,
     "average_communication_score": 7.5,
     "average_spikes_completion": 8.2,
-    "average_overall_score": 7.8
+    "average_overall_score": 7.8,
+    "average_score_by_month": [
+      { "month": "2025-01", "score": 78.5 },
+      { "month": "2025-02", "score": 80.1 }
+    ]
   }
 }
 ```

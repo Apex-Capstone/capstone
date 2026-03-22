@@ -802,7 +802,7 @@ export const Admin = () => {
                         <h4 className="font-medium mb-2">Average Score by Month</h4>
                         {stats.analyticsData.averageScoreByMonth.length === 0 ? (
                           <p className="text-sm text-gray-500">
-                            Monthly score trends are not included in the admin aggregates API.
+                            No monthly score data yet. Completed sessions with scores will appear here.
                           </p>
                         ) : (
                           <div className="space-y-2">

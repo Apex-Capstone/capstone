@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class UserStats(BaseModel):
@@ -24,13 +24,21 @@ class SessionStats(BaseModel):
     sessions_by_case: dict[str, int]
 
 
+class MonthScoreAverage(BaseModel):
+    """Average overall score for a calendar month (YYYY-MM)."""
+
+    month: str
+    score: float
+
+
 class PerformanceStats(BaseModel):
     """Performance statistics schema."""
-    
+
     average_empathy_score: float
     average_communication_score: float
     average_spikes_completion: float
     average_overall_score: float
+    average_score_by_month: list[MonthScoreAverage] = Field(default_factory=list)
 
 
 class CaseStats(BaseModel):
