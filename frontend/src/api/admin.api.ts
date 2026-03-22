@@ -64,7 +64,7 @@ export interface AdminStats {
   /** From case_stats */
   casesByCategory?: Record<string, number>
   analyticsData?: {
-    /** Backend aggregates omit time series; UI shows empty state when []. */
+    /** From `performance_stats.average_score_by_month` on `/v1/admin/aggregates`. */
     averageScoreByMonth: Array<{ month: string; score: number }>
     /** Share of sessions per case title (rate = count / total_sessions). Empty if backend sends no per-case counts. */
     completionRates: Array<{ difficulty: string; rate: number }>
@@ -92,6 +92,7 @@ interface AggregatesResponse {
     average_communication_score: number
     average_spikes_completion: number
     average_overall_score: number
+    average_score_by_month: Array<{ month: string; score: number }>
   }
   case_stats: {
     total_cases: number
@@ -228,7 +229,9 @@ export const fetchAdminStats = async (): Promise<AdminStats> => {
     averageSpikesCompletion: data.performance_stats.average_spikes_completion,
     casesByCategory,
     analyticsData: {
-      averageScoreByMonth: [],
+      averageScoreByMonth: (data.performance_stats.average_score_by_month ?? []).map(
+        (row) => ({ month: row.month, score: row.score })
+      ),
       completionRates: completionRatesFromSessionsByCase(sessionsByCase, totalSessions),
       commonChallenges: commonChallengesFromCategories(casesByCategory),
     },
