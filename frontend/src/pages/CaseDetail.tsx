@@ -149,7 +149,7 @@ export const CaseDetail = () => {
         } else {
           createdSessionForCase.current = numericCaseId
           try {
-            const session = await createSession(numericCaseId)
+            const session = await createSession(numericCaseId, { forceNew: true })
             setSessionId(session.id)
             setCurrentSpikesStage(session.currentSpikesStage || 'setting')
 

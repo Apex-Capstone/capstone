@@ -396,10 +396,11 @@ async def get_session_feedback(
 async def list_user_sessions(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    state: str = Query(..., regex="^(active|completed)$"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
 ):
-    """List current user's sessions."""
+    """List current user's sessions filtered by state."""
     session_service = SessionService(db)
-    return await session_service.list_user_sessions(current_user.id, skip, limit)
+    return await session_service.list_user_sessions(current_user.id, skip, limit, state=state)
 

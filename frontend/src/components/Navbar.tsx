@@ -46,7 +46,7 @@ export const Navbar = () => {
                   {user?.name || user?.email}
                 </span>
                 <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
-                  {user?.role}
+                  {user?.role && user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                 </span>
                 <Button variant="default" size="sm" onClick={logout}>
                   <LogOut className="mr-2 h-4 w-4" />
