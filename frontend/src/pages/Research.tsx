@@ -4,7 +4,12 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { fetchResearchData, type ResearchData } from '@/api/research.api'
+import {
+  downloadMetricsCSV,
+  downloadTranscriptsCSV,
+  fetchResearchData,
+  type ResearchData,
+} from '@/api/research.api'
 import { useAuthStore } from '@/store/authStore'
 import { ResearchSessionsTable } from '@/components/research/ResearchSessionsTable'
 import { Navbar } from '@/components/Navbar'
@@ -25,8 +30,6 @@ import {
   BarChart,
   Bar,
 } from 'recharts'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 /** Trailing window for rolling average of daily means (Score Trends, daily view). */
 const DAILY_ROLLING_WINDOW_DAYS = 7
@@ -508,54 +511,10 @@ export const Research = () => {
   const [exportingMetrics, setExportingMetrics] = useState(false)
   const [exportingTranscripts, setExportingTranscripts] = useState(false)
 
-  /**
-   * Reads JWT from persisted `auth-storage` for authenticated downloads.
-   *
-   * @returns Bearer token or null
-   */
-  const getToken = (): string | null => {
-    try {
-      const raw = localStorage.getItem('auth-storage')
-      if (!raw) return null
-      const parsed = JSON.parse(raw)
-      return parsed?.state?.token ?? parsed?.token ?? null
-    } catch {
-      return null
-    }
-  }
-
-  /**
-   * Triggers a browser download for an in-memory blob.
-   *
-   * @param blob - File contents
-   * @param filename - Suggested download name
-   */
-  const downloadBlob = (blob: Blob, filename: string) => {
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    window.URL.revokeObjectURL(url)
-  }
-
-  /**
-   * Fetches anonymized session metrics as CSV (Bearer auth) and triggers download.
-   *
-   * @remarks
-   * No-op when `getToken()` returns null.
-   */
   const handleDownloadMetricsCsv = async () => {
-    const token = getToken()
-    if (!token) return
     setExportingMetrics(true)
     try {
-      const response = await fetch(`${API_URL}/v1/research/export/metrics.csv`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!response.ok) throw new Error('Metrics export failed')
-      const blob = await response.blob()
-      downloadBlob(blob, 'session_metrics.csv')
+      await downloadMetricsCSV()
     } catch (err) {
       console.error('Failed to download metrics CSV:', err)
     } finally {
@@ -563,23 +522,10 @@ export const Research = () => {
     }
   }
 
-  /**
-   * Fetches all transcript rows as CSV (Bearer auth) and triggers download.
-   *
-   * @remarks
-   * No-op when `getToken()` returns null.
-   */
   const handleDownloadTranscriptsCsv = async () => {
-    const token = getToken()
-    if (!token) return
     setExportingTranscripts(true)
     try {
-      const response = await fetch(`${API_URL}/v1/research/export/transcripts.csv`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!response.ok) throw new Error('Transcripts export failed')
-      const blob = await response.blob()
-      downloadBlob(blob, 'all_transcripts.csv')
+      await downloadTranscriptsCSV()
     } catch (err) {
       console.error('Failed to download transcripts CSV:', err)
     } finally {
