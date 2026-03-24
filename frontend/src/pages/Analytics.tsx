@@ -27,9 +27,27 @@ import {
   type AnalyticsMetricId,
 } from '@/components/analytics/analyticsMetricConfig'
 import { MetricInfoTooltip } from '@/components/analytics/MetricInfoTooltip'
+import {
+  DEFAULT_ANALYTICS_TIME_RANGE,
+  filterAnalyticsSessionsByTimeRange,
+  type AnalyticsTimeRange,
+} from '@/components/analytics/analyticsTimeFilter'
+import { AnalyticsTimeRangeControl } from '@/components/analytics/AnalyticsTimeRangeControl'
 
 const average = (values: number[]) =>
   values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
+
+type AnalyticsSummary =
+  | { empty: true }
+  | {
+      empty: false
+      empathy: number
+      communication: number
+      clinical: number
+      spikes: number
+      overall: number
+      total: number
+    }
 
 type LegendPayloadItem = {
   value?: string
@@ -72,6 +90,7 @@ export const Analytics = () => {
   const [sessions, setSessions] = useState<TraineeSessionAnalytics[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [timeRange, setTimeRange] = useState<AnalyticsTimeRange>(DEFAULT_ANALYTICS_TIME_RANGE)
 
   useEffect(() => {
     const load = async () => {
@@ -88,34 +107,50 @@ export const Analytics = () => {
     load()
   }, [])
 
-  const summary = useMemo(() => {
-    const empathy = average(sessions.map((s) => s.empathyScore))
-    const communication = average(sessions.map((s) => s.communicationScore))
-    const clinical = average(sessions.map((s) => s.clinicalScore))
-    const spikes = average(sessions.map((s) => s.spikesCompletionScore))
-    const overall =
-      sessions.length === 0 ? 0 : (empathy + communication + clinical + spikes) / 4
-    return { empathy, communication, clinical, spikes, overall, total: sessions.length }
-  }, [sessions])
+  const filteredSessions = useMemo(
+    () => filterAnalyticsSessionsByTimeRange(sessions, timeRange),
+    [sessions, timeRange]
+  )
 
-  const summaryValue = (id: AnalyticsMetricId): number => {
+  const summary = useMemo((): AnalyticsSummary => {
+    if (filteredSessions.length === 0) {
+      return { empty: true }
+    }
+    const empathy = average(filteredSessions.map((s) => s.empathyScore))
+    const communication = average(filteredSessions.map((s) => s.communicationScore))
+    const clinical = average(filteredSessions.map((s) => s.clinicalScore))
+    const spikes = average(filteredSessions.map((s) => s.spikesCompletionScore))
+    const overall = (empathy + communication + clinical + spikes) / 4
+    return {
+      empty: false,
+      empathy,
+      communication,
+      clinical,
+      spikes,
+      overall,
+      total: filteredSessions.length,
+    }
+  }, [filteredSessions])
+
+  const summaryMetricDisplay = (id: AnalyticsMetricId): string => {
+    if (summary.empty) return '—'
     switch (id) {
       case 'empathy':
-        return summary.empathy
+        return formatPercent(summary.empathy)
       case 'communication':
-        return summary.communication
+        return formatPercent(summary.communication)
       case 'clinicalReasoning':
-        return summary.clinical
+        return formatPercent(summary.clinical)
       case 'spikes':
-        return summary.spikes
+        return formatPercent(summary.spikes)
       case 'overall':
-        return summary.overall
+        return formatPercent(summary.overall)
     }
   }
 
   const trendData = useMemo(
     () =>
-      sessions.map((s, index) => ({
+      filteredSessions.map((s, index) => ({
         label: `S${index + 1}`,
         date: new Date(s.createdAt).toLocaleDateString(),
         empathy: s.empathyScore,
@@ -123,13 +158,21 @@ export const Analytics = () => {
         clinical: s.clinicalScore,
         spikes: s.spikesCoveragePercent,
       })),
-    [sessions]
+    [filteredSessions]
   )
 
   const insight = useMemo(() => {
-    const withEO = sessions.find((s) => typeof s.eoAddressedRate === 'number')
+    if (filteredSessions.length === 0) {
+      return 'No sessions in this time range. Try a different time filter or complete more sessions.'
+    }
+
+    const withEO = filteredSessions.find((s) => typeof s.eoAddressedRate === 'number')
     if (withEO && typeof withEO.eoAddressedRate === 'number') {
       return `You responded to ${formatPercent(withEO.eoAddressedRate)} of empathy opportunities.`
+    }
+
+    if (summary.empty) {
+      return 'No sessions in this time range to analyze yet.'
     }
 
     const scores = [
@@ -140,7 +183,7 @@ export const Analytics = () => {
     ]
     scores.sort((a, b) => b.value - a.value)
     return `Your strongest average area right now is ${metricLabelForInsightKey(scores[0].key)}.`
-  }, [sessions, summary])
+  }, [filteredSessions, summary])
 
   if (loading) {
     return (
@@ -174,11 +217,20 @@ export const Analytics = () => {
               <span className="text-gray-900">My Analytics</span>
             </nav>
 
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">My Analytics</h1>
-              <p className="mt-2 text-gray-600">
-                Track your communication development across completed sessions.
-              </p>
+            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">My Analytics</h1>
+                <p className="mt-2 text-gray-600">
+                  Track your communication development across completed sessions.
+                </p>
+              </div>
+              {sessions.length > 0 && (
+                <AnalyticsTimeRangeControl
+                  className="self-end sm:self-auto"
+                  value={timeRange}
+                  onChange={setTimeRange}
+                />
+              )}
             </div>
 
             {error ? (
@@ -205,7 +257,7 @@ export const Analytics = () => {
                             <MetricInfoTooltip description={m.description} className="mt-0.5" />
                           </div>
                           <p className={`mt-1 text-2xl font-bold ${m.valueColorClass}`}>
-                            {formatPercent(summaryValue(id))}
+                            {summaryMetricDisplay(id)}
                           </p>
                         </CardContent>
                       </Card>
@@ -214,7 +266,9 @@ export const Analytics = () => {
                   <Card>
                     <CardContent className="pt-6 text-center">
                       <p className="text-sm text-gray-600">Completed Sessions</p>
-                      <p className="mt-1 text-2xl font-bold text-gray-700">{summary.total}</p>
+                      <p className="mt-1 text-2xl font-bold text-gray-700">
+                        {summary.empty ? '0' : summary.total}
+                      </p>
                     </CardContent>
                   </Card>
                 </div>
@@ -228,38 +282,44 @@ export const Analytics = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="h-[320px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={trendData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                          <YAxis domain={[0, 100]} />
-                          <RechartsTooltip
-                            formatter={(value: unknown, name: unknown) => [
-                              formatPercent(typeof value === 'number' ? value : Number(value)),
-                              name == null ? '' : String(name),
-                            ]}
-                          />
-                          <Legend content={<ProgressLineLegend />} />
-                          <Line
-                            type="monotone"
-                            dataKey="empathy"
-                            stroke={ANALYTICS_METRICS.empathy.chartColor}
-                            name={ANALYTICS_METRICS.empathy.label}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="communication"
-                            stroke={ANALYTICS_METRICS.communication.chartColor}
-                            name={ANALYTICS_METRICS.communication.label}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="clinical"
-                            stroke={ANALYTICS_METRICS.clinicalReasoning.chartColor}
-                            name={ANALYTICS_METRICS.clinicalReasoning.label}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
+                      {trendData.length === 0 ? (
+                        <div className="flex h-full items-center justify-center px-4 text-center text-sm text-gray-500">
+                          No sessions in this time range. Adjust the filter or complete more sessions.
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={trendData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                            <YAxis domain={[0, 100]} />
+                            <RechartsTooltip
+                              formatter={(value: unknown, name: unknown) => [
+                                formatPercent(typeof value === 'number' ? value : Number(value)),
+                                name == null ? '' : String(name),
+                              ]}
+                            />
+                            <Legend content={<ProgressLineLegend />} />
+                            <Line
+                              type="monotone"
+                              dataKey="empathy"
+                              stroke={ANALYTICS_METRICS.empathy.chartColor}
+                              name={ANALYTICS_METRICS.empathy.label}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="communication"
+                              stroke={ANALYTICS_METRICS.communication.chartColor}
+                              name={ANALYTICS_METRICS.communication.label}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="clinical"
+                              stroke={ANALYTICS_METRICS.clinicalReasoning.chartColor}
+                              name={ANALYTICS_METRICS.clinicalReasoning.label}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -273,31 +333,37 @@ export const Analytics = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="h-[300px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={trendData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="label" />
-                          <YAxis domain={[0, 100]} />
-                          <RechartsTooltip
-                            formatter={(value: unknown, name: unknown) => [
-                              formatPercent(typeof value === 'number' ? value : Number(value)),
-                              name == null ? '' : String(name),
-                            ]}
-                          />
-                          <Bar
-                            dataKey="spikes"
-                            fill={ANALYTICS_METRICS.spikes.chartColor}
-                            name={ANALYTICS_METRICS.spikes.label}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
+                      {trendData.length === 0 ? (
+                        <div className="flex h-full items-center justify-center px-4 text-center text-sm text-gray-500">
+                          No sessions in this time range. Adjust the filter or complete more sessions.
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={trendData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="label" />
+                            <YAxis domain={[0, 100]} />
+                            <RechartsTooltip
+                              formatter={(value: unknown, name: unknown) => [
+                                formatPercent(typeof value === 'number' ? value : Number(value)),
+                                name == null ? '' : String(name),
+                              ]}
+                            />
+                            <Bar
+                              dataKey="spikes"
+                              fill={ANALYTICS_METRICS.spikes.chartColor}
+                              name={ANALYTICS_METRICS.spikes.label}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardContent className="pt-6">
-                    <AnalyticsSessionsTable sessions={sessions} />
+                    <AnalyticsSessionsTable key={timeRange} sessions={filteredSessions} />
                   </CardContent>
                 </Card>
 
