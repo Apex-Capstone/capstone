@@ -20,4 +20,5 @@ class TraineeSessionAnalytics(BaseModel):
     duration_seconds: int
     created_at: datetime
     eo_addressed_rate: Optional[float] = None
+    spikes_stages_covered: Optional[list[str]] = None
 

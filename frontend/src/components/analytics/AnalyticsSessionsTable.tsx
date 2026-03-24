@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ChevronRight } from 'lucide-react'
 import type { TraineeSessionAnalytics } from '@/types/analytics'
 import { formatPercent } from '@/utils/format'
 import { ANALYTICS_METRICS } from '@/components/analytics/analyticsMetricConfig'
+import { AnalyticsSessionPreview } from '@/components/analytics/AnalyticsSessionPreview'
+import { cn } from '@/lib/utils'
 
 type SortKey =
   | 'caseTitle'
@@ -55,6 +58,16 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
   const [sortKey, setSortKey] = useState<SortKey>('createdAt')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [page, setPage] = useState(1)
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(() => new Set())
+
+  const toggleExpanded = useCallback((sessionId: number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(sessionId)) next.delete(sessionId)
+      else next.add(sessionId)
+      return next
+    })
+  }, [])
 
   const caseOptions = useMemo(() => {
     return [...new Set(sessions.map((s) => s.caseTitle))].sort((a, b) => a.localeCompare(b))
@@ -212,9 +225,12 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
 
       <div className="overflow-x-auto rounded-lg border">
         <div className="max-h-[460px] overflow-y-auto">
-          <table className="min-w-[980px] w-full text-sm">
+          <table className="min-w-[1020px] w-full text-sm">
             <thead className="sticky top-0 z-10 bg-gray-50">
               <tr className="border-b text-gray-600">
+                <th className="w-10 px-2 py-3 text-left" scope="col">
+                  <span className="sr-only">Expand details</span>
+                </th>
                 <th className="px-4 py-3 text-left">Session</th>
                 <th className="px-4 py-3 text-left">
                   <button type="button" onClick={() => onSort('caseTitle')} className="font-semibold">
@@ -252,34 +268,87 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
             <tbody>
               {paginatedSessions.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
                     No sessions match your filters.
                   </td>
                 </tr>
               ) : (
-                paginatedSessions.map((s, index) => (
-                  <tr
-                    key={s.sessionId}
-                    className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'} border-b hover:bg-blue-50/50`}
-                  >
-                    <td className="px-4 py-3 font-medium text-gray-900">#{s.sessionId}</td>
-                    <td className="px-4 py-3">{s.caseTitle}</td>
-                    <td className="px-4 py-3">{metricBar(s.empathyScore, 'bg-blue-500')}</td>
-                    <td className="px-4 py-3">{metricBar(s.communicationScore, 'bg-purple-500')}</td>
-                    <td className="px-4 py-3">{metricBar(s.clinicalScore, 'bg-green-500')}</td>
-                    <td className="px-4 py-3">{metricBar(s.spikesCoveragePercent, 'bg-orange-500')}</td>
-                    <td className="px-4 py-3 text-gray-600">{new Date(s.createdAt).toLocaleString()}</td>
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/feedback/${s.sessionId}`)}
-                        className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                paginatedSessions.map((s, index) => {
+                  const expanded = expandedIds.has(s.sessionId)
+                  const previewId = `analytics-session-preview-${s.sessionId}`
+                  return (
+                    <Fragment key={s.sessionId}>
+                      <tr
+                        className={cn(
+                          index % 2 === 0 ? 'bg-white' : 'bg-gray-50/60',
+                          'border-b hover:bg-blue-50/50 cursor-pointer'
+                        )}
+                        onClick={(e) => {
+                          const el = e.target as HTMLElement
+                          if (el.closest('button')) return
+                          navigate(`/feedback/${s.sessionId}`)
+                        }}
                       >
-                        View Feedback
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                        <td className="w-10 px-2 py-3 align-middle">
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                            aria-expanded={expanded}
+                            aria-controls={previewId}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleExpanded(s.sessionId)
+                            }}
+                          >
+                            <span className="sr-only">
+                              {expanded ? 'Collapse' : 'Expand'} session #{s.sessionId} details
+                            </span>
+                            <ChevronRight
+                              className={cn('h-4 w-4 transition-transform duration-150', expanded && 'rotate-90')}
+                              aria-hidden
+                            />
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 font-medium text-gray-900">#{s.sessionId}</td>
+                        <td className="px-4 py-3">{s.caseTitle}</td>
+                        <td className="px-4 py-3">{metricBar(s.empathyScore, 'bg-blue-500')}</td>
+                        <td className="px-4 py-3">{metricBar(s.communicationScore, 'bg-purple-500')}</td>
+                        <td className="px-4 py-3">{metricBar(s.clinicalScore, 'bg-green-500')}</td>
+                        <td className="px-4 py-3">{metricBar(s.spikesCoveragePercent, 'bg-orange-500')}</td>
+                        <td className="px-4 py-3 text-gray-600">{new Date(s.createdAt).toLocaleString()}</td>
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigate(`/feedback/${s.sessionId}`)
+                            }}
+                            className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                          >
+                            View Feedback
+                          </button>
+                        </td>
+                      </tr>
+                      {expanded && (
+                        <tr
+                          className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}
+                          aria-live="polite"
+                        >
+                          <td colSpan={9} className="border-b px-4 py-0">
+                            <div
+                              id={previewId}
+                              role="region"
+                              aria-label={`Session ${s.sessionId} preview`}
+                              className="border-t border-gray-100 bg-slate-50/70 py-3 pl-2 pr-4 sm:pl-4"
+                            >
+                              <AnalyticsSessionPreview session={s} />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })
               )}
             </tbody>
           </table>

@@ -50,6 +50,12 @@ class TraineeAnalyticsService:
                 spikes_percent_raw = float(spikes_coverage.get("percent") or 0.0)
             spikes_coverage_percent = max(0.0, min(100.0, spikes_percent_raw * 100.0))
 
+            spikes_stages_covered: list[str] | None = None
+            if spikes_coverage:
+                raw_covered = spikes_coverage.get("covered")
+                if isinstance(raw_covered, list) and raw_covered:
+                    spikes_stages_covered = [str(x) for x in raw_covered if x is not None]
+
             eo_addressed_rate: float | None = None
             if linkage_stats and linkage_stats.get("addressed_rate") is not None:
                 eo_addressed_rate = max(
@@ -70,6 +76,7 @@ class TraineeAnalyticsService:
                     duration_seconds=int(session.duration_seconds or 0),
                     created_at=feedback.created_at or session.started_at,
                     eo_addressed_rate=eo_addressed_rate,
+                    spikes_stages_covered=spikes_stages_covered,
                 )
             )
 

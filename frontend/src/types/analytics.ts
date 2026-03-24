@@ -10,6 +10,7 @@ export interface TraineeSessionAnalyticsDTO {
   duration_seconds: number
   created_at: string
   eo_addressed_rate?: number | null
+  spikes_stages_covered?: string[] | null
 }
 
 export interface TraineeSessionAnalytics {
@@ -24,5 +25,7 @@ export interface TraineeSessionAnalytics {
   durationSeconds: number
   createdAt: string
   eoAddressedRate?: number
+  /** SPIKES stage codes present in the session (e.g. S, P, I), when available from feedback. */
+  spikesStagesCovered?: string[]
 }
 

@@ -20,6 +20,10 @@ function fromDTO(dto: TraineeSessionAnalyticsDTO): TraineeSessionAnalytics {
     createdAt: dto.created_at,
     eoAddressedRate:
       typeof dto.eo_addressed_rate === 'number' ? dto.eo_addressed_rate : undefined,
+    spikesStagesCovered:
+      Array.isArray(dto.spikes_stages_covered) && dto.spikes_stages_covered.length > 0
+        ? dto.spikes_stages_covered.map(String)
+        : undefined,
   }
 }
 
