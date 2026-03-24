@@ -15,8 +15,10 @@ import {
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { AnalyticsSessionsTable } from '@/components/analytics/AnalyticsSessionsTable'
 import { fetchMySessionAnalytics } from '@/api/analytics.api'
 import type { TraineeSessionAnalytics } from '@/types/analytics'
+import { formatPercent } from '@/utils/format'
 
 const average = (values: number[]) =>
   values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
@@ -66,7 +68,7 @@ export const Analytics = () => {
   const insight = useMemo(() => {
     const withEO = sessions.find((s) => typeof s.eoAddressedRate === 'number')
     if (withEO && typeof withEO.eoAddressedRate === 'number') {
-      return `You responded to ${Math.round(withEO.eoAddressedRate)}% of empathy opportunities.`
+      return `You responded to ${formatPercent(withEO.eoAddressedRate)} of empathy opportunities.`
     }
 
     const scores = [
@@ -85,7 +87,7 @@ export const Analytics = () => {
         <Navbar />
         <div className="flex flex-1 min-h-0">
           <Sidebar />
-          <main className="flex-1 overflow-y-auto md:ml-64">
+        <main className="flex flex-col gap-6 overflow-y-auto pb-10 md:ml-64">
             <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
               <div className="h-8 w-64 bg-gray-200 rounded animate-pulse mb-2" />
               <div className="h-4 w-80 bg-gray-200 rounded animate-pulse" />
@@ -101,7 +103,7 @@ export const Analytics = () => {
       <Navbar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto md:ml-64">
+        <main className="flex flex-col gap-6 overflow-y-auto pb-10 md:ml-64">
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             <nav className="mb-4 text-sm text-gray-500">
               <span className="cursor-pointer hover:text-gray-700" onClick={() => navigate('/dashboard')}>
@@ -131,10 +133,10 @@ export const Analytics = () => {
             ) : (
               <div className="space-y-8">
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                  <Card><CardContent className="pt-6 text-center"><p className="text-sm text-gray-600">Average Empathy</p><p className="text-2xl font-bold text-blue-600">{summary.empathy.toFixed(1)}%</p></CardContent></Card>
-                  <Card><CardContent className="pt-6 text-center"><p className="text-sm text-gray-600">Average Communication</p><p className="text-2xl font-bold text-purple-600">{summary.communication.toFixed(1)}%</p></CardContent></Card>
-                  <Card><CardContent className="pt-6 text-center"><p className="text-sm text-gray-600">Average Clinical</p><p className="text-2xl font-bold text-green-600">{summary.clinical.toFixed(1)}%</p></CardContent></Card>
-                  <Card><CardContent className="pt-6 text-center"><p className="text-sm text-gray-600">Average SPIKES</p><p className="text-2xl font-bold text-orange-600">{summary.spikes.toFixed(1)}%</p></CardContent></Card>
+                  <Card><CardContent className="pt-6 text-center"><p className="text-sm text-gray-600">Average Empathy</p><p className="text-2xl font-bold text-blue-500">{formatPercent(summary.empathy)}</p></CardContent></Card>
+                  <Card><CardContent className="pt-6 text-center"><p className="text-sm text-gray-600">Average Communication</p><p className="text-2xl font-bold text-purple-500">{formatPercent(summary.communication)}</p></CardContent></Card>
+                  <Card><CardContent className="pt-6 text-center"><p className="text-sm text-gray-600">Average Clinical</p><p className="text-2xl font-bold text-green-500">{formatPercent(summary.clinical)}</p></CardContent></Card>
+                  <Card><CardContent className="pt-6 text-center"><p className="text-sm text-gray-600">Average SPIKES</p><p className="text-2xl font-bold text-orange-500">{formatPercent(summary.spikes)}</p></CardContent></Card>
                   <Card><CardContent className="pt-6 text-center"><p className="text-sm text-gray-600">Completed Sessions</p><p className="text-2xl font-bold text-gray-700">{summary.total}</p></CardContent></Card>
                 </div>
 
@@ -143,17 +145,22 @@ export const Analytics = () => {
                     <CardTitle>Progress Over Time</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-80 w-full">
+                    <div className="h-[320px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={trendData}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                           <YAxis domain={[0, 100]} />
-                          <Tooltip />
+                          <Tooltip
+                            formatter={(value: unknown, name: unknown) => [
+                              formatPercent(typeof value === 'number' ? value : Number(value)),
+                              name == null ? '' : String(name),
+                            ]}
+                          />
                           <Legend />
-                          <Line type="monotone" dataKey="empathy" stroke="#2563eb" name="Empathy" />
-                          <Line type="monotone" dataKey="communication" stroke="#7c3aed" name="Communication" />
-                          <Line type="monotone" dataKey="clinical" stroke="#16a34a" name="Clinical" />
+                          <Line type="monotone" dataKey="empathy" stroke="#3b82f6" name="Empathy" />
+                          <Line type="monotone" dataKey="communication" stroke="#a855f7" name="Communication" />
+                          <Line type="monotone" dataKey="clinical" stroke="#22c55e" name="Clinical" />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
@@ -165,14 +172,19 @@ export const Analytics = () => {
                     <CardTitle>SPIKES Coverage Trend</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-72 w-full">
+                    <div className="h-[300px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={trendData}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="label" />
                           <YAxis domain={[0, 100]} />
-                          <Tooltip />
-                          <Bar dataKey="spikes" fill="#f97316" name="SPIKES %" />
+                          <Tooltip
+                            formatter={(value: unknown, name: unknown) => [
+                              formatPercent(typeof value === 'number' ? value : Number(value)),
+                              name == null ? '' : String(name),
+                            ]}
+                          />
+                          <Bar dataKey="spikes" fill="#f97316" name="SPIKES" />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -180,42 +192,8 @@ export const Analytics = () => {
                 </Card>
 
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Session History</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left py-2">Session</th>
-                            <th className="text-left py-2">Case</th>
-                            <th className="text-left py-2">Empathy %</th>
-                            <th className="text-left py-2">Communication %</th>
-                            <th className="text-left py-2">Clinical %</th>
-                            <th className="text-left py-2">SPIKES %</th>
-                            <th className="text-left py-2">Date</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sessions.map((s) => (
-                            <tr
-                              key={s.sessionId}
-                              className="border-b cursor-pointer hover:bg-gray-50"
-                              onClick={() => navigate(`/feedback/${s.sessionId}`)}
-                            >
-                              <td className="py-2 font-medium">#{s.sessionId}</td>
-                              <td className="py-2">{s.caseTitle}</td>
-                              <td className="py-2">{s.empathyScore.toFixed(1)}</td>
-                              <td className="py-2">{s.communicationScore.toFixed(1)}</td>
-                              <td className="py-2">{s.clinicalScore.toFixed(1)}</td>
-                              <td className="py-2">{s.spikesCoveragePercent.toFixed(1)}</td>
-                              <td className="py-2 text-gray-500">{new Date(s.createdAt).toLocaleString()}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                  <CardContent className="pt-6">
+                    <AnalyticsSessionsTable sessions={sessions} />
                   </CardContent>
                 </Card>
 
