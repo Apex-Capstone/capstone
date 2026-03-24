@@ -1047,12 +1047,11 @@ export const Research = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="mb-2 text-xs text-gray-500">Showing latest 10 anonymized sessions</p>
-                  <div className="max-h-[420px] overflow-y-auto border rounded-lg">
-                    <ResearchSessionsTable
-                      sessions={displayedSessions}
-                      showActions={user?.role === 'admin'}
-                    />
-                  </div>
+                  <ResearchSessionsTable
+                    sessions={displayedSessions}
+                    showActions={user?.role === 'admin'}
+                    showExperimentMetadata={false}
+                  />
                   <div className="mt-3 flex justify-end">
                     <Link
                       to="/research/sessions"

@@ -12,7 +12,12 @@ export interface ResearchSessionDTO {
   case_id: number
   duration_seconds: number
   state: string
+  patient_model_plugin?: string | null
+  evaluator_plugin?: string | null
+  metrics_plugins?: string | null
   spikes_stage?: string | null
+  spikes_coverage_percent?: number | null
+  spikes_coverage?: number | null
   empathy_score?: number | null
   communication_score?: number | null
   clinical_score?: number | null
@@ -34,9 +39,15 @@ export interface ResearchData {
     demographics: { ageGroup: string; gender: string }
     scores: { empathy: number | null; communication: number | null; clinical: number | null }
     timestamp: string
+    caseId?: number
+    patientModelPlugin?: string | null
+    evaluatorPlugin?: string | null
+    metricsPlugins?: string | null
     duration_seconds?: number
     state?: string
     spikes_stage?: string | null
+    spikes_coverage_percent?: number | null
+    spikes_coverage?: number | null
   }>
   fairnessMetrics?: {
     biasProbeConsistency: number
@@ -148,9 +159,15 @@ export async function fetchResearchData(): Promise<ResearchData> {
         demographics: { ageGroup: '—', gender: '—' } as const,
         scores: { empathy, communication, clinical } as const,
         timestamp: s.timestamp ?? '',
+        caseId: s.case_id,
+        patientModelPlugin: s.patient_model_plugin ?? null,
+        evaluatorPlugin: s.evaluator_plugin ?? null,
+        metricsPlugins: s.metrics_plugins ?? null,
         duration_seconds: s.duration_seconds,
         state: s.state,
         spikes_stage: s.spikes_stage ?? null,
+        spikes_coverage_percent: s.spikes_coverage_percent ?? null,
+        spikes_coverage: s.spikes_coverage ?? null,
       }
     })
     return {

@@ -12,6 +12,24 @@ export const ResearchSessions = () => {
   const [data, setData] = useState<ResearchData | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const averageEmpathy = (() => {
+    if (!data?.anonymizedSessions.length) return 0
+    const values = data.anonymizedSessions
+      .map((session) => session.scores.empathy)
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+    if (!values.length) return 0
+    return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+  })()
+
+  const averageClinical = (() => {
+    if (!data?.anonymizedSessions.length) return 0
+    const values = data.anonymizedSessions
+      .map((session) => session.scores.clinical)
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+    if (!values.length) return 0
+    return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+  })()
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -65,7 +83,36 @@ export const ResearchSessions = () => {
 
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900">Research Sessions</h1>
-              <p className="mt-2 text-gray-600">Browse all anonymized training sessions.</p>
+              <p className="mt-2 text-gray-600">
+                Browse anonymized training sessions and experiment configurations.
+              </p>
+            </div>
+
+            <div className="mb-6 grid gap-4 sm:grid-cols-3">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Total Sessions</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{data.anonymizedSessions.length}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Average Empathy Score</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{averageEmpathy}%</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Average Clinical Score</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{averageClinical}%</div>
+                </CardContent>
+              </Card>
             </div>
 
             <Card>
@@ -79,6 +126,7 @@ export const ResearchSessions = () => {
                 <ResearchSessionsTable
                   sessions={data.anonymizedSessions}
                   showActions={user?.role === 'admin'}
+                  showExperimentMetadata
                 />
                 <div className="mt-4 text-xs text-gray-500">
                   <p>

@@ -381,6 +381,9 @@ class ResearchService:
         data = {
             "session_id": generate_anon_session_id(session.id) if export_request.anonymize else str(session.id),
             "case_id": session.case_id,
+            "patient_model_plugin": session.patient_model_plugin,
+            "evaluator_plugin": session.evaluator_plugin,
+            "metrics_plugins": session.metrics_plugins,
             "duration_seconds": session.duration_seconds,
             "state": session.state,
             "spikes_stage": session.current_spikes_stage,
