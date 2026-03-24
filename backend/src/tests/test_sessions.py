@@ -29,8 +29,7 @@ def test_db():
 def test_user(test_db):
     """Create a test user."""
     user = User(
-        email="test@example.com",
-        hashed_password="hashed_password",
+        email="test@example.com",        
         role="trainee",
         full_name="Test User",
     )

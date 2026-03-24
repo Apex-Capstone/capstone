@@ -111,8 +111,7 @@ def test_db():
 @pytest.fixture
 def seeded_session(test_db):
     user = User(
-        email="dialogue_plugin_tester@example.com",
-        hashed_password="not_used_in_tests",
+        email="dialogue_plugin_tester@example.com",        
         role="trainee",
         full_name="Dialogue Plugin Tester",
     )

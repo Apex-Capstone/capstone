@@ -32,10 +32,13 @@ class Settings(BaseSettings):
     # Database
     database_url: str = Field(...)
     
-    # JWT
-    secret_key: str = Field(...)
+    # JWT (legacy — kept for backward compatibility during migration)
+    secret_key: str = Field(default="unused")
     algorithm: str = Field(default="HS256")
     access_token_expire_minutes: int = Field(default=30)
+    
+    # Supabase Auth
+    supabase_jwt_secret: str = Field(...)
     
     # CORS: stored as string so env never triggers json.loads; parsed via helper.
     # Set CORS_ORIGINS to e.g. https://apex-client.onrender.com or ["https://..."]

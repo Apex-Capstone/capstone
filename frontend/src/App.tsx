@@ -1,11 +1,13 @@
 /**
  * Root router: public routes, role-protected trainee/admin pages, and login redirect.
  */
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { useAuthStore } from './store/authStore'
 import { Home } from './pages/Home'
 import { Login } from './pages/Login'
+import { Signup } from './pages/Signup'
 import { Dashboard } from './pages/Dashboard'
 import { CaseDetail } from './pages/CaseDetail'
 import { Feedback } from './pages/Feedback'
@@ -39,6 +41,12 @@ const LoginRoute = () => {
  * @returns Browser router wrapping all page routes
  */
 function App() {
+  const initialize = useAuthStore((s) => s.initialize)
+
+  useEffect(() => {
+    initialize()
+  }, [initialize])
+
   return (
     <BrowserRouter>
       <Toaster position="top-center" richColors />
@@ -46,6 +54,7 @@ function App() {
         {/* Public */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<LoginRoute />} />
+        <Route path="/signup" element={<Signup />} />
 
         {/* Shared: admin + trainee */}
         <Route

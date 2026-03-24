@@ -30,7 +30,6 @@ def seeded_session(test_db):
     """Create a minimal user, case, and empty session for scoring."""
     user = User(
         email="evaluator_plugin_tester@example.com",
-        hashed_password="not_used_in_tests",
         role="trainee",
         full_name="Evaluator Plugin Tester",
     )

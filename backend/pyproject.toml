@@ -33,7 +33,6 @@ ruff = "^0.1.6"
 mypy = "^1.7.0"
 
 [tool.poetry.scripts]
-seed = "src.scripts.seed:main"
 cleanup-expired-audio = "src.scripts.cleanup_expired_audio:main"
 
 [build-system]

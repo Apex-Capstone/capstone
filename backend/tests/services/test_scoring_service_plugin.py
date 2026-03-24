@@ -38,7 +38,6 @@ async def test_scoring_service_generate_feedback_uses_plugin(test_db, monkeypatc
     # Configure a minimal user and case, and seed a GOOD transcript
     user = User(
         email="scoring_plugin_tester@example.com",
-        hashed_password="not_used_in_tests",
         role="trainee",
         full_name="Scoring Plugin Tester",
     )
