@@ -106,7 +106,7 @@ export const CaseDetail = () => {
   const [currentSpikesStage, setCurrentSpikesStage] = useState<string>('setting')
   const [error, setError] = useState<string | null>(null)
   const [closing, setClosing] = useState(false)
-  const [briefingExpanded, setBriefingExpanded] = useState(false)
+  const [briefingExpanded, setBriefingExpanded] = useState(true)
   type BriefingTab = 'patientBackground' | 'objectives' | 'script' | 'expectedSpikesFlow'
   const [briefingTab, setBriefingTab] = useState<BriefingTab>('patientBackground')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -704,6 +704,10 @@ export const CaseDetail = () => {
     )
   }
 
+  const difficultyLabel = caseData.difficultyLevel
+    ? `${caseData.difficultyLevel.charAt(0).toUpperCase()}${caseData.difficultyLevel.slice(1)}`
+    : 'No difficulty'
+
   return (
     <div className="flex h-screen flex-col">
       <style>
@@ -717,297 +721,320 @@ export const CaseDetail = () => {
       <Navbar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto md:ml-64 flex flex-col">
-          {/* Header */}
-          <div className="border-b bg-white px-4 py-4 sm:px-6 lg:px-8">
-            <nav className="mb-3 text-sm text-gray-500">
-              <span>Dashboard</span> / <span className="text-gray-900">Case Detail</span>
-            </nav>
+        <main className="flex-1 overflow-y-auto bg-slate-50 md:ml-64 xl:overflow-hidden">
+          <div className="flex min-h-full flex-col px-4 py-4 sm:px-6 lg:px-8 xl:h-full">
+            <div className="mb-4 rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
+              <nav className="text-sm text-gray-500">
+                <span>Dashboard</span> / <span className="text-gray-900">Case</span>
+              </nav>
 
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{caseData.title}</h1>
-                {caseData.description && (
-                  <p className="mt-1 text-sm text-gray-600">{caseData.description}</p>
-                )}
-              </div>
-
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleEndSession}
-                disabled={closing}
-                className="flex items-center gap-2"
-              >
-                <PhoneOff className="h-4 w-4" />
-                {closing ? 'Generating Feedback...' : 'End Session'}
-              </Button>
-            </div>
-
-            {/* Timer + metadata cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className="bg-green-50 border-green-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Session Timer
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0 text-green-700 font-semibold text-lg">
-                  {formatTime(sessionElapsed)}
-                </CardContent>
-              </Card>
-
-              <Card className="bg-blue-50 border-blue-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Difficulty</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0 text-blue-700 font-semibold">
-                  {caseData.difficultyLevel ?? '—'}
-                </CardContent>
-              </Card>
-
-              <Card className="bg-purple-50 border-purple-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Category</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0 text-purple-700 font-semibold">
-                  {caseData.category ?? '—'}
-                </CardContent>
-              </Card>
-
-              <Card className="bg-orange-50 border-orange-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">SPIKES</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <SpikesProgressBar currentStage={currentSpikesStage} />
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="mt-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium">Case Briefing</CardTitle>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="bg-transparent border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                      onClick={() => setBriefingExpanded((expanded) => !expanded)}
-                    >
-                      {briefingExpanded ? (
-                        <>
-                          <ChevronUp className="mr-1 h-4 w-4" />
-                          Hide briefing
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="mr-1 h-4 w-4" />
-                          View full briefing
-                        </>
-                      )}
-                    </Button>
+              <div className="mt-3 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                <div className="space-y-3">
+                  <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-gray-900">{caseData.title}</h1>
+                    {caseData.description && (
+                      <p className="mt-1 max-w-3xl text-sm text-gray-600">{caseData.description}</p>
+                    )}
                   </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {!briefingExpanded ? (
-                    <p className="line-clamp-2 text-sm text-gray-600">
-                      {caseData.patientBackground?.trim() || caseData.description || 'No briefing preview.'}
-                    </p>
-                  ) : (
-                    <>
-                      <div className="mb-3 flex flex-wrap gap-1 border-b border-gray-200 pb-2">
-                        {caseData.patientBackground != null && (
-                          <button
-                            type="button"
-                            onClick={() => setBriefingTab('patientBackground')}
-                            className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-                              briefingTab === 'patientBackground'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
-                          >
-                            Patient background
-                          </button>
-                        )}
-                        {caseData.objectives != null && (
-                          <button
-                            type="button"
-                            onClick={() => setBriefingTab('objectives')}
-                            className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-                              briefingTab === 'objectives'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
-                          >
-                            Objectives
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setBriefingTab('script')}
-                          className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-                            briefingTab === 'script'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }`}
-                        >
-                          Script
-                        </button>
-                        {caseData.expectedSpikesFlow != null && (
-                          <button
-                            type="button"
-                            onClick={() => setBriefingTab('expectedSpikesFlow')}
-                            className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-                              briefingTab === 'expectedSpikesFlow'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
-                          >
-                            Expected SPIKES flow
-                          </button>
-                        )}
-                      </div>
-                      <div className="max-h-64 min-h-[120px] overflow-y-auto">
-                        {briefingTab === 'patientBackground' && (
-                          <pre className="whitespace-pre-wrap text-sm text-gray-800">
-                            {caseData.patientBackground || '—'}
-                          </pre>
-                        )}
-                        {briefingTab === 'objectives' && (
-                          <pre className="whitespace-pre-wrap text-sm text-gray-800">
-                            {caseData.objectives ?? '—'}
-                          </pre>
-                        )}
-                        {briefingTab === 'script' && (
-                          <pre className="whitespace-pre-wrap text-sm text-gray-800">
-                            {caseData.script}
-                          </pre>
-                        )}
-                        {briefingTab === 'expectedSpikesFlow' && (
-                          <pre className="whitespace-pre-wrap text-sm text-gray-800">
-                            {caseData.expectedSpikesFlow ?? '—'}
-                          </pre>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-          {/* Chat area */}
-          <div className="flex-1 overflow-y-auto bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-4xl space-y-4">
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-                  {error}
-                </div>
-              )}
-              {messages.length === 0 && !sending && (
-                <div className="text-center text-gray-500 py-8">
-                  <p className="text-lg font-medium mb-2">Start the conversation</p>
-                  <p className="text-sm">
-                    Begin by introducing yourself and following the SPIKES framework
-                  </p>
-                </div>
-              )}
-              {messages.map((message) => (
-                <ChatBubble key={message.id} message={message} onReplayAudio={playAssistantAudio} />
-              ))}
-              {showPatientRespondingIndicator && (
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <div className="h-2 w-2 animate-pulse rounded-full bg-gray-400" />
-                  Patient is responding...
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-          </div>
 
-          {/* Input */}
-          <div className="border-t bg-white px-4 py-4 sm:px-6 lg:px-8">
-            <form onSubmit={handleSubmit} className="mx-auto max-w-4xl">
-              <div className="flex items-center gap-2">
-                <Input
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Type your message following the SPIKES framework..."
-                  disabled={sending || isRecording}
-                  className="h-12 flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={handleVoiceInput}
-                  disabled={sending || closing || !sessionId}
-                  className={isRecording ? 'h-12 w-12 shrink-0 border-red-500 bg-red-50 text-red-600 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]' : 'h-12 w-12 shrink-0'}
-                  title={isRecording ? 'Stop recording' : 'Start voice input'}
-                >
-                  <Mic className="h-5 w-5" />
-                </Button>
-                <Button
-                  type="submit"
-                  size="icon"
-                  disabled={sending || closing || isRecording || !inputValue.trim() || !sessionId}
-                  className="h-12 w-12 shrink-0"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="mt-2 flex justify-between items-center text-xs text-gray-500">
-                <span>Session time: {formatTime(sessionElapsed)} • SPIKES: {currentSpikesStage}</span>
-                {sessionId && <span>Session ID: {sessionId}</span>}
-              </div>
-              <label className="mt-3 inline-flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={audioResponsesEnabled}
-                  onChange={(e) => setAudioResponsesEnabled(e.target.checked)}
-                  disabled={sending || closing}
-                  className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                />
-                <span>Audio responses</span>
-                <span className="text-xs text-gray-500">Off by default</span>
-              </label>
-              {error && (
-                <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {error}
                 </div>
-              )}
-              <div
-                className={`overflow-hidden transition-all duration-300 ease-out ${showVoiceIndicator ? 'mt-3 max-h-24 translate-y-0 opacity-100' : 'mt-0 max-h-0 -translate-y-1 opacity-0'}`}
-              >
-                <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 transition-colors duration-200">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleEndSession}
+                  disabled={closing}
+                  className="h-11 shrink-0 rounded-xl px-4 text-sm font-semibold"
+                >
+                  <PhoneOff className="mr-2 h-4 w-4" />
+                  {closing ? 'Generating Feedback...' : 'End Session'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1.55fr)_24.5rem]">
+              <section className="flex min-h-[520px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm xl:min-h-0">
+                <div className="flex-1 overflow-y-auto bg-gradient-to-b from-slate-50 via-white to-slate-50 px-4 py-5 sm:px-6">
+                  <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+                    {messages.length === 0 && !sending && (
+                      <div className="rounded-3xl border border-dashed border-slate-200 bg-white/80 px-6 py-12 text-center text-gray-500 shadow-sm">
+                        <p className="text-lg font-semibold text-gray-800">Start the conversation</p>
+                        <p className="mt-2 text-sm">
+                          Begin by introducing yourself and follow the SPIKES framework while you respond.
+                        </p>
+                      </div>
+                    )}
+                    {messages.map((message) => (
+                      <ChatBubble key={message.id} message={message} onReplayAudio={playAssistantAudio} />
+                    ))}
+                    {showPatientRespondingIndicator && (
+                      <div className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-sm text-gray-500">
+                        <div className="h-2 w-2 animate-pulse rounded-full bg-gray-400" />
+                        Patient is responding...
+                      </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200 bg-white px-4 py-4 sm:px-5">
+                  <form onSubmit={handleSubmit} className="space-y-3">
+                    {error && (
+                      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {error}
+                      </div>
+                    )}
+                    <div
+                      className={`rounded-2xl p-2 shadow-inner transition-colors duration-200 ${
+                        showVoiceIndicator
+                          ? 'border border-emerald-200 bg-emerald-50'
+                          : 'border border-slate-200 bg-slate-50/80'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {showVoiceIndicator ? (
+                          <div className="flex h-12 flex-1 items-center gap-3 rounded-xl px-3 text-emerald-900">
+                            <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-500" />
+                            <div className="min-w-0">
+                              <div className="font-medium">Listening</div>
+                              <div className="truncate text-xs text-emerald-700">
+                                Tap the microphone again when you are done speaking.
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <Input
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            placeholder="Type your message following the SPIKES framework..."
+                            disabled={sending || isRecording}
+                            className="h-12 flex-1 border-0 bg-transparent px-3 shadow-none focus-visible:ring-0"
+                          />
+                        )}
+                        {showVoiceIndicator && (
+                          <div className="mr-2 flex h-8 w-16 shrink-0 items-end justify-end gap-1">
+                            {listeningBarHeights.map((height, index) => (
+                              <span
+                                key={`voice-bar-${index}`}
+                                className="w-1.5 origin-bottom rounded-full bg-emerald-500"
+                                style={{
+                                  height,
+                                  animation: `listening-wave 0.9s ease-in-out ${index * 0.12}s infinite`,
+                                }}
+                              />
+                            ))}
+                          </div>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={handleVoiceInput}
+                          disabled={sending || closing || !sessionId}
+                          className={isRecording ? 'h-12 w-12 shrink-0 rounded-2xl border-red-500 bg-red-50 text-red-600 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]' : 'h-12 w-12 shrink-0 rounded-2xl border-slate-200 bg-white'}
+                          title={isRecording ? 'Stop recording' : 'Start voice input'}
+                        >
+                          <Mic className="h-5 w-5" />
+                        </Button>
+                        <Button
+                          type="submit"
+                          size="icon"
+                          disabled={sending || closing || isRecording || !inputValue.trim() || !sessionId}
+                          className="h-12 w-12 shrink-0 rounded-2xl"
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </section>
+
+              <aside className="flex flex-col gap-4 xl:h-full xl:min-h-0 xl:overflow-y-auto xl:pr-1">
+                <Card className="shrink-0 rounded-[28px] border-slate-200 shadow-sm">
+                  <CardHeader className="space-y-1 border-b border-slate-100 pb-4">
+                    <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="font-medium">Listening</div>
-                        <div className="text-xs text-emerald-700">
-                          Tap the microphone again when you are done speaking.
+                        <CardTitle className="text-base">Case Briefing</CardTitle>
+                        <p className="text-sm text-gray-500">
+                          Reference the brief without letting it compete with the conversation.
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-slate-700 hover:bg-slate-50"
+                        onClick={() => setBriefingExpanded((expanded) => !expanded)}
+                      >
+                        {briefingExpanded ? (
+                          <>
+                            <ChevronUp className="mr-2 h-4 w-4" />
+                            Hide
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="mr-2 h-4 w-4" />
+                            Show
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="min-w-0 space-y-4 px-6 pb-6 pt-5">
+                    {!briefingExpanded ? (
+                      <div className="rounded-2xl bg-slate-50 px-4 py-4">
+                        <p className="text-[15px] leading-7 text-gray-600">
+                          {caseData.patientBackground?.trim() || caseData.description || 'No briefing preview.'}
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="min-w-0 flex flex-wrap gap-2 border-b border-gray-200 pb-4">
+                          {caseData.patientBackground != null && (
+                            <button
+                              type="button"
+                              onClick={() => setBriefingTab('patientBackground')}
+                              className={`rounded-full px-3.5 py-2 text-xs font-medium ${
+                                briefingTab === 'patientBackground'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              Patient background
+                            </button>
+                          )}
+                          {caseData.objectives != null && (
+                            <button
+                              type="button"
+                              onClick={() => setBriefingTab('objectives')}
+                              className={`rounded-full px-3.5 py-2 text-xs font-medium ${
+                                briefingTab === 'objectives'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              Objectives
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setBriefingTab('script')}
+                            className={`rounded-full px-3.5 py-2 text-xs font-medium ${
+                              briefingTab === 'script'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            Script
+                          </button>
+                          {caseData.expectedSpikesFlow != null && (
+                            <button
+                              type="button"
+                              onClick={() => setBriefingTab('expectedSpikesFlow')}
+                              className={`rounded-full px-3.5 py-2 text-xs font-medium ${
+                                briefingTab === 'expectedSpikesFlow'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              Expected SPIKES flow
+                            </button>
+                          )}
+                        </div>
+                        <div className="min-w-0 rounded-2xl bg-slate-50 px-4 py-4">
+                          {briefingTab === 'patientBackground' && (
+                            <pre className="max-w-full whitespace-pre-wrap break-words text-[15px] leading-7 text-gray-800">
+                              {caseData.patientBackground || '—'}
+                            </pre>
+                          )}
+                          {briefingTab === 'objectives' && (
+                            <pre className="max-w-full whitespace-pre-wrap break-words text-[15px] leading-7 text-gray-800">
+                              {caseData.objectives ?? '—'}
+                            </pre>
+                          )}
+                          {briefingTab === 'script' && (
+                            <pre className="max-w-full whitespace-pre-wrap break-words text-[15px] leading-7 text-gray-800">
+                              {caseData.script}
+                            </pre>
+                          )}
+                          {briefingTab === 'expectedSpikesFlow' && (
+                            <pre className="max-w-full whitespace-pre-wrap break-words text-[15px] leading-7 text-gray-800">
+                              {caseData.expectedSpikesFlow ?? '—'}
+                            </pre>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="shrink-0 rounded-[28px] border-slate-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Session Overview</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-5 px-5 pb-5 pt-0">
+                    <div>
+                      <SpikesProgressBar currentStage={currentSpikesStage} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div
+                        className={`rounded-2xl border border-slate-200 bg-white p-4 ${
+                          sessionId ? '' : 'col-span-2'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+                            <Clock className="h-3.5 w-3.5" />
+                          </span>
+                          Session time
+                        </div>
+                        <div className="mt-2 text-xl font-semibold text-slate-900">
+                          {formatTime(sessionElapsed)}
                         </div>
                       </div>
+                      {sessionId && (
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                            Session ID
+                          </div>
+                          <div className="mt-2 text-sm font-semibold text-slate-900">{sessionId}</div>
+                        </div>
+                      )}
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                          Level
+                        </div>
+                        <div className="mt-2 text-sm font-semibold text-slate-900">{difficultyLabel}</div>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                          Type
+                        </div>
+                        <div className="mt-2 text-sm font-semibold text-slate-900">
+                          {caseData.category ?? 'No category'}
+                        </div>
+                      </div>
+                      <div className="col-span-2 rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                          Audio responses
+                        </div>
+                        <label className="mt-2 inline-flex items-center gap-2 text-sm text-slate-900">
+                          <input
+                            type="checkbox"
+                            checked={audioResponsesEnabled}
+                            onChange={(e) => setAudioResponsesEnabled(e.target.checked)}
+                            disabled={sending || closing}
+                            className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <span>Enable spoken replies</span>
+                        </label>
+                      </div>
                     </div>
-                    <div className="flex h-8 w-16 items-end justify-end gap-1">
-                      {listeningBarHeights.map((height, index) => (
-                        <span
-                          key={`voice-bar-${index}`}
-                          className="w-1.5 origin-bottom rounded-full bg-emerald-500"
-                          style={{
-                            height,
-                            animation: `listening-wave 0.9s ease-in-out ${index * 0.12}s infinite`,
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </form>
+                  </CardContent>
+                </Card>
+              </aside>
+            </div>
           </div>
         </main>
       </div>
