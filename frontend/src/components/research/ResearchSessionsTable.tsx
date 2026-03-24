@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import type { ResearchData } from '@/api/research.api'
+import { formatPluginName as formatPluginNameFromLib } from '@/lib/formatPluginName'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -34,25 +35,10 @@ const formatDuration = (value: number | undefined) => {
   return `${minutes}m ${seconds}s`
 }
 
-const pluginDisplay: Record<string, string> = {
-  DefaultLLMPatientModel: 'Default LLM',
-  ApexHybridEvaluator: 'Hybrid Evaluator',
-  ApexMetrics: 'Default Metrics',
-}
-
-const extractPluginClassName = (plugin?: string | null) => {
-  if (!plugin) return undefined
-  const trimmed = plugin.trim()
-  if (!trimmed) return undefined
-  const afterColon = trimmed.includes(':') ? trimmed.split(':').pop() : trimmed
-  const token = (afterColon ?? trimmed).split('.').pop()
-  return token || trimmed
-}
-
 const formatPluginName = (plugin?: string | null) => {
-  const className = extractPluginClassName(plugin)
-  if (!className) return '—'
-  return pluginDisplay[className] ?? className
+  if (plugin == null || !String(plugin).trim()) return '—'
+  const label = formatPluginNameFromLib(String(plugin).trim())
+  return label || '—'
 }
 
 type SortKey = 'case' | 'empathy' | 'communication' | 'clinical' | 'spikes' | 'duration' | 'date'

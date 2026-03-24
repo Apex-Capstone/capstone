@@ -77,6 +77,7 @@ export interface ResearchSessionDTO {
   empathy_score?: number | null
   communication_score?: number | null
   clinical_score?: number | null
+  spikes_completion_score?: number | null
   timestamp?: string | null
 }
 
@@ -104,6 +105,7 @@ export interface ResearchData {
     spikes_stage?: string | null
     spikes_coverage_percent?: number | null
     spikes_coverage?: number | null
+    spikes_completion_score?: number | null
   }>
   fairnessMetrics?: {
     biasProbeConsistency: number
@@ -224,6 +226,7 @@ export async function fetchResearchData(): Promise<ResearchData> {
         spikes_stage: s.spikes_stage ?? null,
         spikes_coverage_percent: s.spikes_coverage_percent ?? null,
         spikes_coverage: s.spikes_coverage ?? null,
+        spikes_completion_score: s.spikes_completion_score ?? null,
       }
     })
     return {
