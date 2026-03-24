@@ -53,7 +53,7 @@ export const Sidebar = () => {
   return (
     <div
       className={cn(
-        'fixed left-0 top-16 z-40 h-[calc(100vh-4rem)] border-r bg-white transition-transform md:translate-x-0',
+        'fixed left-0 top-16 z-40 h-[calc(100vh-4rem)] w-64 border-r bg-white transition-transform md:translate-x-0',
         collapsed ? '-translate-x-full' : 'translate-x-0'
       )}
     >
