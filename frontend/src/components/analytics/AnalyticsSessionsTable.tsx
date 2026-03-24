@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { TraineeSessionAnalytics } from '@/types/analytics'
 import { formatPercent } from '@/utils/format'
+import { ANALYTICS_METRICS } from '@/components/analytics/analyticsMetricConfig'
 
 type SortKey =
   | 'caseTitle'
@@ -232,7 +233,7 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
                 </th>
                 <th className="px-4 py-3 text-left">
                   <button type="button" onClick={() => onSort('clinicalScore')} className="font-semibold">
-                    Clinical % {sortArrow('clinicalScore')}
+                    {ANALYTICS_METRICS.clinicalReasoning.shortLabel} % {sortArrow('clinicalScore')}
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left">

@@ -7,21 +7,65 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   BarChart,
   Bar,
 } from 'recharts'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AnalyticsSessionsTable } from '@/components/analytics/AnalyticsSessionsTable'
 import { fetchMySessionAnalytics } from '@/api/analytics.api'
 import type { TraineeSessionAnalytics } from '@/types/analytics'
 import { formatPercent } from '@/utils/format'
+import {
+  ANALYTICS_METRICS,
+  ANALYTICS_TREND_METRIC_ORDER,
+  getMetricByDataKey,
+  metricLabelForInsightKey,
+  type AnalyticsMetricId,
+} from '@/components/analytics/analyticsMetricConfig'
+import { MetricInfoTooltip } from '@/components/analytics/MetricInfoTooltip'
 
 const average = (values: number[]) =>
   values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
+
+type LegendPayloadItem = {
+  value?: string
+  color?: string
+  dataKey?: string | number
+}
+
+function ProgressLineLegend(props: { payload?: LegendPayloadItem[] }) {
+  const { payload } = props
+  if (!payload?.length) return null
+  return (
+    <ul className="flex flex-wrap justify-center gap-x-5 gap-y-2 pt-2 text-sm">
+      {payload.map((entry) => {
+        const key = entry.dataKey != null ? String(entry.dataKey) : ''
+        const metric = getMetricByDataKey(key)
+        if (!metric) return null
+        return (
+          <li key={key} className="flex items-center gap-1.5 text-gray-700">
+            <span
+              className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: entry.color }}
+              aria-hidden
+            />
+            <span>{metric.label}</span>
+            <MetricInfoTooltip description={metric.description} />
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+const SUMMARY_METRIC_IDS: AnalyticsMetricId[] = [
+  ...ANALYTICS_TREND_METRIC_ORDER,
+  'overall',
+]
 
 export const Analytics = () => {
   const navigate = useNavigate()
@@ -49,8 +93,25 @@ export const Analytics = () => {
     const communication = average(sessions.map((s) => s.communicationScore))
     const clinical = average(sessions.map((s) => s.clinicalScore))
     const spikes = average(sessions.map((s) => s.spikesCompletionScore))
-    return { empathy, communication, clinical, spikes, total: sessions.length }
+    const overall =
+      sessions.length === 0 ? 0 : (empathy + communication + clinical + spikes) / 4
+    return { empathy, communication, clinical, spikes, overall, total: sessions.length }
   }, [sessions])
+
+  const summaryValue = (id: AnalyticsMetricId): number => {
+    switch (id) {
+      case 'empathy':
+        return summary.empathy
+      case 'communication':
+        return summary.communication
+      case 'clinicalReasoning':
+        return summary.clinical
+      case 'spikes':
+        return summary.spikes
+      case 'overall':
+        return summary.overall
+    }
+  }
 
   const trendData = useMemo(
     () =>
@@ -72,13 +133,13 @@ export const Analytics = () => {
     }
 
     const scores = [
-      { label: 'empathy', value: summary.empathy },
-      { label: 'communication', value: summary.communication },
-      { label: 'clinical', value: summary.clinical },
-      { label: 'SPIKES', value: summary.spikes },
+      { key: 'empathy' as const, value: summary.empathy },
+      { key: 'communication' as const, value: summary.communication },
+      { key: 'clinical' as const, value: summary.clinical },
+      { key: 'spikes' as const, value: summary.spikes },
     ]
     scores.sort((a, b) => b.value - a.value)
-    return `Your strongest average area right now is ${scores[0].label}.`
+    return `Your strongest average area right now is ${metricLabelForInsightKey(scores[0].key)}.`
   }, [sessions, summary])
 
   if (loading) {
@@ -87,7 +148,7 @@ export const Analytics = () => {
         <Navbar />
         <div className="flex flex-1 min-h-0">
           <Sidebar />
-        <main className="flex flex-col gap-6 overflow-y-auto pb-10 md:ml-64">
+          <main className="flex flex-col gap-6 overflow-y-auto pb-10 md:ml-64">
             <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
               <div className="h-8 w-64 bg-gray-200 rounded animate-pulse mb-2" />
               <div className="h-4 w-80 bg-gray-200 rounded animate-pulse" />
@@ -132,17 +193,38 @@ export const Analytics = () => {
               </Card>
             ) : (
               <div className="space-y-8">
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                  <Card><CardContent className="pt-6 text-center"><p className="text-sm text-gray-600">Average Empathy</p><p className="text-2xl font-bold text-blue-500">{formatPercent(summary.empathy)}</p></CardContent></Card>
-                  <Card><CardContent className="pt-6 text-center"><p className="text-sm text-gray-600">Average Communication</p><p className="text-2xl font-bold text-purple-500">{formatPercent(summary.communication)}</p></CardContent></Card>
-                  <Card><CardContent className="pt-6 text-center"><p className="text-sm text-gray-600">Average Clinical</p><p className="text-2xl font-bold text-green-500">{formatPercent(summary.clinical)}</p></CardContent></Card>
-                  <Card><CardContent className="pt-6 text-center"><p className="text-sm text-gray-600">Average SPIKES</p><p className="text-2xl font-bold text-orange-500">{formatPercent(summary.spikes)}</p></CardContent></Card>
-                  <Card><CardContent className="pt-6 text-center"><p className="text-sm text-gray-600">Completed Sessions</p><p className="text-2xl font-bold text-gray-700">{summary.total}</p></CardContent></Card>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                  {SUMMARY_METRIC_IDS.map((id) => {
+                    const m = ANALYTICS_METRICS[id]
+                    const labelText = id === 'overall' ? m.label : `Average ${m.label}`
+                    return (
+                      <Card key={id}>
+                        <CardContent className="pt-6 text-center">
+                          <div className="flex items-start justify-center gap-1">
+                            <p className="text-sm text-gray-600">{labelText}</p>
+                            <MetricInfoTooltip description={m.description} className="mt-0.5" />
+                          </div>
+                          <p className={`mt-1 text-2xl font-bold ${m.valueColorClass}`}>
+                            {formatPercent(summaryValue(id))}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <p className="text-sm text-gray-600">Completed Sessions</p>
+                      <p className="mt-1 text-2xl font-bold text-gray-700">{summary.total}</p>
+                    </CardContent>
+                  </Card>
                 </div>
 
                 <Card>
                   <CardHeader>
                     <CardTitle>Progress Over Time</CardTitle>
+                    <CardDescription>
+                      Empathy, Communication, Clinical Reasoning, and SPIKES coverage by session date.
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="h-[320px] w-full">
@@ -151,16 +233,31 @@ export const Analytics = () => {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                           <YAxis domain={[0, 100]} />
-                          <Tooltip
+                          <RechartsTooltip
                             formatter={(value: unknown, name: unknown) => [
                               formatPercent(typeof value === 'number' ? value : Number(value)),
                               name == null ? '' : String(name),
                             ]}
                           />
-                          <Legend />
-                          <Line type="monotone" dataKey="empathy" stroke="#3b82f6" name="Empathy" />
-                          <Line type="monotone" dataKey="communication" stroke="#a855f7" name="Communication" />
-                          <Line type="monotone" dataKey="clinical" stroke="#22c55e" name="Clinical" />
+                          <Legend content={<ProgressLineLegend />} />
+                          <Line
+                            type="monotone"
+                            dataKey="empathy"
+                            stroke={ANALYTICS_METRICS.empathy.chartColor}
+                            name={ANALYTICS_METRICS.empathy.label}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="communication"
+                            stroke={ANALYTICS_METRICS.communication.chartColor}
+                            name={ANALYTICS_METRICS.communication.label}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="clinical"
+                            stroke={ANALYTICS_METRICS.clinicalReasoning.chartColor}
+                            name={ANALYTICS_METRICS.clinicalReasoning.label}
+                          />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
@@ -169,7 +266,10 @@ export const Analytics = () => {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>SPIKES Coverage Trend</CardTitle>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <CardTitle>SPIKES Coverage Trend</CardTitle>
+                      <MetricInfoTooltip description={ANALYTICS_METRICS.spikes.description} />
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="h-[300px] w-full">
@@ -178,13 +278,17 @@ export const Analytics = () => {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="label" />
                           <YAxis domain={[0, 100]} />
-                          <Tooltip
+                          <RechartsTooltip
                             formatter={(value: unknown, name: unknown) => [
                               formatPercent(typeof value === 'number' ? value : Number(value)),
                               name == null ? '' : String(name),
                             ]}
                           />
-                          <Bar dataKey="spikes" fill="#f97316" name="SPIKES" />
+                          <Bar
+                            dataKey="spikes"
+                            fill={ANALYTICS_METRICS.spikes.chartColor}
+                            name={ANALYTICS_METRICS.spikes.label}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -213,4 +317,3 @@ export const Analytics = () => {
     </div>
   )
 }
-
