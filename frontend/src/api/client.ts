@@ -17,17 +17,16 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
-const AUTH_ENDPOINTS = ['/v1/auth/me']
-
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (
-      error?.response?.status === 401 &&
-      !AUTH_ENDPOINTS.some((ep) => error.config?.url?.includes(ep))
-    ) {
-      useAuthStore.getState().logout()
-      window.location.href = '/login'
+  async (error) => {
+    if (error?.response?.status === 401) {
+      await useAuthStore.getState().logout()
+      const path = window.location.pathname
+      const onPublicAuthPath = path === '/login' || path === '/signup'
+      if (!onPublicAuthPath) {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

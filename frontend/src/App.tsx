@@ -27,7 +27,15 @@ import { ProtectedRoute } from './components/ProtectedRoute'
  * @returns Login screen or a client-side redirect
  */
 const LoginRoute = () => {
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, loading } = useAuthStore()
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-gray-500">
+        Loading...
+      </div>
+    )
+  }
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />

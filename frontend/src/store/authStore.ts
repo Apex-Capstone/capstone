@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import axios from 'axios'
 import { supabase } from '@/lib/supabase'
 import type { Session } from '@supabase/supabase-js'
 
@@ -49,28 +50,40 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   initialize: async () => {
+    set({ loading: true })
+
     const { data } = await supabase.auth.getSession()
     const session = data.session
+    const accessToken = session?.access_token ?? null
 
     set({
-      token: session?.access_token ?? null,
-      isAuthenticated: !!session?.access_token,
+      token: accessToken,
+      user: null,
+      isAuthenticated: false,
     })
 
-    if (session?.access_token) {
+    if (accessToken) {
       try {
         const { default: api } = await import('@/api/client')
         const { data: profile } = await api.get('/v1/auth/me')
-        set({ user: profile })
-      } catch {
-        // Profile not available yet — user can still navigate
+        set({ user: profile, isAuthenticated: true })
+      } catch (err) {
+        if (
+          axios.isAxiosError(err) &&
+          (err.response?.status === 401 || err.response?.status === 403)
+        ) {
+          await get().logout()
+          set({ token: null, user: null, isAuthenticated: false })
+        } else {
+          set({ user: null, isAuthenticated: true })
+        }
       }
     }
 
     set({ loading: false })
 
-    supabase.auth.onAuthStateChange((_event, session) => {
-      get().setSession(session)
+    supabase.auth.onAuthStateChange((_event, nextSession) => {
+      get().setSession(nextSession)
     })
   },
 }))

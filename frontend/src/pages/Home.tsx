@@ -8,7 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Stethoscope, FileText, BarChart3, Shield, ArrowRight } from 'lucide-react'
 
 export const Home = () => {
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, loading } = useAuthStore()
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-gray-500">
+        Loading...
+      </div>
+    )
+  }
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />

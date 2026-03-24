@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import axios from 'axios'
 import { useAuthStore } from '@/store/authStore'
 import { supabase } from '@/lib/supabase'
 import api from '@/api/client'
@@ -37,8 +38,17 @@ export const Login = () => {
       try {
         const { data: profile } = await api.get('/v1/auth/me')
         setUser(profile)
-      } catch {
-        // Profile fetch can fail if the user row hasn't synced yet; continue to dashboard
+      } catch (err) {
+        if (
+          axios.isAxiosError(err) &&
+          (err.response?.status === 401 || err.response?.status === 403)
+        ) {
+          await useAuthStore.getState().logout()
+          setError(
+            'This account is not available in the app. It may have been removed — try another email or sign up again.'
+          )
+          return
+        }
       }
 
       navigate('/dashboard')

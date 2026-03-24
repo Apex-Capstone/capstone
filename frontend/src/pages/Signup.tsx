@@ -2,10 +2,11 @@ import { useState, useMemo } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import api from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Check, X } from 'lucide-react'
+import { Check, Eye, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const GENDER_OPTIONS = [
@@ -62,6 +63,7 @@ export const Signup = () => {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const passwordChecks = useMemo(
     () => PASSWORD_RULES.map((rule) => ({ ...rule, passed: rule.test(password) })),
@@ -93,6 +95,14 @@ export const Signup = () => {
     setLoading(true)
 
     try {
+      const { data: existsResult } = await api.get<{ exists: boolean }>('/v1/auth/email-exists', {
+        params: { email },
+      })
+      if (existsResult.exists) {
+        setError('An account with this email already exists. Please sign in instead.')
+        return
+      }
+
       const metadata: Record<string, string> = {
         full_name: fullName,
         role: 'trainee',
@@ -190,15 +200,32 @@ export const Signup = () => {
               <label htmlFor="password" className="text-sm font-medium">
                 Password <span className="text-red-500">*</span>
               </label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Create a password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Create a password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 bg-transparent border-0 shadow-none hover:bg-transparent active:bg-transparent focus:outline-none focus-visible:ring-0 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  onMouseDown={() => setShowPassword(true)}
+                  onMouseUp={() => setShowPassword(false)}
+                  onMouseLeave={() => setShowPassword(false)}
+                  onTouchStart={() => setShowPassword(true)}
+                  onTouchEnd={() => setShowPassword(false)}
+                  onTouchCancel={() => setShowPassword(false)}
+                  disabled={loading}
+                >
+                  <Eye className="h-4 w-4" />
+                </button>
+              </div>
 
               <div className="space-y-2 pt-1">
                 {/* Strength bar */}
