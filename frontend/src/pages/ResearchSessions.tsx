@@ -12,16 +12,10 @@ import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Database, Download } from 'lucide-react'
-import {
-  downloadMetricsCSV,
-  downloadTranscriptsCSV,
-  fetchResearchData,
-  type ResearchData,
-} from '@/api/research.api'
+import { Database } from 'lucide-react'
+import { fetchResearchData, type ResearchData } from '@/api/research.api'
 import { useAuthStore } from '@/store/authStore'
 import { ResearchSessionsTable } from '@/components/research/ResearchSessionsTable'
-import { Button } from '@/components/ui/button'
 import { formatPluginName } from '@/lib/formatPluginName'
 
 type AnonSession = ResearchData['anonymizedSessions'][number]
@@ -134,8 +128,6 @@ export const ResearchSessions = () => {
   const { user } = useAuthStore()
   const [data, setData] = useState<ResearchData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [exportingMetrics, setExportingMetrics] = useState(false)
-  const [exportingTranscripts, setExportingTranscripts] = useState(false)
 
   const summary = useMemo(() => {
     const sessions = data?.anonymizedSessions ?? []
@@ -213,28 +205,6 @@ export const ResearchSessions = () => {
     }
   }, [data])
 
-  const handleExportMetricsCsv = async () => {
-    setExportingMetrics(true)
-    try {
-      await downloadMetricsCSV()
-    } catch (err) {
-      console.error('Failed to download metrics CSV:', err)
-    } finally {
-      setExportingMetrics(false)
-    }
-  }
-
-  const handleExportTranscriptsCsv = async () => {
-    setExportingTranscripts(true)
-    try {
-      await downloadTranscriptsCSV()
-    } catch (err) {
-      console.error('Failed to download transcripts CSV:', err)
-    } finally {
-      setExportingTranscripts(false)
-    }
-  }
-
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -296,29 +266,6 @@ export const ResearchSessions = () => {
                 Browse anonymized training sessions and experiment configurations.
               </p>
             </div>
-
-            {user?.role === 'admin' && (
-              <div className="mb-6 flex flex-wrap items-center justify-end gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExportMetricsCsv}
-                  disabled={exportingMetrics}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  {exportingMetrics ? 'Downloading…' : 'Export Metrics CSV'}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExportTranscriptsCsv}
-                  disabled={exportingTranscripts}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  {exportingTranscripts ? 'Downloading…' : 'Export Transcripts CSV'}
-                </Button>
-              </div>
-            )}
 
             <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Card>

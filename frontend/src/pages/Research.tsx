@@ -1017,7 +1017,7 @@ export const Research = () => {
               </Card>
 
               {/* Summary Statistics */}
-              <div className="grid gap-6 md:grid-cols-3">
+              <div className="grid gap-6 md:grid-cols-2">
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-sm">Total Sessions</CardTitle>
@@ -1049,26 +1049,6 @@ export const Research = () => {
                       </ResponsiveContainer>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">Empathy, communication, clinical</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm">Gender Distribution</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-1">
-                      {['female', 'male', 'other'].map(gender => {
-                        const count = data.anonymizedSessions.filter(s => s.demographics.gender === gender).length
-                        const percentage = Math.round((count / data.anonymizedSessions.length) * 100)
-                        return (
-                          <div key={gender} className="flex items-center justify-between text-sm">
-                            <span className="capitalize">{gender}</span>
-                            <span className="font-medium">{percentage}%</span>
-                          </div>
-                        )
-                      })}
-                    </div>
                   </CardContent>
                 </Card>
               </div>
