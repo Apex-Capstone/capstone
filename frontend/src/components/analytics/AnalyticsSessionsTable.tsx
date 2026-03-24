@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import type { TraineeSessionAnalytics } from '@/types/analytics'
-import { formatPercent } from '@/utils/format'
+import { formatPercentWhole } from '@/utils/format'
 import { ANALYTICS_METRICS } from '@/components/analytics/analyticsMetricConfig'
 import { AnalyticsSessionPreview } from '@/components/analytics/AnalyticsSessionPreview'
 import { cn } from '@/lib/utils'
@@ -38,10 +38,10 @@ const inRange = (value: number, range: RangeOption) => {
 }
 
 const metricBar = (value: number, colorClass: string) => {
-  const clamped = Math.max(0, Math.min(100, value))
+  const clamped = Math.round(Math.max(0, Math.min(100, value)))
   return (
-    <div className="min-w-[150px]">
-      <div className="mb-1 text-xs font-medium text-gray-700">{formatPercent(clamped)}</div>
+    <div className="w-[148px] shrink-0">
+      <div className="mb-1 text-xs font-medium tabular-nums text-gray-700">{formatPercentWhole(clamped)}</div>
       <div className="h-2.5 w-full rounded-full bg-gray-200/90">
         <div className={`h-2.5 rounded-full ${colorClass}`} style={{ width: `${clamped}%` }} />
       </div>
@@ -225,44 +225,44 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
 
       <div className="overflow-x-auto rounded-lg border">
         <div className="max-h-[460px] overflow-y-auto">
-          <table className="min-w-[1020px] w-full text-sm">
+          <table className="min-w-[1180px] w-full text-sm">
             <thead className="sticky top-0 z-10 bg-gray-50">
               <tr className="border-b text-gray-600">
-                <th className="w-10 px-2 py-3 text-left" scope="col">
+                <th className="w-10 px-2 py-3 text-left align-middle" scope="col">
                   <span className="sr-only">Expand details</span>
                 </th>
-                <th className="px-4 py-3 text-left">Session</th>
-                <th className="px-4 py-3 text-left">
+                <th className="px-4 py-3 text-left align-middle">Session</th>
+                <th className="min-w-[240px] max-w-[min(320px,40vw)] px-4 py-3 text-left align-middle">
                   <button type="button" onClick={() => onSort('caseTitle')} className="font-semibold">
                     Case {sortArrow('caseTitle')}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left">
+                <th className="w-[148px] px-3 py-3 text-left align-middle">
                   <button type="button" onClick={() => onSort('empathyScore')} className="font-semibold">
                     Empathy % {sortArrow('empathyScore')}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left">
+                <th className="w-[148px] px-3 py-3 text-left align-middle">
                   <button type="button" onClick={() => onSort('communicationScore')} className="font-semibold">
                     Communication % {sortArrow('communicationScore')}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left">
+                <th className="w-[148px] px-3 py-3 text-left align-middle">
                   <button type="button" onClick={() => onSort('clinicalScore')} className="font-semibold">
                     {ANALYTICS_METRICS.clinicalReasoning.shortLabel} % {sortArrow('clinicalScore')}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left">
+                <th className="w-[148px] px-3 py-3 text-left align-middle">
                   <button type="button" onClick={() => onSort('spikesCoveragePercent')} className="font-semibold">
                     SPIKES % {sortArrow('spikesCoveragePercent')}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left">
+                <th className="whitespace-nowrap px-4 py-3 text-left align-middle">
                   <button type="button" onClick={() => onSort('createdAt')} className="font-semibold">
                     Date {sortArrow('createdAt')}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left">Actions</th>
+                <th className="px-4 py-3 text-left align-middle">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -281,7 +281,7 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
                       <tr
                         className={cn(
                           index % 2 === 0 ? 'bg-white' : 'bg-gray-50/60',
-                          'border-b hover:bg-blue-50/50 cursor-pointer'
+                          'border-b cursor-pointer transition-colors hover:bg-gray-50'
                         )}
                         onClick={(e) => {
                           const el = e.target as HTMLElement
@@ -309,14 +309,18 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
                             />
                           </button>
                         </td>
-                        <td className="px-4 py-3 font-medium text-gray-900">#{s.sessionId}</td>
-                        <td className="px-4 py-3">{s.caseTitle}</td>
-                        <td className="px-4 py-3">{metricBar(s.empathyScore, 'bg-blue-500')}</td>
-                        <td className="px-4 py-3">{metricBar(s.communicationScore, 'bg-purple-500')}</td>
-                        <td className="px-4 py-3">{metricBar(s.clinicalScore, 'bg-green-500')}</td>
-                        <td className="px-4 py-3">{metricBar(s.spikesCoveragePercent, 'bg-orange-500')}</td>
-                        <td className="px-4 py-3 text-gray-600">{new Date(s.createdAt).toLocaleString()}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 align-middle font-medium text-gray-900">#{s.sessionId}</td>
+                        <td className="min-w-[240px] max-w-[min(320px,40vw)] px-4 py-3 align-middle text-gray-900">
+                          {s.caseTitle}
+                        </td>
+                        <td className="px-3 py-3 align-middle">{metricBar(s.empathyScore, 'bg-blue-500')}</td>
+                        <td className="px-3 py-3 align-middle">{metricBar(s.communicationScore, 'bg-purple-500')}</td>
+                        <td className="px-3 py-3 align-middle">{metricBar(s.clinicalScore, 'bg-green-500')}</td>
+                        <td className="px-3 py-3 align-middle">{metricBar(s.spikesCoveragePercent, 'bg-orange-500')}</td>
+                        <td className="whitespace-nowrap px-4 py-3 align-middle text-gray-600">
+                          {new Date(s.createdAt).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 align-middle">
                           <button
                             type="button"
                             onClick={(e) => {

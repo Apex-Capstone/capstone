@@ -1,5 +1,5 @@
 import type { TraineeSessionAnalytics } from '@/types/analytics'
-import { formatPercent } from '@/utils/format'
+import { formatPercentWhole } from '@/utils/format'
 
 /** Canonical SPIKES stage order for display (matches backend scoring). */
 const SPIKES_STAGE_ORDER = ['S', 'P', 'I', 'K', 'E', 'S2'] as const
@@ -57,7 +57,7 @@ type AnalyticsSessionPreviewProps = {
 export function AnalyticsSessionPreview({ session }: AnalyticsSessionPreviewProps) {
   const eo =
     typeof session.eoAddressedRate === 'number' && Number.isFinite(session.eoAddressedRate)
-      ? formatPercent(session.eoAddressedRate)
+      ? formatPercentWhole(session.eoAddressedRate)
       : null
 
   const stages =
@@ -94,14 +94,14 @@ export function AnalyticsSessionPreview({ session }: AnalyticsSessionPreviewProp
 
       <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-gray-100 pt-3 text-xs text-gray-600">
         <span>
-          SPIKES coverage <strong className="font-semibold text-gray-900">{formatPercent(session.spikesCoveragePercent)}</strong>
+          SPIKES coverage <strong className="font-semibold text-gray-900">{formatPercentWhole(session.spikesCoveragePercent)}</strong>
         </span>
         <span className="text-gray-300" aria-hidden>
           ·
         </span>
         <span>
           SPIKES completion{' '}
-          <strong className="font-semibold text-gray-900">{formatPercent(session.spikesCompletionScore)}</strong>
+          <strong className="font-semibold text-gray-900">{formatPercentWhole(session.spikesCompletionScore)}</strong>
         </span>
       </div>
 

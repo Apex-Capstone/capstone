@@ -18,14 +18,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AnalyticsSessionsTable } from '@/components/analytics/AnalyticsSessionsTable'
 import { fetchMySessionAnalytics } from '@/api/analytics.api'
 import type { TraineeSessionAnalytics } from '@/types/analytics'
-import { formatPercent } from '@/utils/format'
+import { formatPercentWhole } from '@/utils/format'
 import {
   ANALYTICS_METRICS,
   ANALYTICS_TREND_METRIC_ORDER,
   getMetricByDataKey,
-  metricLabelForInsightKey,
   type AnalyticsMetricId,
 } from '@/components/analytics/analyticsMetricConfig'
+import { getAnalyticsCoachingInsight } from '@/components/analytics/analyticsCoachingInsight'
 import { MetricInfoTooltip } from '@/components/analytics/MetricInfoTooltip'
 import {
   DEFAULT_ANALYTICS_TIME_RANGE,
@@ -138,15 +138,15 @@ export const Analytics = () => {
     if (summary.empty) return '—'
     switch (id) {
       case 'empathy':
-        return formatPercent(summary.empathy)
+        return formatPercentWhole(summary.empathy)
       case 'communication':
-        return formatPercent(summary.communication)
+        return formatPercentWhole(summary.communication)
       case 'clinicalReasoning':
-        return formatPercent(summary.clinical)
+        return formatPercentWhole(summary.clinical)
       case 'spikes':
-        return formatPercent(summary.spikes)
+        return formatPercentWhole(summary.spikes)
       case 'overall':
-        return formatPercent(summary.overall)
+        return formatPercentWhole(summary.overall)
     }
   }
 
@@ -163,29 +163,10 @@ export const Analytics = () => {
     [filteredSessions]
   )
 
-  const insight = useMemo(() => {
-    if (filteredSessions.length === 0) {
-      return 'No sessions in this time range. Try a different time filter or complete more sessions.'
-    }
-
-    const withEO = filteredSessions.find((s) => typeof s.eoAddressedRate === 'number')
-    if (withEO && typeof withEO.eoAddressedRate === 'number') {
-      return `You responded to ${formatPercent(withEO.eoAddressedRate)} of empathy opportunities.`
-    }
-
-    if (summary.empty) {
-      return 'No sessions in this time range to analyze yet.'
-    }
-
-    const scores = [
-      { key: 'empathy' as const, value: summary.empathy },
-      { key: 'communication' as const, value: summary.communication },
-      { key: 'clinical' as const, value: summary.clinical },
-      { key: 'spikes' as const, value: summary.spikes },
-    ]
-    scores.sort((a, b) => b.value - a.value)
-    return `Your strongest average area right now is ${metricLabelForInsightKey(scores[0].key)}.`
-  }, [filteredSessions, summary])
+  const insight = useMemo(
+    () => getAnalyticsCoachingInsight(filteredSessions, summary),
+    [filteredSessions, summary]
+  )
 
   if (loading) {
     return (
@@ -219,7 +200,7 @@ export const Analytics = () => {
               <span className="text-gray-900">My Analytics</span>
             </nav>
 
-            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">My Analytics</h1>
                 <p className="mt-2 text-gray-600">
@@ -242,30 +223,30 @@ export const Analytics = () => {
             ) : sessions.length === 0 ? (
               <AnalyticsEmptyState />
             ) : (
-              <div className="space-y-8">
+              <div className="space-y-6">
                 <AnalyticsLowDataHint sessionCount={sessions.length} />
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                   {SUMMARY_METRIC_IDS.map((id) => {
                     const m = ANALYTICS_METRICS[id]
                     const labelText = id === 'overall' ? m.label : `Average ${m.label}`
                     return (
-                      <Card key={id}>
-                        <CardContent className="pt-6 text-center">
-                          <div className="flex items-start justify-center gap-1">
-                            <p className="text-sm text-gray-600">{labelText}</p>
-                            <MetricInfoTooltip description={m.description} className="mt-0.5" />
+                      <Card key={id} className="flex flex-col">
+                        <CardContent className="flex flex-1 flex-col items-center justify-between px-4 pb-6 pt-6 text-center">
+                          <div className="flex min-h-[2.75rem] w-full items-center justify-center gap-1">
+                            <span className="text-center text-sm leading-snug text-gray-600">{labelText}</span>
+                            <MetricInfoTooltip description={m.description} />
                           </div>
-                          <p className={`mt-1 text-2xl font-bold ${m.valueColorClass}`}>
+                          <p className={`mt-3 text-2xl font-bold tabular-nums ${m.valueColorClass}`}>
                             {summaryMetricDisplay(id)}
                           </p>
                         </CardContent>
                       </Card>
                     )
                   })}
-                  <Card>
-                    <CardContent className="pt-6 text-center">
-                      <p className="text-sm text-gray-600">Completed Sessions</p>
-                      <p className="mt-1 text-2xl font-bold text-gray-700">
+                  <Card className="flex flex-col">
+                    <CardContent className="flex flex-1 flex-col items-center justify-between px-4 pb-6 pt-6 text-center">
+                      <p className="flex min-h-[2.75rem] items-center text-sm text-gray-600">Completed Sessions</p>
+                      <p className="mt-3 text-2xl font-bold tabular-nums text-gray-700">
                         {summary.empty ? '0' : summary.total}
                       </p>
                     </CardContent>
@@ -273,13 +254,11 @@ export const Analytics = () => {
                 </div>
 
                 <Card>
-                  <CardHeader>
+                  <CardHeader className="space-y-1 pb-2 pt-5">
                     <CardTitle>Progress Over Time</CardTitle>
-                    <CardDescription>
-                      Empathy, Communication, Clinical Reasoning, and SPIKES coverage by session date.
-                    </CardDescription>
+                    <CardDescription>Scores by session</CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="pb-5 pt-0">
                     <div className="h-[320px] w-full">
                       {trendData.length === 0 ? (
                         <div className="flex h-full items-center justify-center px-4 text-center text-sm text-gray-500">
@@ -293,7 +272,9 @@ export const Analytics = () => {
                             <YAxis domain={[0, 100]} />
                             <RechartsTooltip
                               formatter={(value: unknown, name: unknown) => [
-                                formatPercent(typeof value === 'number' ? value : Number(value)),
+                                formatPercentWhole(
+                                  typeof value === 'number' ? value : Number(value)
+                                ),
                                 name == null ? '' : String(name),
                               ]}
                             />
@@ -324,13 +305,14 @@ export const Analytics = () => {
                 </Card>
 
                 <Card>
-                  <CardHeader>
+                  <CardHeader className="space-y-1 pb-2 pt-5">
                     <div className="flex flex-wrap items-center gap-2">
                       <CardTitle>SPIKES Coverage Trend</CardTitle>
                       <MetricInfoTooltip description={ANALYTICS_METRICS.spikes.description} />
                     </div>
+                    <CardDescription>Scores by session</CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="pb-5 pt-0">
                     <div className="h-[300px] w-full">
                       {trendData.length === 0 ? (
                         <div className="flex h-full items-center justify-center px-4 text-center text-sm text-gray-500">
@@ -344,7 +326,9 @@ export const Analytics = () => {
                             <YAxis domain={[0, 100]} />
                             <RechartsTooltip
                               formatter={(value: unknown, name: unknown) => [
-                                formatPercent(typeof value === 'number' ? value : Number(value)),
+                                formatPercentWhole(
+                                  typeof value === 'number' ? value : Number(value)
+                                ),
                                 name == null ? '' : String(name),
                               ]}
                             />
@@ -361,17 +345,17 @@ export const Analytics = () => {
                 </Card>
 
                 <Card>
-                  <CardContent className="pt-6">
+                  <CardContent className="px-4 pb-5 pt-5 sm:px-6">
                     <AnalyticsSessionsTable key={timeRange} sessions={filteredSessions} />
                   </CardContent>
                 </Card>
 
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Insight</CardTitle>
+                  <CardHeader className="pb-2 pt-5">
+                    <CardTitle>Coaching insight</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-gray-700">{insight}</p>
+                  <CardContent className="pb-5 pt-0">
+                    <p className="text-sm leading-relaxed text-gray-700">{insight}</p>
                   </CardContent>
                 </Card>
               </div>
