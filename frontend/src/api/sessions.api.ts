@@ -3,6 +3,7 @@
  */
 import api from '@/api/client'
 import type {
+  AudioToneAnalysis,
   Session,
   SessionDTO,
   SessionDetail,
@@ -13,6 +14,7 @@ import type {
   TurnResponseWithAudioDTO,
 } from '@/types/session'
 import {
+  audioToneFromDTO,
   sessionFromDTO,
   sessionListFromDTO,
   turnResponseWithAudioFromDTO,
@@ -43,10 +45,11 @@ export const submitTurn = async (
   text: string,
   audioUrl?: string,
   enableTts = false,
+  voiceTone?: AudioToneAnalysis,
 ): Promise<TurnResponseWithAudio> => {
   const res = await api.post<TurnResponseWithAudioDTO>(
     `${BASE}/${sessionId}/turns`,
-    toTurnCreatePayload(text, audioUrl, enableTts)
+    toTurnCreatePayload(text, audioUrl, enableTts, voiceTone)
   )
   return turnResponseWithAudioFromDTO(res.data)
 }
@@ -122,6 +125,7 @@ export const submitAudioTurn = async (
 /** Result of audio-only transcription without advancing the dialogue. */
 export interface AudioTranscriptionResult {
   transcript: string
+  audioTone?: AudioToneAnalysis
 }
 
 /**
@@ -134,7 +138,7 @@ export const transcribeAudioTurn = async (
   const formData = new FormData()
   formData.append('audio_file', audioFile)
 
-  const res = await api.post<{ transcript: string }>(
+  const res = await api.post<{ transcript: string; audio_tone?: TurnResponseWithAudioDTO['audio_tone'] }>(
     `${BASE}/${sessionId}/audio:transcribe`,
     formData,
     {
@@ -146,6 +150,7 @@ export const transcribeAudioTurn = async (
 
   return {
     transcript: res.data.transcript,
+    audioTone: audioToneFromDTO(res.data.audio_tone),
   }
 }
 

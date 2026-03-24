@@ -22,6 +22,8 @@ interface ChatBubbleProps {
 export const ChatBubble = ({ message, onReplayAudio }: ChatBubbleProps) => {
   const isUser = message.role === 'user'
   const assistantAudioUrl = message.assistantAudioUrl
+  const voiceToneLabels =
+    message.voiceTone?.labels?.filter((label) => label.toLowerCase() !== 'unclear').slice(0, 2) ?? []
 
   return (
     <div
@@ -61,6 +63,18 @@ export const ChatBubble = ({ message, onReplayAudio }: ChatBubbleProps) => {
         >
           {message.source === 'audio' ? 'Voice' : 'Text'} • {new Date(message.timestamp).toLocaleTimeString()}
         </p>
+        {isUser && message.source === 'audio' && voiceToneLabels.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {voiceToneLabels.map((label) => (
+              <span
+                key={label}
+                className="rounded-full bg-emerald-500/80 px-2 py-0.5 text-[10px] font-medium text-emerald-50"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        )}
         {!isUser && assistantAudioUrl && onReplayAudio && (
           <Button
             type="button"

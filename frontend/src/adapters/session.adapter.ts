@@ -2,6 +2,7 @@
  * Maps session and turn DTOs to domain models and builds request payloads for `/v1/sessions`.
  */
 import type {
+  AudioToneAnalysis,
   Session,
   SessionDTO,
   SessionDetail,
@@ -13,6 +14,28 @@ import type {
   SessionListResponse,
   SessionListResponseDTO,
 } from '@/types/session'
+
+export function audioToneFromDTO(dto?: TurnResponseWithAudioDTO['audio_tone']): AudioToneAnalysis | undefined {
+  if (!dto) return undefined
+
+  return {
+    primary: dto.primary,
+    secondary: dto.secondary ?? undefined,
+    confidence: dto.confidence,
+    dimensions: {
+      valence: dto.dimensions?.valence ?? undefined,
+      arousal: dto.dimensions?.arousal ?? undefined,
+      paceWpm: dto.dimensions?.pace_wpm ?? undefined,
+      volumeDb: dto.dimensions?.volume_db ?? undefined,
+      pitchHz: dto.dimensions?.pitch_hz ?? undefined,
+      jitter: dto.dimensions?.jitter ?? undefined,
+      shimmer: dto.dimensions?.shimmer ?? undefined,
+      pausesPerMin: dto.dimensions?.pauses_per_min ?? undefined,
+    },
+    labels: dto.labels ?? [],
+    provider: dto.provider,
+  }
+}
 
 /**
  * Converts a session DTO to the camelCase {@link Session} model.
@@ -71,6 +94,7 @@ export function turnResponseWithAudioFromDTO(dto: TurnResponseWithAudioDTO): Tur
     turn: turnFromDTO(dto.turn),
     patientReply: dto.patient_reply,
     transcript: dto.transcript ?? undefined,
+    audioTone: audioToneFromDTO(dto.audio_tone),
     audioUrl: dto.audio_url ?? undefined,
     assistantAudioUrl: dto.assistant_audio_url ?? undefined,
     spikesStage: dto.spikes_stage ?? undefined,
@@ -125,10 +149,34 @@ export function toSessionCreatePayload(caseId: number, forceNew?: boolean) {
  * @param enableTts - Request TTS audio for assistant reply
  * @returns Serialized turn payload
  */
-export function toTurnCreatePayload(text: string, audioUrl?: string, enableTts = false) {
+export function toTurnCreatePayload(
+  text: string,
+  audioUrl?: string,
+  enableTts = false,
+  voiceTone?: AudioToneAnalysis
+) {
   return {
     text,
     audio_url: audioUrl,
     enable_tts: enableTts,
+    voice_tone: voiceTone
+      ? {
+          primary: voiceTone.primary,
+          secondary: voiceTone.secondary,
+          confidence: voiceTone.confidence,
+          dimensions: {
+            valence: voiceTone.dimensions.valence,
+            arousal: voiceTone.dimensions.arousal,
+            pace_wpm: voiceTone.dimensions.paceWpm,
+            volume_db: voiceTone.dimensions.volumeDb,
+            pitch_hz: voiceTone.dimensions.pitchHz,
+            jitter: voiceTone.dimensions.jitter,
+            shimmer: voiceTone.dimensions.shimmer,
+            pauses_per_min: voiceTone.dimensions.pausesPerMin,
+          },
+          labels: voiceTone.labels,
+          provider: voiceTone.provider,
+        }
+      : undefined,
   }
 }

@@ -10,6 +10,7 @@ from domain.entities.turn import Turn
 async def analyze_user_input(
     pipeline: NLUPipeline,
     text: str,
+    voice_tone: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Analyze user (clinician) input for metrics and spans."""
     analysis = await pipeline.analyze(text)
@@ -36,6 +37,8 @@ async def analyze_user_input(
         "empathy_response": empathy_response,
         "empathy_response_type": empathy_response_type,
     }
+    if voice_tone:
+        metrics["voice_tone"] = voice_tone
 
     return metrics, all_spans
 

@@ -7,7 +7,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { getCase } from '@/api/cases.api'
 import { createSession, transcribeAudioTurn, submitTurn, closeSession, getSession, fetchAssistantAudioObjectUrl } from '@/api/sessions.api'
 import type { Case as CaseType } from '@/types/case'
-import type { Message } from '@/types/session'
+import type { AudioToneAnalysis, Message } from '@/types/session'
 
 import { ChatBubble } from '@/components/ChatBubble'
 import { Navbar } from '@/components/Navbar'
@@ -49,6 +49,36 @@ type ApiErrorShape = {
       detail?: string
       message?: string
     }
+  }
+}
+
+const parseVoiceToneFromMetrics = (metricsJson?: string): AudioToneAnalysis | undefined => {
+  if (!metricsJson) return undefined
+
+  try {
+    const parsed = JSON.parse(metricsJson)
+    const rawTone = parsed?.voice_tone
+    if (!rawTone || typeof rawTone !== 'object') return undefined
+
+    return {
+      primary: typeof rawTone.primary === 'string' ? rawTone.primary : 'neutral',
+      secondary: typeof rawTone.secondary === 'string' ? rawTone.secondary : undefined,
+      confidence: typeof rawTone.confidence === 'number' ? rawTone.confidence : 0,
+      dimensions: {
+        valence: typeof rawTone.dimensions?.valence === 'number' ? rawTone.dimensions.valence : undefined,
+        arousal: typeof rawTone.dimensions?.arousal === 'number' ? rawTone.dimensions.arousal : undefined,
+        paceWpm: typeof rawTone.dimensions?.pace_wpm === 'number' ? rawTone.dimensions.pace_wpm : undefined,
+        volumeDb: typeof rawTone.dimensions?.volume_db === 'number' ? rawTone.dimensions.volume_db : undefined,
+        pitchHz: typeof rawTone.dimensions?.pitch_hz === 'number' ? rawTone.dimensions.pitch_hz : undefined,
+        jitter: typeof rawTone.dimensions?.jitter === 'number' ? rawTone.dimensions.jitter : undefined,
+        shimmer: typeof rawTone.dimensions?.shimmer === 'number' ? rawTone.dimensions.shimmer : undefined,
+        pausesPerMin: typeof rawTone.dimensions?.pauses_per_min === 'number' ? rawTone.dimensions.pauses_per_min : undefined,
+      },
+      labels: Array.isArray(rawTone.labels) ? rawTone.labels.filter((label: unknown): label is string => typeof label === 'string') : [],
+      provider: typeof rawTone.provider === 'string' ? rawTone.provider : 'prosody_v1',
+    }
+  } catch {
+    return undefined
   }
 }
 
@@ -142,8 +172,13 @@ export const CaseDetail = () => {
             role: turn.role as 'user' | 'assistant',
             content: turn.text,
             timestamp: turn.timestamp,
-            source: turn.role === 'user' && turn.audioUrl ? 'audio' : 'text',
+            source:
+              turn.role === 'user' &&
+              (turn.audioUrl || parseVoiceToneFromMetrics(turn.metricsJson))
+                ? 'audio'
+                : 'text',
             assistantAudioUrl: turn.role === 'assistant' ? turn.audioUrl : undefined,
+            voiceTone: turn.role === 'user' ? parseVoiceToneFromMetrics(turn.metricsJson) : undefined,
           }))
           setMessages(restoredMessages)
         } else {
@@ -165,8 +200,13 @@ export const CaseDetail = () => {
               role: turn.role as 'user' | 'assistant',
               content: turn.text,
               timestamp: turn.timestamp,
-              source: turn.role === 'user' && turn.audioUrl ? 'audio' : 'text',
+              source:
+                turn.role === 'user' &&
+                (turn.audioUrl || parseVoiceToneFromMetrics(turn.metricsJson))
+                  ? 'audio'
+                  : 'text',
               assistantAudioUrl: turn.role === 'assistant' ? turn.audioUrl : undefined,
+              voiceTone: turn.role === 'user' ? parseVoiceToneFromMetrics(turn.metricsJson) : undefined,
             }))
             setMessages(restoredMessages)
           } catch (creationError) {
@@ -455,6 +495,7 @@ export const CaseDetail = () => {
       updateMessage(pendingMessageId, {
         content: transcription.transcript || 'Voice message sent.',
         status: 'sent',
+        voiceTone: transcription.audioTone,
       })
 
       setVoiceStatus(null)
@@ -464,6 +505,7 @@ export const CaseDetail = () => {
         transcription.transcript,
         undefined,
         audioResponsesEnabled,
+        transcription.audioTone,
       )
 
       if (response.spikesStage) {

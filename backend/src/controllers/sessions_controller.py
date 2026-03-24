@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from adapters.audio_tone_adapter import AudioToneAdapter
 from adapters.asr.whisper_adapter import WhisperAdapter
 from adapters.llm.openai_adapter import OpenAIAdapter
 from adapters.nlu.simple_rule_nlu import SimpleRuleNLU
@@ -22,6 +23,7 @@ from domain.entities.user import User
 from repositories.feedback_repo import FeedbackRepository
 from repositories.session_repo import SessionRepository
 from domain.models.sessions import (
+    AudioToneAnalysis,
     FeedbackResponse,
     SessionCreate,
     SessionDetailResponse,
@@ -116,6 +118,29 @@ def _validate_session_write_access(session_id: int, db: Session, current_user: U
 class AudioTranscriptionResponse(BaseModel):
     """Audio transcription payload before patient response generation."""
     transcript: str
+    audio_tone: AudioToneAnalysis | None = None
+
+
+async def _transcribe_and_analyze_audio(
+    audio_file: UploadFile,
+) -> tuple[str, dict | None]:
+    """Run ASR and best-effort acoustic tone analysis on the uploaded audio."""
+    audio_format = _normalize_audio_extension(audio_file)
+
+    audio_data = await audio_file.read()
+    _validate_audio_payload(audio_data)
+
+    asr_adapter = WhisperAdapter()
+    transcribed_text = await asr_adapter.transcribe_audio(
+        audio_data,
+        audio_format=audio_format,
+    )
+    audio_tone = await AudioToneAdapter().analyze_audio(
+        audio_data,
+        audio_format=audio_format,
+        transcript=transcribed_text,
+    )
+    return transcribed_text, audio_tone
 
 
 class TurnListResponse(BaseModel):
@@ -193,11 +218,13 @@ async def submit_audio_turn(
     enable_tts: Annotated[bool, Form()] = False,
 ):
     """Upload audio file and process it as a normal conversation turn."""
-    transcription = await transcribe_audio_turn(session_id, audio_file, db, current_user)
+    _validate_session_write_access(session_id, db, current_user)
+    transcript, audio_tone = await _transcribe_and_analyze_audio(audio_file)
 
     # Process as turn
     turn_data = TurnCreate(
-        text=transcription.transcript,
+        text=transcript,
+        voice_tone=audio_tone,
         enable_tts=enable_tts,
     )
 
@@ -227,7 +254,8 @@ async def submit_audio_turn(
     return TurnResponseWithAudio(
         turn=patient_turn.model_copy(update={"audio_url": resolved_assistant_audio_url}),
         patient_reply=patient_turn.text,
-        transcript=transcription.transcript,
+        transcript=transcript,
+        audio_tone=audio_tone,
         audio_url=None,
         assistant_audio_url=resolved_assistant_audio_url,
         spikes_stage=session_detail.current_spikes_stage,
@@ -243,22 +271,11 @@ async def transcribe_audio_turn(
 ):
     """Upload audio file and return only the transcript."""
     _validate_session_write_access(session_id, db, current_user)
-
-    audio_format = _normalize_audio_extension(audio_file)
-
-    # Read audio file
-    audio_data = await audio_file.read()
-    _validate_audio_payload(audio_data)
-
-    # Transcribe with ASR
-    asr_adapter = WhisperAdapter()
-    transcribed_text = await asr_adapter.transcribe_audio(
-        audio_data,
-        audio_format=audio_format,
-    )
+    transcribed_text, audio_tone = await _transcribe_and_analyze_audio(audio_file)
 
     return AudioTranscriptionResponse(
         transcript=transcribed_text,
+        audio_tone=audio_tone,
     )
 
 
