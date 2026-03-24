@@ -3,14 +3,16 @@
  */
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { Link } from 'react-router-dom'
 import { fetchResearchData, type ResearchData } from '@/api/research.api'
 import { useAuthStore } from '@/store/authStore'
+import { ResearchSessionsTable } from '@/components/research/ResearchSessionsTable'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { AlertTriangle, Database, Download, Shield, BarChart3, TrendingUp } from 'lucide-react'
+import { AlertTriangle, Download, Shield, BarChart3, TrendingUp } from 'lucide-react'
 import {
   LineChart,
   Line,
@@ -53,19 +55,6 @@ const formatScoreTooltipPercent = (value: unknown) => {
   const n = typeof value === 'number' ? value : Number.parseFloat(String(value))
   const clamped = safePercent(Number.isFinite(n) ? n : 0)
   return `${Number.parseFloat(String(clamped)).toFixed(2)}%`
-}
-
-/**
- * Formats session timestamps for tables; falls back to em dash when invalid.
- *
- * @param value - ISO string or empty
- * @returns Locale string or `—`
- */
-const formatTimestamp = (value: string | null | undefined) => {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleString()
 }
 
 /**
@@ -518,7 +507,6 @@ export const Research = () => {
   const [loading, setLoading] = useState(true)
   const [exportingMetrics, setExportingMetrics] = useState(false)
   const [exportingTranscripts, setExportingTranscripts] = useState(false)
-  const [exportingSessionId, setExportingSessionId] = useState<string | null>(null)
 
   /**
    * Reads JWT from persisted `auth-storage` for authenticated downloads.
@@ -596,33 +584,6 @@ export const Research = () => {
       console.error('Failed to download transcripts CSV:', err)
     } finally {
       setExportingTranscripts(false)
-    }
-  }
-
-  /**
-   * Downloads a single anonymized session transcript CSV by `anonSessionId`.
-   *
-   * @param anonSessionId - Session identifier from the anonymized list
-   * @remarks
-   * Sanitizes the id for the filename; no-op when `getToken()` returns null.
-   */
-  const handleExportSessionTranscript = async (anonSessionId: string) => {
-    const token = getToken()
-    if (!token) return
-    setExportingSessionId(anonSessionId)
-    try {
-      const response = await fetch(
-        `${API_URL}/v1/research/export/session/${encodeURIComponent(anonSessionId)}.csv`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      if (!response.ok) throw new Error('Session export failed')
-      const blob = await response.blob()
-      const safe = anonSessionId.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 32)
-      downloadBlob(blob, `session_${safe}.csv`)
-    } catch (err) {
-      console.error('Failed to export session transcript:', err)
-    } finally {
-      setExportingSessionId(null)
     }
   }
 
@@ -794,6 +755,8 @@ export const Research = () => {
       </div>
     )
   }
+
+  const displayedSessions = data.anonymizedSessions.slice(0, 10)
 
   return (
     <div className="h-screen flex flex-col">
@@ -1079,95 +1042,24 @@ export const Research = () => {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Database className="h-5 w-5 text-gray-600" />
                     Anonymized Session Data
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-2">Session ID</th>
-                          <th className="text-left py-2">Age Group</th>
-                          <th className="text-left py-2">Gender</th>
-                          <th className="text-left py-2">Empathy Score</th>
-                          <th className="text-left py-2">Communication</th>
-                          <th className="text-left py-2">SPIKES Stage</th>
-                          <th className="text-left py-2">Clinical Score</th>
-                          <th className="text-left py-2">Timestamp</th>
-                          {user?.role === 'admin' && (
-                            <th className="text-left py-2">Actions</th>
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.anonymizedSessions.map((session) => (
-                          <tr key={session.sessionId} className="border-b">
-                            <td className="py-2 font-mono text-xs">{session.sessionId}</td>
-                            <td className="py-2">{session.demographics.ageGroup}</td>
-                            <td className="py-2 capitalize">{session.demographics.gender}</td>
-                            <td className="py-2">
-                              <div className="flex items-center gap-2">
-                                <div className="w-12 h-2 bg-gray-200 rounded-full">
-                                  <div
-                                    className="h-full bg-emerald-500 rounded-full"
-                                    style={{ width: `${safePercent(session.scores.empathy)}%` }}
-                                  />
-                                </div>
-                                <span className="font-medium">
-                                  {(session.scores.empathy ?? 0).toFixed(0)}%
-                                </span>
-                              </div>
-                            </td>
-                            <td className="py-2 capitalize">
-                              {session.spikes_stage ?? '—'}
-                            </td>
-                            <td className="py-2">
-                              <div className="flex items-center gap-2">
-                                <div className="w-12 h-2 bg-gray-200 rounded-full">
-                                  <div
-                                    className="h-full bg-sky-500 rounded-full"
-                                    style={{ width: `${safePercent(session.scores.communication)}%` }}
-                                  />
-                                </div>
-                                <span className="font-medium">
-                                  {(session.scores.communication ?? 0).toFixed(0)}%
-                                </span>
-                              </div>
-                            </td>
-                            <td className="py-2">
-                              <div className="flex items-center gap-2">
-                                <div className="w-12 h-2 bg-gray-200 rounded-full">
-                                  <div
-                                    className="h-full bg-indigo-500 rounded-full"
-                                    style={{ width: `${safePercent(session.scores.clinical)}%` }}
-                                  />
-                                </div>
-                                <span className="font-medium">
-                                  {(session.scores.clinical ?? 0).toFixed(0)}%
-                                </span>
-                              </div>
-                            </td>
-                            <td className="py-2 text-xs text-gray-500">
-                              {formatTimestamp(session.timestamp)}
-                            </td>
-                            {user?.role === 'admin' && (
-                              <td className="py-2">
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={() => handleExportSessionTranscript(session.sessionId)}
-                                  disabled={exportingSessionId === session.sessionId}
-                                >
-                                  {exportingSessionId === session.sessionId ? 'Exporting…' : 'Export Transcript'}
-                                </Button>
-                              </td>
-                            )}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <p className="mb-2 text-xs text-gray-500">Showing latest 10 anonymized sessions</p>
+                  <div className="max-h-[420px] overflow-y-auto border rounded-lg">
+                    <ResearchSessionsTable
+                      sessions={displayedSessions}
+                      showActions={user?.role === 'admin'}
+                    />
+                  </div>
+                  <div className="mt-3 flex justify-end">
+                    <Link
+                      to="/research/sessions"
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      View All Sessions →
+                    </Link>
                   </div>
 
                   <div className="mt-4 text-xs text-gray-500">
