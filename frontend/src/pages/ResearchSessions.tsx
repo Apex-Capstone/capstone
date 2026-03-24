@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
+import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Database, Download } from 'lucide-react'
 import {
@@ -108,23 +108,13 @@ export const ResearchSessions = () => {
         <Sidebar />
         <main className="flex-1 overflow-y-auto md:ml-64">
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-            <nav className="mb-4 text-sm text-gray-500">
-              <Link
-                to="/dashboard"
-                className="cursor-pointer text-gray-500 hover:text-gray-700"
-              >
-                Dashboard
-              </Link>
-              {' / '}
-              <Link
-                to="/research"
-                className="cursor-pointer text-gray-500 hover:text-gray-700"
-              >
-                Research Analytics
-              </Link>
-              {' / '}
-              <span className="text-gray-900">Sessions</span>
-            </nav>
+            <Breadcrumb
+              items={[
+                { label: 'Dashboard', href: '/dashboard' },
+                { label: 'Research Analytics', href: '/research' },
+                { label: 'Sessions' },
+              ]}
+            />
 
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900">Research Sessions</h1>
