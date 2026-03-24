@@ -296,7 +296,7 @@ export const Dashboard = () => {
                       ))}
                     </div>
 
-                    <div className="mt-12 grid gap-4 sm:grid-cols-3">
+                    <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                       <div className="bg-white rounded-lg border p-4 text-center">
                         <div className="text-2xl font-bold text-emerald-600">
                           {completedTotal}
@@ -315,6 +315,14 @@ export const Dashboard = () => {
                         </div>
                         <div className="text-sm text-gray-600">Available Cases</div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/analytics')}
+                        className="bg-white rounded-lg border p-4 text-left hover:shadow-md hover:border-blue-300 transition-shadow"
+                      >
+                        <div className="text-sm font-semibold text-blue-700">My Analytics</div>
+                        <div className="mt-1 text-sm text-gray-600">View My Analytics →</div>
+                      </button>
                     </div>
                   </div>
                 )}

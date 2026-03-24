@@ -3,7 +3,7 @@
  */
 import { Link, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
-import { LayoutDashboard, FileText, Shield, BarChart3, Menu } from 'lucide-react'
+import { LayoutDashboard, FileText, Shield, BarChart3, Menu, LineChart } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -34,6 +34,12 @@ export const Sidebar = () => {
       name: 'Cases',
       href: '/dashboard',
       icon: FileText,
+      roles: ['trainee', 'admin'],
+    },
+    {
+      name: 'My Analytics',
+      href: '/analytics',
+      icon: LineChart,
       roles: ['trainee', 'admin'],
     },
     {
