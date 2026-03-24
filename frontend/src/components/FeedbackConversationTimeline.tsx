@@ -64,6 +64,12 @@ const parseMetricsBadges = (metricsJson?: string): MetricsBadges => {
       raw.question?.type === 'open'
 
     const tone = raw.tone || raw.speech_tone || raw.voice_tone
+    const voiceToneLabels = Array.isArray(raw.voice_tone?.labels)
+      ? raw.voice_tone.labels.filter(
+          (label: unknown): label is string =>
+            typeof label === 'string' && label.toLowerCase() !== 'unclear'
+        )
+      : []
 
     if (empathyDetected) {
       labels.push('Empathy detected')
@@ -76,6 +82,17 @@ const parseMetricsBadges = (metricsJson?: string): MetricsBadges => {
     if (tone === 'calm') {
       labels.push('Calm tone')
     }
+    if (tone && typeof tone === 'object') {
+      if (tone.calm === true) labels.push('Calm tone')
+      if (tone.clear === true) labels.push('Clear delivery')
+    }
+    if (
+      typeof raw.voice_tone?.primary === 'string' &&
+      raw.voice_tone.primary.toLowerCase() !== 'unclear'
+    ) {
+      labels.push(`Voice: ${raw.voice_tone.primary}`)
+    }
+    voiceToneLabels.slice(0, 2).forEach((label: string) => labels.push(`Voice: ${label}`))
 
     // Generic fallback: expose any additional boolean tags as simple labels
     if (raw.flags && typeof raw.flags === 'object') {
@@ -86,7 +103,7 @@ const parseMetricsBadges = (metricsJson?: string): MetricsBadges => {
       })
     }
 
-    return { labels }
+    return { labels: [...new Set(labels)] }
   } catch {
     return { labels: [] }
   }

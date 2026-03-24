@@ -90,7 +90,11 @@ class DialogueService:
         state = DialogueState(session)
 
         # Build legacy-compatible metrics and spans from analysis
-        user_metrics, user_spans = await analyze_user_input(self.nlu_pipeline, turn_data.text)
+        user_metrics, user_spans = await analyze_user_input(
+            self.nlu_pipeline,
+            turn_data.text,
+            voice_tone=turn_data.voice_tone,
+        )
 
         # Track question type and emotion spans in state
         # (analysis already computed inside analyze_user_input)

@@ -18,6 +18,7 @@ os.environ.setdefault("openai_api_key", "test-openai-key")
 from controllers.sessions_controller import submit_audio_turn, transcribe_audio_turn
 from core.errors import AuthorizationError, ConflictError, ExternalServiceError, ValidationError
 from db.base import Base
+from adapters.audio_tone_adapter import AudioToneAdapter
 from domain.entities.case import Case
 from domain.entities.session import Session as SessionEntity
 from domain.entities.user import User
@@ -131,16 +132,40 @@ def make_upload_file(filename: str, payload: bytes, content_type: str) -> Upload
 @pytest.mark.asyncio
 async def test_submit_audio_turn_success(monkeypatch, test_db, owner_user, active_session):
     """Audio uploads should return transcript, patient reply, and stored audio URL."""
+    fake_audio_tone = {
+        "primary": "calm",
+        "secondary": "clear",
+        "confidence": 0.84,
+        "dimensions": {
+            "valence": 0.64,
+            "arousal": 0.22,
+            "pace_wpm": 118.0,
+            "volume_db": -21.4,
+            "pitch_hz": 182.0,
+            "jitter": None,
+            "shimmer": None,
+            "pauses_per_min": 6.5,
+        },
+        "labels": ["calm", "clear"],
+        "provider": "prosody_v1",
+    }
 
     async def fake_transcribe_audio(self, audio_data: bytes, audio_format: str) -> str:
         assert audio_data == b"fake-audio"
         assert audio_format == "webm"
         return "I wanted to ask about my results."
 
+    async def fake_analyze_audio(self, audio_data: bytes, audio_format: str, transcript: str | None = None):
+        assert audio_data == b"fake-audio"
+        assert audio_format == "webm"
+        assert transcript == "I wanted to ask about my results."
+        return fake_audio_tone
+
     async def fake_process_user_turn(self, session_id: int, turn_data) -> TurnResponse:
         assert session_id == active_session.id
         assert turn_data.text == "I wanted to ask about my results."
         assert turn_data.audio_url is None
+        assert turn_data.voice_tone == fake_audio_tone
         assert turn_data.enable_tts is False
         return TurnResponse(
             id=42,
@@ -160,6 +185,7 @@ async def test_submit_audio_turn_success(monkeypatch, test_db, owner_user, activ
         return SimpleNamespace(current_spikes_stage="perception")
 
     monkeypatch.setattr(WhisperAdapter, "transcribe_audio", fake_transcribe_audio)
+    monkeypatch.setattr(AudioToneAdapter, "analyze_audio", fake_analyze_audio)
     monkeypatch.setattr(DialogueService, "process_user_turn", fake_process_user_turn)
     monkeypatch.setattr(SessionService, "get_session", fake_get_session)
 
@@ -173,6 +199,7 @@ async def test_submit_audio_turn_success(monkeypatch, test_db, owner_user, activ
     assert response.transcript == "I wanted to ask about my results."
     assert response.patient_reply == "Of course. Tell me what is on your mind."
     assert response.audio_url is None
+    assert response.audio_tone.primary == "calm"
     assert response.assistant_audio_url == "http://localhost:8000/v1/turns/42/audio"
     assert response.spikes_stage == "perception"
 
@@ -180,13 +207,35 @@ async def test_submit_audio_turn_success(monkeypatch, test_db, owner_user, activ
 @pytest.mark.asyncio
 async def test_transcribe_audio_turn_success(monkeypatch, test_db, owner_user, active_session):
     """Audio transcription endpoint should return transcript before patient reply generation."""
+    fake_audio_tone = {
+        "primary": "calm",
+        "secondary": "steady",
+        "confidence": 0.79,
+        "dimensions": {
+            "valence": 0.58,
+            "arousal": 0.3,
+            "pace_wpm": 110.0,
+            "volume_db": -19.0,
+            "pitch_hz": 176.0,
+            "jitter": None,
+            "shimmer": None,
+            "pauses_per_min": 7.0,
+        },
+        "labels": ["calm", "steady"],
+        "provider": "prosody_v1",
+    }
 
     async def fake_transcribe_audio(self, audio_data: bytes, audio_format: str) -> str:
         assert audio_data == b"fake-audio"
         assert audio_format == "webm"
         return "I wanted to ask about my results."
 
+    async def fake_analyze_audio(self, audio_data: bytes, audio_format: str, transcript: str | None = None):
+        assert transcript == "I wanted to ask about my results."
+        return fake_audio_tone
+
     monkeypatch.setattr(WhisperAdapter, "transcribe_audio", fake_transcribe_audio)
+    monkeypatch.setattr(AudioToneAdapter, "analyze_audio", fake_analyze_audio)
 
     response = await transcribe_audio_turn(
         active_session.id,
@@ -196,6 +245,7 @@ async def test_transcribe_audio_turn_success(monkeypatch, test_db, owner_user, a
     )
 
     assert response.transcript == "I wanted to ask about my results."
+    assert response.audio_tone.primary == "calm"
 
 
 @pytest.mark.asyncio
@@ -259,7 +309,11 @@ async def test_submit_audio_turn_survives_storage_failure(monkeypatch, test_db, 
     async def fake_get_session(self, session_id: int):
         return SimpleNamespace(current_spikes_stage="perception")
 
+    async def fake_analyze_audio(self, audio_data: bytes, audio_format: str, transcript: str | None = None):
+        return None
+
     monkeypatch.setattr(WhisperAdapter, "transcribe_audio", fake_transcribe_audio)
+    monkeypatch.setattr(AudioToneAdapter, "analyze_audio", fake_analyze_audio)
     monkeypatch.setattr(DialogueService, "process_user_turn", fake_process_user_turn)
     monkeypatch.setattr(SessionService, "get_session", fake_get_session)
 
@@ -290,3 +344,32 @@ async def test_submit_audio_turn_propagates_asr_failure(monkeypatch, test_db, ow
             test_db,
             owner_user,
         )
+
+
+@pytest.mark.asyncio
+async def test_transcribe_audio_turn_returns_null_audio_tone_when_analysis_skips(
+    monkeypatch,
+    test_db,
+    owner_user,
+    active_session,
+):
+    """Tone analysis is best-effort and should not block transcription."""
+
+    async def fake_transcribe_audio(self, audio_data: bytes, audio_format: str) -> str:
+        return "Voice transcript"
+
+    async def fake_analyze_audio(self, audio_data: bytes, audio_format: str, transcript: str | None = None):
+        return None
+
+    monkeypatch.setattr(WhisperAdapter, "transcribe_audio", fake_transcribe_audio)
+    monkeypatch.setattr(AudioToneAdapter, "analyze_audio", fake_analyze_audio)
+
+    response = await transcribe_audio_turn(
+        active_session.id,
+        make_upload_file("voice.webm", b"fake-audio", "audio/webm"),
+        test_db,
+        owner_user,
+    )
+
+    assert response.transcript == "Voice transcript"
+    assert response.audio_tone is None
