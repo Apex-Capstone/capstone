@@ -1,0 +1,4 @@
+Meeting Notes – March 23, 2025
+Discussed updates on current async progress.
+Went through P0, P1 and P2 to see what is realistic to achieve with the remaining time.
+Next meeting will be on Wednesday March 25th to discuss deliverables and split work on posters, final video demo and final submission.
