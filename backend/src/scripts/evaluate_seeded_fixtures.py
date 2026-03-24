@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from db.base import Base
 from domain.entities.user import User
 from domain.entities.case import Case
-from tests.test_conversation_fixture import (
+from tests.fixtures.conversation_fixture import (
     TEST_CONVERSATION_BAD,
     TEST_CONVERSATION_MEDIUM,
     TEST_CONVERSATION_GOOD,

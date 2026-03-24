@@ -11,7 +11,7 @@ This evaluates ONLY the detector/preview layer, not scoring:
 - SPIKES stages (via StageTracker)
 
 It compares:
-- Seeded gold annotations in tests.test_conversation_fixture
+- Seeded gold annotations in tests.fixtures.conversation_fixture
 - Against the current rule-based preview pipeline (SimpleRuleNLU + NLUPipeline + StageTracker)
 """
 
@@ -27,7 +27,7 @@ from typing import Any, Dict, List, Tuple, Optional, Iterable
 from adapters.nlu.simple_rule_nlu import SimpleRuleNLU
 from services.nlu_pipeline import NLUPipeline
 from services.stage_tracker import StageTracker
-from tests.test_conversation_fixture import (
+from tests.fixtures.conversation_fixture import (
     TEST_CONVERSATION_BAD,
     TEST_CONVERSATION_MEDIUM,
     TEST_CONVERSATION_GOOD,

@@ -1,8 +1,7 @@
-"""Mirrored tests for session service behaviour (non-src tree).
+"""Mirrored tests for session service behaviour.
 
-These tests intentionally duplicate backend/src/tests/test_sessions.py so that
-they are picked up when pytest is pointed at the top-level backend/tests/
-directory. Keep them in sync with the source-tree tests.
+These tests intentionally overlap with `tests/services/test_sessions.py`.
+Keep both files in sync until the suite is deduplicated.
 """
 
 import pytest
@@ -11,7 +10,6 @@ from sqlalchemy.orm import sessionmaker
 
 from db.base import Base
 from domain.entities.case import Case
-from domain.entities.session import Session
 from domain.entities.user import User
 from domain.models.sessions import SessionCreate
 from services.session_service import SessionService

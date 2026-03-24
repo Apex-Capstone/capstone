@@ -7,7 +7,7 @@ from domain.entities.case import Case
 from domain.entities.user import User
 from domain.models.sessions import FeedbackResponse
 from schemas.llm_reviewer import LLMReviewerOutput
-from tests.test_conversation_fixture import TEST_CONVERSATION_BAD
+from tests.fixtures.conversation_fixture import TEST_CONVERSATION_BAD
 from tests.utils.transcript_runner import (
     create_all_for_test_engine,
     run_fixture_seeded_transcript_through_scoring,

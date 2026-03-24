@@ -11,7 +11,7 @@ from domain.entities.user import User
 from plugins.evaluators.apex_baseline_evaluator import ApexBaselineEvaluator  # noqa: F401
 from plugins.evaluators.apex_hybrid_evaluator import ApexHybridEvaluator  # noqa: F401
 from schemas.llm_reviewer import LLMReviewerOutput
-from tests.test_conversation_fixture import TEST_CONVERSATION_BAD
+from tests.fixtures.conversation_fixture import TEST_CONVERSATION_BAD
 from tests.utils.transcript_runner import (
     create_all_for_test_engine,
     run_fixture_seeded_transcript_through_scoring,
