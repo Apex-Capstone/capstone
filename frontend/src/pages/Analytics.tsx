@@ -33,6 +33,8 @@ import {
   type AnalyticsTimeRange,
 } from '@/components/analytics/analyticsTimeFilter'
 import { AnalyticsTimeRangeControl } from '@/components/analytics/AnalyticsTimeRangeControl'
+import { AnalyticsEmptyState } from '@/components/analytics/AnalyticsEmptyState'
+import { AnalyticsLowDataHint } from '@/components/analytics/AnalyticsLowDataHint'
 
 const average = (values: number[]) =>
   values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
@@ -238,13 +240,10 @@ export const Analytics = () => {
                 <CardContent className="py-8 text-sm text-red-600">{error}</CardContent>
               </Card>
             ) : sessions.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center text-gray-600">
-                  No completed sessions yet. Complete a case to start tracking your analytics.
-                </CardContent>
-              </Card>
+              <AnalyticsEmptyState />
             ) : (
               <div className="space-y-8">
+                <AnalyticsLowDataHint sessionCount={sessions.length} />
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                   {SUMMARY_METRIC_IDS.map((id) => {
                     const m = ANALYTICS_METRICS[id]
