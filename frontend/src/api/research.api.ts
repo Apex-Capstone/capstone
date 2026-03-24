@@ -66,6 +66,7 @@ export async function downloadTranscriptsCSV(): Promise<void> {
 export interface ResearchSessionDTO {
   session_id: string | number
   case_id: number
+  case_name?: string | null
   duration_seconds: number
   state: string
   patient_model_plugin?: string | null
@@ -97,6 +98,8 @@ export interface ResearchData {
     scores: { empathy: number | null; communication: number | null; clinical: number | null }
     timestamp: string
     caseId?: number
+    /** Display title from backend `case_name` (case title). */
+    caseName?: string | null
     patientModelPlugin?: string | null
     evaluatorPlugin?: string | null
     metricsPlugins?: string | null
@@ -164,6 +167,27 @@ export async function fetchResearchSessions(
 }
 
 /**
+ * Fetches a single anonymized research session by `anon_session_id` (admin only).
+ *
+ * @throws Error on 403 or when the session is not found
+ */
+export async function fetchResearchSessionByAnonId(
+  anonSessionId: string
+): Promise<Record<string, unknown>> {
+  try {
+    const { data } = await api.get<Record<string, unknown>>(
+      `${BASE}/sessions/${encodeURIComponent(anonSessionId)}`
+    )
+    return data
+  } catch (err) {
+    if (isForbidden(err)) {
+      throw new Error('Access denied. Admin privileges required.')
+    }
+    throw err
+  }
+}
+
+/**
  * Downloads the anonymized research export as `research_export.json` in the browser.
  *
  * @remarks
@@ -218,6 +242,7 @@ export async function fetchResearchData(): Promise<ResearchData> {
         scores: { empathy, communication, clinical } as const,
         timestamp: s.timestamp ?? '',
         caseId: s.case_id,
+        caseName: s.case_name ?? null,
         patientModelPlugin: s.patient_model_plugin ?? null,
         evaluatorPlugin: s.evaluator_plugin ?? null,
         metricsPlugins: s.metrics_plugins ?? null,

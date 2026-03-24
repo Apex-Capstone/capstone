@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import type { ResearchData } from '@/api/research.api'
 import { formatPluginName as formatPluginNameFromLib } from '@/lib/formatPluginName'
+import { cn } from '@/lib/utils'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -41,13 +43,49 @@ const formatPluginName = (plugin?: string | null) => {
   return label || '—'
 }
 
+/** Prefer API `case_name`; fall back to a stable id-based label for filtering and exports. */
+const caseDisplayLabel = (session: Session) =>
+  session.caseName?.trim() ||
+  (typeof session.caseId === 'number' ? `Case ${session.caseId}` : '—')
+
+const StatusBadge = ({ state }: { state?: string | null }) => {
+  const s = (state ?? '').toLowerCase().trim()
+  if (!s) return <span className="text-gray-400">—</span>
+  if (s === 'completed') {
+    return (
+      <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+        Completed
+      </span>
+    )
+  }
+  if (s === 'active') {
+    return (
+      <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+        Active
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium capitalize text-gray-700">
+      {state}
+    </span>
+  )
+}
+
 type SortKey = 'case' | 'empathy' | 'communication' | 'clinical' | 'spikes' | 'duration' | 'date'
+
+const thBase =
+  'border-b border-gray-200 bg-gray-50 px-4 py-3 text-left text-xs font-semibold text-gray-700 whitespace-nowrap'
+const thMetric = `${thBase} text-center`
+const tdBase = 'border-b border-gray-100 px-4 py-3 align-middle text-sm text-gray-800'
+const tdMetric = `${tdBase} text-center`
 
 export function ResearchSessionsTable({
   sessions = [],
   showActions = false,
   showExperimentMetadata = false,
 }: ResearchSessionsTableProps) {
+  const navigate = useNavigate()
   const [exportingSessionId, setExportingSessionId] = useState<string | null>(null)
   const [searchText, setSearchText] = useState('')
   const [caseFilter, setCaseFilter] = useState('all')
@@ -59,6 +97,9 @@ export function ResearchSessionsTable({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const pageSize = 10
   const safeSessions = Array.isArray(sessions) ? sessions : []
+
+  const tableColumnCount =
+    5 + (showExperimentMetadata ? 7 : 0) + (showActions ? 1 : 0)
 
   const getToken = (): string | null => {
     try {
@@ -80,7 +121,11 @@ export function ResearchSessionsTable({
     window.URL.revokeObjectURL(url)
   }
 
-  const handleExportSessionTranscript = async (anonSessionId: string) => {
+  const handleExportSessionTranscript = async (
+    event: { stopPropagation: () => void },
+    anonSessionId: string
+  ) => {
+    event.stopPropagation()
     const token = getToken()
     if (!token) return
     setExportingSessionId(anonSessionId)
@@ -128,11 +173,16 @@ export function ResearchSessionsTable({
 
   const spikesOptions = ['0-25', '25-50', '50-75', '75-100']
   const caseOptions = useMemo(() => {
-    const values = new Set<number>()
+    const labelById = new Map<number, string>()
     for (const session of safeSessions) {
-      if (typeof session.caseId === 'number') values.add(session.caseId)
+      if (typeof session.caseId !== 'number') continue
+      if (!labelById.has(session.caseId)) {
+        labelById.set(session.caseId, caseDisplayLabel(session))
+      }
     }
-    return [...values].sort((a, b) => a - b)
+    return [...labelById.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([id, label]) => ({ id, label }))
   }, [safeSessions])
 
   const filteredSessions = useMemo(() => {
@@ -262,14 +312,24 @@ export function ResearchSessionsTable({
     value: number | null | undefined,
     colorClass: 'bg-emerald-500' | 'bg-sky-500' | 'bg-indigo-500' | 'bg-amber-500'
   ) => {
-    if (value == null || !Number.isFinite(value)) return <span className="text-gray-500">—</span>
+    if (value == null || !Number.isFinite(value)) {
+      return <span className="text-gray-400">—</span>
+    }
     const percent = safePercent(value)
     return (
-      <div className="flex items-center gap-2">
-        <div className="w-12 h-2 bg-gray-200 rounded">
-          <div className={`h-2 rounded ${colorClass}`} style={{ width: `${percent}%` }} />
+      <div className="inline-flex items-center justify-center gap-2">
+        <div className="h-2 w-12 shrink-0 overflow-hidden rounded bg-gray-200">
+          <div
+            className={cn('h-2 rounded', colorClass)}
+            style={{
+              width: `${percent}%`,
+              minWidth: percent > 0 ? '6px' : undefined,
+            }}
+          />
         </div>
-        <span className="font-medium">{percent.toFixed(0)}%</span>
+        <span className="min-w-[2.5rem] text-left font-medium tabular-nums text-gray-900">
+          {percent.toFixed(0)}%
+        </span>
       </div>
     )
   }
@@ -291,6 +351,10 @@ export function ResearchSessionsTable({
     }
   }, [currentPage, totalPages])
 
+  const openSessionDetail = (sessionId: string) => {
+    navigate(`/admin/sessions/${encodeURIComponent(sessionId)}`)
+  }
+
   return (
     <div>
       <div className="mb-3 grid gap-3 md:grid-cols-2 lg:grid-cols-5">
@@ -307,9 +371,9 @@ export function ResearchSessionsTable({
           className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
           <option value="all">All Cases</option>
-          {caseOptions.map((value) => (
-            <option key={value} value={value}>
-              Case {value}
+          {caseOptions.map(({ id, label }) => (
+            <option key={id} value={id}>
+              {label}
             </option>
           ))}
         </select>
@@ -349,54 +413,94 @@ export function ResearchSessionsTable({
       </div>
 
       <div className="overflow-x-auto">
-        <div className="max-h-[420px] overflow-y-auto border rounded-lg min-w-[980px]">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b sticky top-0 bg-white z-10">
-                <th className="text-left py-2">Session ID</th>
+        <div className="max-h-[420px] min-w-[980px] overflow-y-auto rounded-lg border border-gray-200">
+          <table className="w-full border-collapse text-sm">
+            <thead className="sticky top-0 z-10">
+              <tr>
+                <th className={thBase}>Session ID</th>
                 {showExperimentMetadata && (
-                  <th className="text-left py-2 cursor-pointer" onClick={() => handleSort('case')}>
+                  <th className={cn(thBase, 'cursor-pointer')} onClick={() => handleSort('case')}>
                     Case{sortArrow('case')}
                   </th>
                 )}
-                {showExperimentMetadata && <th className="text-left py-2">Patient Model</th>}
-                {showExperimentMetadata && <th className="text-left py-2">Evaluator</th>}
-                {showExperimentMetadata && <th className="text-left py-2">Metrics</th>}
-                <th className="text-left py-2 cursor-pointer" onClick={() => handleSort('empathy')}>
-                  Empathy %{sortArrow('empathy')}
+                {showExperimentMetadata && <th className={thBase}>Patient Model</th>}
+                {showExperimentMetadata && <th className={thBase}>Evaluator</th>}
+                {showExperimentMetadata && <th className={thBase}>Metrics</th>}
+                <th
+                  className={cn(thMetric, 'cursor-pointer')}
+                  onClick={() => handleSort('empathy')}
+                >
+                  Empathy{sortArrow('empathy')}
                 </th>
                 {showExperimentMetadata && (
-                  <th className="text-left py-2 cursor-pointer" onClick={() => handleSort('communication')}>
-                    Communication %{sortArrow('communication')}
+                  <th
+                    className={cn(thMetric, 'cursor-pointer')}
+                    onClick={() => handleSort('communication')}
+                  >
+                    Communication{sortArrow('communication')}
                   </th>
                 )}
-                <th className="text-left py-2 cursor-pointer" onClick={() => handleSort('clinical')}>
-                  Clinical %{sortArrow('clinical')}
+                <th
+                  className={cn(thMetric, 'cursor-pointer')}
+                  onClick={() => handleSort('clinical')}
+                >
+                  Clinical{sortArrow('clinical')}
                 </th>
-                <th className="text-left py-2 cursor-pointer" onClick={() => handleSort('spikes')}>
-                  SPIKES %{sortArrow('spikes')}
+                <th
+                  className={cn(thMetric, 'cursor-pointer')}
+                  onClick={() => handleSort('spikes')}
+                >
+                  SPIKES{sortArrow('spikes')}
                 </th>
                 {showExperimentMetadata && (
-                  <th className="text-left py-2 cursor-pointer" onClick={() => handleSort('duration')}>
+                  <th
+                    className={cn(thBase, 'cursor-pointer')}
+                    onClick={() => handleSort('duration')}
+                  >
                     Duration{sortArrow('duration')}
                   </th>
                 )}
-                {showExperimentMetadata && <th className="text-left py-2">State</th>}
-                <th className="text-left py-2 cursor-pointer" onClick={() => handleSort('date')}>
+                {showExperimentMetadata && <th className={thBase}>Status</th>}
+                <th className={cn(thBase, 'cursor-pointer')} onClick={() => handleSort('date')}>
                   Date{sortArrow('date')}
                 </th>
-                {showActions && <th className="text-left py-2">Actions</th>}
+                {showActions && <th className={thBase}>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {paginatedSessions.map((session) => (
-                <tr key={session.sessionId} className="border-b odd:bg-gray-50 hover:bg-gray-50">
-                  <td className="py-2 font-mono text-xs">{session.sessionId}</td>
-                  {showExperimentMetadata && <td className="py-2">{session.caseId ?? '—'}</td>}
+                <tr
+                  key={session.sessionId}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openSessionDetail(session.sessionId)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      openSessionDetail(session.sessionId)
+                    }
+                  }}
+                  className="cursor-pointer border-b border-gray-100 transition-colors hover:bg-gray-50"
+                >
+                  <td className={cn(tdBase, 'font-mono text-xs text-gray-900')}>
+                    {session.sessionId}
+                  </td>
+                  {showExperimentMetadata && (
+                    <td
+                      className={cn(tdBase, 'max-w-[200px] truncate')}
+                      title={
+                        typeof session.caseId === 'number'
+                          ? `Case ID: ${session.caseId}`
+                          : undefined
+                      }
+                    >
+                      {caseDisplayLabel(session)}
+                    </td>
+                  )}
                   {showExperimentMetadata && (
                     <td
                       title={formatPluginName(session.patientModelPlugin)}
-                      className="py-2 max-w-[160px] truncate"
+                      className={cn(tdBase, 'max-w-[160px] truncate')}
                     >
                       {formatPluginName(session.patientModelPlugin)}
                     </td>
@@ -404,7 +508,7 @@ export function ResearchSessionsTable({
                   {showExperimentMetadata && (
                     <td
                       title={formatPluginName(session.evaluatorPlugin)}
-                      className="py-2 max-w-[160px] truncate"
+                      className={cn(tdBase, 'max-w-[160px] truncate')}
                     >
                       {formatPluginName(session.evaluatorPlugin)}
                     </td>
@@ -412,37 +516,41 @@ export function ResearchSessionsTable({
                   {showExperimentMetadata && (
                     <td
                       title={formatMetricsPlugins(session.metricsPlugins)}
-                      className="py-2 max-w-[160px] truncate"
+                      className={cn(tdBase, 'max-w-[160px] truncate')}
                     >
                       {formatMetricsPlugins(session.metricsPlugins)}
                     </td>
                   )}
-                  <td className="py-2">{metricCell(session.scores.empathy, 'bg-emerald-500')}</td>
+                  <td className={tdMetric}>{metricCell(session.scores.empathy, 'bg-emerald-500')}</td>
                   {showExperimentMetadata && (
-                    <td className="py-2">{metricCell(session.scores.communication, 'bg-sky-500')}</td>
+                    <td className={tdMetric}>
+                      {metricCell(session.scores.communication, 'bg-sky-500')}
+                    </td>
                   )}
-                  <td className="py-2">{metricCell(session.scores.clinical, 'bg-indigo-500')}</td>
-                  <td className="py-2">{metricCell(getSpikesPercent(session), 'bg-amber-500')}</td>
+                  <td className={tdMetric}>{metricCell(session.scores.clinical, 'bg-indigo-500')}</td>
+                  <td className={tdMetric}>{metricCell(getSpikesPercent(session), 'bg-amber-500')}</td>
                   {showExperimentMetadata && (
-                    <td className="py-2">{formatDuration(session.duration_seconds)}</td>
+                    <td className={tdBase}>{formatDuration(session.duration_seconds)}</td>
                   )}
                   {showExperimentMetadata && (
-                    <td className="py-2 capitalize">{session.state ?? '—'}</td>
+                    <td className={tdBase}>
+                      <StatusBadge state={session.state} />
+                    </td>
                   )}
-                  <td className="py-2 text-xs text-gray-500">
+                  <td className={cn(tdBase, 'text-xs text-gray-600')}>
                     {formatTimestamp(session.timestamp)}
                   </td>
                   {showActions && (
-                    <td className="py-2">
+                    <td className={cn(tdBase, 'text-left')} onClick={(e) => e.stopPropagation()}>
                       <Button
-                        variant="secondary"
+                        type="button"
+                        variant="ghost"
                         size="sm"
-                        onClick={() => handleExportSessionTranscript(session.sessionId)}
+                        className="h-8 px-2 text-xs"
+                        onClick={(e) => handleExportSessionTranscript(e, session.sessionId)}
                         disabled={exportingSessionId === session.sessionId}
                       >
-                        {exportingSessionId === session.sessionId
-                          ? 'Exporting…'
-                          : 'Export Transcript'}
+                        {exportingSessionId === session.sessionId ? '…' : 'Transcript'}
                       </Button>
                     </td>
                   )}
@@ -450,14 +558,7 @@ export function ResearchSessionsTable({
               ))}
               {paginatedSessions.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={
-                      (showExperimentMetadata ? 11 : 4) +
-                      (showActions ? 1 : 0) +
-                      1
-                    }
-                    className="py-6 text-center text-gray-500"
-                  >
+                  <td colSpan={tableColumnCount} className="px-4 py-8 text-center text-gray-500">
                     No sessions match your current filters.
                   </td>
                 </tr>

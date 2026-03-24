@@ -83,6 +83,7 @@ class ResearchSessionSummary(BaseModel):
 
     session_id: str
     case_id: int
+    case_name: Optional[str] = None
     patient_model_plugin: Optional[str] = None
     evaluator_plugin: Optional[str] = None
     metrics_plugins: Optional[str] = None

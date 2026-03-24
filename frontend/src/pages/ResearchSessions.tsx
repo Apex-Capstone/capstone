@@ -95,6 +95,23 @@ const formatPluginSummaryLabel = (raw: string) => {
   return label || '—'
 }
 
+/** Truncates long case titles for chart axis labels (ellipsis when over `maxLength`). */
+function truncateCaseName(name: string, maxLength = 18): string {
+  const t = name.trim()
+  if (!t) return '—'
+  if (t.length <= maxLength) return t
+  return `${t.slice(0, maxLength - 1)}…`
+}
+
+type SessionsPerCaseRow = {
+  /** Short label for X-axis */
+  name: string
+  /** Full title for tooltip */
+  fullLabel: string
+  caseId: number
+  sessions: number
+}
+
 type TopPluginResult = { display: string; count: number }
 
 const mostCommonPlugin = (
@@ -165,20 +182,32 @@ export const ResearchSessions = () => {
     const topPatient = mostCommonPlugin(sessions, (s) => s.patientModelPlugin)
     const topEvaluator = mostCommonPlugin(sessions, (s) => s.evaluatorPlugin)
 
-    const sessionsPerCase = (() => {
-      const counts = new Map<number, number>()
+    const sessionsPerCase: SessionsPerCaseRow[] = (() => {
+      const counts = new Map<number, { count: number; label: string }>()
       for (const s of sessions) {
         const id = s.caseId
         if (typeof id !== 'number') continue
-        counts.set(id, (counts.get(id) ?? 0) + 1)
+        const label = s.caseName?.trim() || `Case ${id}`
+        const prev = counts.get(id)
+        if (prev) {
+          prev.count += 1
+        } else {
+          counts.set(id, { count: 1, label })
+        }
       }
       return [...counts.entries()]
         .sort((a, b) => a[0] - b[0])
-        .map(([caseId, count]) => ({
-          name: `Case ${caseId}`,
-          caseId,
-          sessions: count,
-        }))
+        .map(([caseId, { count, label }]) => {
+          const idSuffix = String(caseId).slice(-4)
+          const fullLabel = `${label} (#${idSuffix})`
+          const name = `${truncateCaseName(label)} (#${idSuffix})`
+          return {
+            name,
+            fullLabel,
+            caseId,
+            sessions: count,
+          }
+        })
     })()
 
     const spikesCoverageBins = (() => {
@@ -338,16 +367,16 @@ export const ResearchSessions = () => {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={summary.sessionsPerCase}
-                        margin={{ top: 8, right: 8, left: 0, bottom: 4 }}
+                        margin={{ top: 8, right: 8, left: 0, bottom: 32 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
                         <XAxis
                           dataKey="name"
                           tick={{ fontSize: 11 }}
                           interval={0}
-                          angle={summary.sessionsPerCase.length > 6 ? -35 : 0}
-                          textAnchor={summary.sessionsPerCase.length > 6 ? 'end' : 'middle'}
-                          height={summary.sessionsPerCase.length > 6 ? 56 : 28}
+                          angle={-30}
+                          textAnchor="end"
+                          height={72}
                         />
                         <YAxis
                           allowDecimals={false}
@@ -355,15 +384,19 @@ export const ResearchSessions = () => {
                           width={36}
                         />
                         <Tooltip
-                          contentStyle={{
-                            fontSize: 12,
-                            borderRadius: 8,
-                            border: '1px solid #e5e7eb',
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null
+                            const row = payload[0]?.payload as SessionsPerCaseRow
+                            if (!row) return null
+                            return (
+                              <div className="max-w-xs rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-md">
+                                <div className="font-medium leading-snug text-gray-900">
+                                  {row.fullLabel}
+                                </div>
+                                <div className="mt-1 text-gray-600">Sessions: {row.sessions}</div>
+                              </div>
+                            )
                           }}
-                          formatter={(value) => [
-                            typeof value === 'number' ? value : Number(value) || 0,
-                            'Sessions',
-                          ]}
                         />
                         <Bar dataKey="sessions" fill="#6366f1" name="Sessions" radius={[4, 4, 0, 0]} />
                       </BarChart>

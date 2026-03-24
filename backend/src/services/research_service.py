@@ -12,6 +12,7 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from config.settings import get_settings
+from domain.entities.case import Case
 from domain.models.admin import ResearchExportRequest, ResearchExportResponse
 from repositories.case_repo import CaseRepository
 from repositories.feedback_repo import FeedbackRepository
@@ -89,6 +90,12 @@ class ResearchService:
     ) -> list[dict[str, Any]]:
         """Return list of anonymized sessions (no PII), including aggregate feedback metrics when available."""
         sessions = self.session_repo.get_all(skip=skip, limit=limit)
+        case_ids = list({s.case_id for s in sessions if getattr(s, "case_id", None) is not None})
+        cases_by_id: dict[int, str] = {}
+        if case_ids:
+            rows = self.db.query(Case).filter(Case.id.in_(case_ids)).all()
+            cases_by_id = {c.id: c.title for c in rows}
+
         request = ResearchExportRequest(
             anonymize=True,
             include_turns=False,
@@ -130,6 +137,7 @@ class ResearchService:
 
             # Remove nested feedback blob to keep response lightweight
             base.pop("feedback", None)
+            base["case_name"] = cases_by_id.get(session.case_id)
             results.append(base)
 
         return results
@@ -143,7 +151,10 @@ class ResearchService:
         if not session:
             raise ValueError("Session not found")
         request = ResearchExportRequest(anonymize=True, include_turns=True, include_feedback=True)
-        return self._anonymize_session(session, request)
+        data = self._anonymize_session(session, request)
+        case = self.case_repo.get_by_id(session.case_id)
+        data["case_name"] = case.title if case else None
+        return data
 
     def get_export_json_content(
         self,
