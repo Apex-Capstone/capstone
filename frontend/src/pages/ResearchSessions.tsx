@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -108,7 +109,21 @@ export const ResearchSessions = () => {
         <main className="flex-1 overflow-y-auto md:ml-64">
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             <nav className="mb-4 text-sm text-gray-500">
-              Dashboard / Research Analytics / <span className="text-gray-900">Sessions</span>
+              <Link
+                to="/dashboard"
+                className="cursor-pointer text-gray-500 hover:text-gray-700"
+              >
+                Dashboard
+              </Link>
+              {' / '}
+              <Link
+                to="/research"
+                className="cursor-pointer text-gray-500 hover:text-gray-700"
+              >
+                Research Analytics
+              </Link>
+              {' / '}
+              <span className="text-gray-900">Sessions</span>
             </nav>
 
             <div className="mb-8">
