@@ -3,7 +3,7 @@
  */
 import { Link, useLocation, type Location } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
-import { LayoutDashboard, FileText, Shield, BarChart3, Menu } from 'lucide-react'
+import { LayoutDashboard, FileText, Shield, BarChart3, Menu, LineChart } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -41,6 +41,12 @@ export const Sidebar = () => {
         loc.pathname === '/dashboard' && loc.hash === '#cases',
     },
     {
+      name: 'My Analytics',
+      href: '/analytics',
+      icon: LineChart,
+      roles: ['trainee', 'admin'],
+    },
+    {
       name: 'Research',
       href: '/research',
       icon: BarChart3,
@@ -76,7 +82,9 @@ export const Sidebar = () => {
 
         <nav className="flex-1 space-y-1 px-2 py-4">
           {navigation.map((item) => {
-            const isActive = item.isActive(location)
+            const isActive = item.isActive
+              ? item.isActive(location)
+              : location.pathname === item.href.split('#')[0]
             return (
               <Link
                 key={item.name}

@@ -13,6 +13,7 @@ import { CaseDetail } from './pages/CaseDetail'
 import { Feedback } from './pages/Feedback'
 import { Sessions } from './pages/Sessions'
 import { SessionDetailPage } from './pages/SessionDetailPage'
+import { Analytics } from './pages/Analytics'
 import { Admin } from './pages/Admin'
 import { Research } from './pages/Research'
 import { ResearchSessions } from './pages/ResearchSessions'
@@ -105,6 +106,14 @@ function App() {
           element={
             <ProtectedRoute>
               <SessionDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'trainee']}>
+              <Analytics />
             </ProtectedRoute>
           }
         />

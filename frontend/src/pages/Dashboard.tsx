@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { listCases } from '@/api/cases.api'
 import { createSession, closeSession, listActiveSessions, listCompletedSessions } from '@/api/sessions.api'
 import type { Case } from '@/types/case'
@@ -53,19 +53,19 @@ export const Dashboard = () => {
           listCompletedSessions({ limit: 3 }),
         ])
         if (casesResult.status === 'fulfilled') {
-          setCases(casesResult.value.items)
+          setCases(casesResult.value.items ?? [])
         } else {
           console.error('Failed to fetch cases:', casesResult.reason)
         }
         if (activeResult.status === 'fulfilled') {
-          setActiveSessions(activeResult.value.sessions)
-          setActiveTotal(activeResult.value.total)
+          setActiveSessions(activeResult.value.sessions ?? [])
+          setActiveTotal(activeResult.value.total ?? 0)
         } else {
           console.error('Failed to fetch active sessions:', activeResult.reason)
         }
         if (completedResult.status === 'fulfilled') {
-          setCompletedSessions(completedResult.value.sessions)
-          setCompletedTotal(completedResult.value.total)
+          setCompletedSessions(completedResult.value.sessions ?? [])
+          setCompletedTotal(completedResult.value.total ?? 0)
         } else {
           console.error('Failed to fetch completed sessions:', completedResult.reason)
         }
@@ -165,7 +165,7 @@ export const Dashboard = () => {
             {session.caseTitle ?? `Case #${session.caseId}`}
           </p>
           <p className="mt-0.5 text-xs text-gray-400">
-            Session {session.id} · {formatDurationLabel(session.durationSeconds)}
+            Session {session.id} · {formatDurationLabel(session.durationSeconds ?? 0)}
           </p>
         </div>
         <span className="px-3 py-1 text-[10px] font-semibold uppercase rounded-full bg-gray-100 border border-gray-200 text-gray-600">
@@ -296,7 +296,7 @@ export const Dashboard = () => {
                       <p className="text-gray-500">No virtual patient cases available. Contact your administrator.</p>
                     </div>
                   ) : (
-                    <>
+                    <Fragment>
                       <div className="mb-6">
                         <h2 className="text-xl font-semibold text-gray-900 mb-2">Virtual Patient Cases</h2>
                         <p className="text-gray-600">
@@ -335,7 +335,7 @@ export const Dashboard = () => {
                           <div className="text-sm text-gray-600">Available Cases</div>
                         </div>
                       </div>
-                    </>
+                    </Fragment>
                   )}
                 </div>
               </div>
@@ -357,7 +357,7 @@ export const Dashboard = () => {
               <span className="font-medium text-gray-900">
                 {confirmCloseSession?.caseTitle ?? `Case #${confirmCloseSession?.caseId}`}
               </span>
-              ? This will end the session and generate feedback. You won't be able to continue it afterward.
+              {`? This will end the session and generate feedback. You won't be able to continue it afterward.`}
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4 flex justify-end gap-3">
