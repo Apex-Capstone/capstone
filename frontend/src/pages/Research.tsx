@@ -847,7 +847,7 @@ export const Research = () => {
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
                       <CardTitle className="flex items-center gap-2">
-                        <TrendingUp className="h-5 w-5 text-blue-600 shrink-0" />
+                        <TrendingUp className="h-5 w-5 text-emerald-600 shrink-0" />
                         Score Trends
                       </CardTitle>
                       <p className="text-sm text-gray-500 font-normal mt-1">
@@ -868,6 +868,11 @@ export const Research = () => {
                         type="button"
                         size="sm"
                         variant={scoreTrendGranularity === 'hourly' ? 'default' : 'outline'}
+                        className={
+                          scoreTrendGranularity !== 'hourly'
+                            ? 'border-emerald-200 hover:bg-emerald-50 hover:text-emerald-900'
+                            : undefined
+                        }
                         onClick={() => setScoreTrendGranularity('hourly')}
                       >
                         Hourly
@@ -876,6 +881,11 @@ export const Research = () => {
                         type="button"
                         size="sm"
                         variant={scoreTrendGranularity === 'daily' ? 'default' : 'outline'}
+                        className={
+                          scoreTrendGranularity !== 'daily'
+                            ? 'border-emerald-200 hover:bg-emerald-50 hover:text-emerald-900'
+                            : undefined
+                        }
                         onClick={() => setScoreTrendGranularity('daily')}
                       >
                         Daily
@@ -884,6 +894,11 @@ export const Research = () => {
                         type="button"
                         size="sm"
                         variant={scoreTrendGranularity === 'weekly' ? 'default' : 'outline'}
+                        className={
+                          scoreTrendGranularity !== 'weekly'
+                            ? 'border-emerald-200 hover:bg-emerald-50 hover:text-emerald-900'
+                            : undefined
+                        }
                         onClick={() => setScoreTrendGranularity('weekly')}
                       >
                         Weekly
@@ -1115,7 +1130,7 @@ export const Research = () => {
                               <div className="flex items-center gap-2">
                                 <div className="w-12 h-2 bg-gray-200 rounded-full">
                                   <div
-                                    className="h-full bg-sky-500 rounded-full"
+                                    className="h-full bg-teal-600 rounded-full"
                                     style={{ width: `${safePercent(session.scores.communication)}%` }}
                                   />
                                 </div>
@@ -1128,7 +1143,7 @@ export const Research = () => {
                               <div className="flex items-center gap-2">
                                 <div className="w-12 h-2 bg-gray-200 rounded-full">
                                   <div
-                                    className="h-full bg-indigo-500 rounded-full"
+                                    className="h-full bg-emerald-700 rounded-full"
                                     style={{ width: `${safePercent(session.scores.clinical)}%` }}
                                   />
                                 </div>

@@ -4,7 +4,7 @@ import { createSession, closeSession, listActiveSessions, listCompletedSessions 
 import type { Case } from '@/types/case'
 import type { Session } from '@/types/session'
 import { Button } from '@/components/ui/button'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { CaseCard } from '@/components/CaseCard'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
@@ -30,6 +30,14 @@ export const Dashboard = () => {
   const [confirmCloseSession, setConfirmCloseSession] = useState<Session | null>(null)
   const { user } = useAuthStore()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  useEffect(() => {
+    if (location.hash !== '#cases' || loading) return
+    requestAnimationFrame(() => {
+      document.getElementById('cases')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [location.hash, loading])
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -277,47 +285,54 @@ export const Dashboard = () => {
                   </div>
                 </div>
 
-                {cases.length === 0 ? (
-                  <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
-                    <p className="text-gray-500">No virtual patient cases available. Contact your administrator.</p>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="mb-6">
-                      <h2 className="text-xl font-semibold text-gray-900 mb-2">Virtual Patient Cases</h2>
-                      <p className="text-gray-600">
-                        Select a case to practice your communication skills using the SPIKES framework
-                      </p>
+                <div id="cases">
+                  {cases.length === 0 ? (
+                    <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
+                      <p className="text-gray-500">No virtual patient cases available. Contact your administrator.</p>
                     </div>
+                  ) : (
+                    <>
+                      <div className="mb-6">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-2">Virtual Patient Cases</h2>
+                        <p className="text-gray-600">
+                          Select a case to practice your communication skills using the SPIKES framework
+                        </p>
+                      </div>
 
-                    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                      {cases.map((caseItem) => (
-                        <CaseCard key={caseItem.id} caseData={caseItem as any} onClick={handleStartNewSession} />
-                      ))}
-                    </div>
+                      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                        {cases.map((caseItem) => (
+                          <CaseCard
+                            key={caseItem.id}
+                            caseData={caseItem as any}
+                            onClick={handleStartNewSession}
+                            selected={creatingSessionForCase === caseItem.id}
+                          />
+                        ))}
+                      </div>
 
-                    <div className="mt-12 grid gap-4 sm:grid-cols-3">
-                      <div className="bg-white rounded-lg border p-4 text-center">
-                        <div className="text-2xl font-bold text-emerald-600">
-                          {completedTotal}
+                      <div className="mt-12 grid gap-4 sm:grid-cols-3">
+                        <div className="bg-white rounded-lg border p-4 text-center">
+                          <div className="text-2xl font-bold text-emerald-600">
+                            {completedTotal}
+                          </div>
+                          <div className="text-sm text-gray-600">Completed Sessions</div>
                         </div>
-                        <div className="text-sm text-gray-600">Completed Sessions</div>
-                      </div>
-                      <div className="bg-white rounded-lg border p-4 text-center">
-                        <div className="text-2xl font-bold text-orange-600">
-                          {inProgressCount}
+                        <div className="bg-white rounded-lg border p-4 text-center">
+                          <div className="text-2xl font-bold text-orange-600">
+                            {inProgressCount}
+                          </div>
+                          <div className="text-sm text-gray-600">In Progress</div>
                         </div>
-                        <div className="text-sm text-gray-600">In Progress</div>
-                      </div>
-                      <div className="bg-white rounded-lg border p-4 text-center">
-                        <div className="text-2xl font-bold text-gray-600">
-                          {cases.length}
+                        <div className="bg-white rounded-lg border p-4 text-center">
+                          <div className="text-2xl font-bold text-gray-600">
+                            {cases.length}
+                          </div>
+                          <div className="text-sm text-gray-600">Available Cases</div>
                         </div>
-                        <div className="text-sm text-gray-600">Available Cases</div>
                       </div>
-                    </div>
-                  </div>
-                )}
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>

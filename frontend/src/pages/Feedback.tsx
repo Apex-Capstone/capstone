@@ -370,8 +370,8 @@ export const Feedback = () => {
 
                       {feedback.questionBreakdown && (
                         <div className="grid grid-cols-3 gap-3 pt-2">
-                          <div className="text-center p-3 bg-blue-50 rounded-lg">
-                            <div className="text-lg font-bold text-blue-600">
+                          <div className="text-center p-3 bg-emerald-50 rounded-lg">
+                            <div className="text-lg font-bold text-emerald-800">
                               {feedback.questionBreakdown.open}
                             </div>
                             <div className="text-xs text-gray-600">Open</div>
@@ -487,7 +487,7 @@ export const Feedback = () => {
                               <div key={dim} className="flex items-center justify-between">
                                 <span className="text-sm font-medium">{dim}</span>
                                 <div className="flex items-center gap-3 text-xs">
-                                  <span className="text-blue-600">{counts.explicit} explicit</span>
+                                  <span className="text-emerald-800">{counts.explicit} explicit</span>
                                   <span className="text-gray-400">|</span>
                                   <span className="text-purple-600">{counts.implicit} implicit</span>
                                   <span className="font-semibold text-gray-700">= {total}</span>

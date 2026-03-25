@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card'
 import type { Case } from '@/types/case'
 import { cn } from '@/lib/utils'
@@ -11,18 +12,40 @@ const difficultyConfig: Record<string, { label: string; color: string }> = {
 interface CaseCardProps {
   caseData: Case
   onClick?: (caseId: number) => void
+  /** Highlights the card (e.g. while starting a session). */
+  selected?: boolean
 }
 
-export const CaseCard = ({ caseData, onClick }: CaseCardProps) => {
+export const CaseCard = ({ caseData, onClick, selected }: CaseCardProps) => {
   const difficultyKey = caseData.difficultyLevel?.toLowerCase()
   const difficulty = difficultyKey ? difficultyConfig[difficultyKey] : null
 
+  const activate = () => onClick?.(caseData.id)
+
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      activate()
+    }
+  }
+
   return (
     <div
-      className="cursor-pointer"
-      onClick={() => onClick?.(caseData.id)}
+      role="button"
+      tabIndex={0}
+      className={cn(
+        'cursor-pointer rounded-lg outline-none transition-shadow',
+        'focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2'
+      )}
+      onClick={activate}
+      onKeyDown={onKeyDown}
     >
-      <Card className="h-full transition-shadow hover:shadow-md hover:border-emerald-300">
+      <Card
+        className={cn(
+          'h-full transition-shadow hover:shadow-md hover:border-emerald-300',
+          selected ? 'border-2 border-emerald-500' : 'border'
+        )}
+      >
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between mb-2">
             <CardTitle className="text-lg leading-tight">{caseData.title}</CardTitle>
