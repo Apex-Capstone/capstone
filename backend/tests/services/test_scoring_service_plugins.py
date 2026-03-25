@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import importlib
+import sys
+from datetime import datetime
 from types import SimpleNamespace
 from typing import Any
 
@@ -21,26 +24,34 @@ class _DummyEvaluator:
 
     name = "tests.dummy:_DummyEvaluator"
     version = "test-1.0"
-
-    def __init__(self) -> None:
-        self.called_with: list[tuple[OrmSession, int]] = []
+    invocations: list[tuple[OrmSession, int]] = []
 
     async def evaluate(self, db: OrmSession, session_id: int) -> FeedbackResponse:
-        self.called_with.append((db, session_id))
-        # The scoring pipeline expects a FeedbackResponse instance; we can
-        # construct a minimal-but-valid one with placeholder values.
+        _DummyEvaluator.invocations.append((db, session_id))
         return FeedbackResponse(
             id=1,
             session_id=session_id,
             empathy_score=0.0,
             communication_score=0.0,
-            clinical_reasoning_score=0.0,
-            professionalism_score=0.0,
             spikes_completion_score=0.0,
             overall_score=0.0,
             latency_ms_avg=0.0,
-            created_at=session.started_at,  # type: ignore[name-defined]
+            created_at=datetime.utcnow(),
         )
+
+
+def _reload_builtin_plugins() -> None:
+    """Re-run plugin module registration after tests clear PluginRegistry (imports are cached)."""
+    for name in (
+        "plugins.evaluators.apex_baseline_evaluator",
+        "plugins.evaluators.apex_hybrid_evaluator",
+        "plugins.patient_models.default_llm_patient",
+        "plugins.metrics.apex_metrics",
+    ):
+        if name in sys.modules:
+            importlib.reload(sys.modules[name])
+        else:
+            importlib.import_module(name)
 
 
 @pytest.fixture(autouse=True)
@@ -53,6 +64,7 @@ def clear_registry():
     PluginRegistry.evaluators.clear()
     PluginRegistry.patient_models.clear()
     PluginRegistry.metrics_plugins.clear()
+    _reload_builtin_plugins()
 
 
 @pytest.fixture
@@ -99,9 +111,9 @@ async def test_scoring_service_uses_session_evaluator(test_db, test_user, test_c
     ScoringService.generate_feedback should load the evaluator from the session's
     frozen evaluator_plugin field and call it.
     """
+    _DummyEvaluator.invocations.clear()
 
     # Arrange a dummy session with frozen evaluator metadata
-    global session  # used inside _DummyEvaluator to populate created_at
     session = Session(
         user_id=test_user.id,
         case_id=test_case.id,
@@ -126,7 +138,6 @@ async def test_scoring_service_uses_session_evaluator(test_db, test_user, test_c
     feedback = await service.generate_feedback(session.id)
 
     assert isinstance(feedback, FeedbackResponse)
-    # Ensure we used the evaluator frozen on the session (via registry lookup)
-    # There is no direct handle to the evaluator instance here, but the call
-    # would have failed if the registry key were not used correctly.
+    assert len(_DummyEvaluator.invocations) == 1
+    assert _DummyEvaluator.invocations[0][1] == session.id
 

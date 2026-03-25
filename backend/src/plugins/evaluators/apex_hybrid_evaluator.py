@@ -9,8 +9,7 @@ from services.scoring_service import ScoringService
 
 class ApexHybridEvaluator:
     """
-    Default Evaluator plugin that delegates to ScoringService's
-    internal scoring implementation.
+    Hybrid evaluator: rule-based core + optional LLM merge (ScoringService.generate_feedback_hybrid).
     """
 
     # Registry key is intentionally the same as the default settings path
@@ -20,8 +19,7 @@ class ApexHybridEvaluator:
 
     async def evaluate(self, db: Session, session_id: int) -> FeedbackResponse:
         service = ScoringService(db)
-        # Call the internal implementation directly to avoid plugin recursion.
-        return await service._generate_feedback_impl(session_id)
+        return await service.generate_feedback_hybrid(session_id)
 
 
 # Register with the global plugin registry on import so that lookups are

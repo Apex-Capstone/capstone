@@ -6,7 +6,6 @@ from sqlalchemy.orm import sessionmaker
 
 from db.base import Base
 from domain.entities.case import Case
-from domain.entities.session import Session
 from domain.entities.user import User
 from domain.models.sessions import SessionCreate
 from services.session_service import SessionService

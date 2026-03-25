@@ -23,9 +23,13 @@ class SuggestedResponse(BaseModel):
 
 class SessionCreate(BaseModel):
     """Session creation schema."""
-    
+
     case_id: int
     force_new: bool = Field(default=False)
+    evaluator_plugin: str | None = Field(
+        default=None,
+        description="Optional evaluator plugin id (registry key). Overrides case and settings when creating a new session.",
+    )
 
 
 class SessionUpdate(BaseModel):
@@ -163,8 +167,6 @@ class FeedbackResponse(BaseModel):
     session_id: int
     empathy_score: float
     communication_score: float | None = None
-    clinical_reasoning_score: float | None = None
-    professionalism_score: float | None = None
     spikes_completion_score: float
     overall_score: float
     

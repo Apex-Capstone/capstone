@@ -246,6 +246,7 @@ async def run_fixture_seeded_transcript_through_scoring(
     case: Case,
     transcript_fixture: Dict[str, Any],
     include_pipeline_preview: bool = False,
+    evaluator_plugin: str | None = None,
 ) -> Dict[str, Any]:
     """Persist a fixture-seeded transcript and run it through ScoringService.
 
@@ -258,6 +259,7 @@ async def run_fixture_seeded_transcript_through_scoring(
         case_id=case.id,
         state="completed",
         current_spikes_stage=None,
+        evaluator_plugin=evaluator_plugin,
     )
     db.add(session)
     db.commit()

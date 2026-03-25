@@ -40,7 +40,7 @@ from repositories.session_repo import SessionRepository
 from repositories.turn_repo import TurnRepository
 from services.dialogue_service import DialogueService
 from services.scoring_service import ScoringService
-from tests.test_conversation_fixture import TEST_CONVERSATION_GOOD
+from tests.fixtures.conversation_fixture import TEST_CONVERSATION_GOOD
 
 # Setup database
 DATABASE_URL = "sqlite:///./dev.db"

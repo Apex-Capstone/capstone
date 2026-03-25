@@ -1,4 +1,4 @@
-# src/tests/test_cases_api_smoke.py
+# backend/tests/api/test_cases_api_smoke.py
 import pytest
 from httpx import AsyncClient, ASGITransport
 
@@ -6,9 +6,9 @@ from app import app
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from db.base import Base
 from core.deps import get_db, get_current_user, require_admin
 from types import SimpleNamespace
+from tests.utils.transcript_runner import create_all_for_test_engine
 
 # --- thread-safe in-memory SQLite for async tests ---
 engine = create_engine(
@@ -17,7 +17,7 @@ engine = create_engine(
     poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-Base.metadata.create_all(engine)
+create_all_for_test_engine(engine)
 
 @pytest.fixture(autouse=True)
 def _overrides():

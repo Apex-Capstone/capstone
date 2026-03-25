@@ -8,7 +8,7 @@ from db.base import Base
 from domain.entities.user import User
 from domain.entities.case import Case
 from domain.models.sessions import FeedbackResponse
-from tests.test_conversation_fixture import (
+from tests.fixtures.conversation_fixture import (
     TEST_CONVERSATION_BAD,
     TEST_CONVERSATION_MEDIUM,
     TEST_CONVERSATION_GOOD,
@@ -82,6 +82,8 @@ async def test_seeded_transcript_scoring_smoke(test_db, test_user, test_case, fi
     assert feedback.empathy_score is not None
     assert feedback.overall_score is not None
     assert feedback.spikes_completion_score is not None
+    dumped = feedback.model_dump()
+    assert "clinical_reasoning_score" not in dumped and "professionalism_score" not in dumped
 
 
 @pytest.mark.asyncio
@@ -105,19 +107,16 @@ async def test_seeded_transcript_score_ordering(test_db, test_user, test_case):
         "Score ordering failed.\n"
         f"BAD   ({TEST_CONVERSATION_BAD['label']}): "
         f"emp={fb_bad.empathy_score}, comm={fb_bad.communication_score}, "
-        f"clin={fb_bad.clinical_reasoning_score}, prof={fb_bad.professionalism_score}, "
         f"overall={fb_bad.overall_score}, spikes={fb_bad.spikes_completion_score}, "
         f"missed={len(fb_bad.missed_opportunities or [])}, "
         f"suggested={len(fb_bad.suggested_responses or [])}\n"
         f"MED   ({TEST_CONVERSATION_MEDIUM['label']}): "
         f"emp={fb_medium.empathy_score}, comm={fb_medium.communication_score}, "
-        f"clin={fb_medium.clinical_reasoning_score}, prof={fb_medium.professionalism_score}, "
         f"overall={fb_medium.overall_score}, spikes={fb_medium.spikes_completion_score}, "
         f"missed={len(fb_medium.missed_opportunities or [])}, "
         f"suggested={len(fb_medium.suggested_responses or [])}\n"
         f"GOOD  ({TEST_CONVERSATION_GOOD['label']}): "
         f"emp={fb_good.empathy_score}, comm={fb_good.communication_score}, "
-        f"clin={fb_good.clinical_reasoning_score}, prof={fb_good.professionalism_score}, "
         f"overall={fb_good.overall_score}, spikes={fb_good.spikes_completion_score}, "
         f"missed={len(fb_good.missed_opportunities or [])}, "
         f"suggested={len(fb_good.suggested_responses or [])}"
@@ -130,6 +129,9 @@ async def test_seeded_transcript_score_ordering(test_db, test_user, test_case):
         <= fb_medium.spikes_completion_score
         <= fb_good.spikes_completion_score
     ), ctx
+    # Communication blends clarity, questioning, and signposting; seeded fixtures preserve ordering.
+    assert fb_bad.communication_score < fb_medium.communication_score, ctx
+    assert fb_medium.communication_score <= fb_good.communication_score, ctx
 
 
 @pytest.mark.asyncio
@@ -185,7 +187,6 @@ async def test_seeded_transcript_score_ranges(test_db, test_user, test_case, fix
             f"Expected range: {expected if expected else '[0, 100]'}\n"
             f"All scores: "
             f"emp={feedback.empathy_score}, comm={feedback.communication_score}, "
-            f"clin={feedback.clinical_reasoning_score}, prof={feedback.professionalism_score}, "
             f"overall={feedback.overall_score}, spikes={feedback.spikes_completion_score}"
         )
 
@@ -198,8 +199,6 @@ async def test_seeded_transcript_score_ranges(test_db, test_user, test_case, fix
 
     _check_range("empathy_score", feedback.empathy_score)
     _check_range("communication_score", feedback.communication_score)
-    _check_range("clinical_reasoning_score", feedback.clinical_reasoning_score)
-    _check_range("professionalism_score", feedback.professionalism_score)
     _check_range("overall_score", feedback.overall_score)
     _check_range("spikes_completion_score", feedback.spikes_completion_score)
 
