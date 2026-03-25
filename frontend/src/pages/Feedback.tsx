@@ -469,6 +469,23 @@ export const Feedback = () => {
                     )}
                   </CardContent>
                 </Card>
+
+                {feedback.evaluatorMeta != null &&
+                  Object.keys(feedback.evaluatorMeta).length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Evaluator metadata</CardTitle>
+                        <p className="text-sm text-gray-500 font-normal mt-1">
+                          Scoring pipeline details (phase, merge status, optional LLM fields).
+                        </p>
+                      </CardHeader>
+                      <CardContent>
+                        <pre className="text-xs overflow-x-auto bg-gray-50 border border-gray-100 rounded-lg p-4 text-left whitespace-pre-wrap break-words">
+                          {JSON.stringify(feedback.evaluatorMeta, null, 2)}
+                        </pre>
+                      </CardContent>
+                    </Card>
+                  )}
               </div>
 
               {/* AFCE Breakdown (if data available) */}

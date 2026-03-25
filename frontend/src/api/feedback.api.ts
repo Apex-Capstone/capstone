@@ -77,6 +77,9 @@ export interface Feedback {
 
   latencyMsAvg: number
 
+  /** Raw JSON from the scoring pipeline (phase, hybrid LLM merge, rule scores, etc.). */
+  evaluatorMeta?: Record<string, unknown> | null
+
   strengths?: string | null
   areasForImprovement?: string | null
   detailedFeedback?: string | null
@@ -165,6 +168,10 @@ export const fetchFeedback = async (sessionId: string): Promise<Feedback> => {
     spikesStrategies: data.spikes_strategies ?? undefined,
     questionBreakdown: data.question_breakdown ?? undefined,
     latencyMsAvg: data.latency_ms_avg ?? 0,
+    evaluatorMeta:
+      data.evaluator_meta != null && typeof data.evaluator_meta === 'object'
+        ? (data.evaluator_meta as Record<string, unknown>)
+        : null,
     strengths: data.strengths ?? null,
     areasForImprovement: data.areas_for_improvement ?? null,
     detailedFeedback: data.detailed_feedback ?? null,
