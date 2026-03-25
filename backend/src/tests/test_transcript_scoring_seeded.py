@@ -38,8 +38,7 @@ def test_db():
 def test_user(test_db):
     """Create a minimal test user."""
     user = User(
-        email="apex_tester@example.com",
-        hashed_password="not_used_in_tests",
+        email="apex_tester@example.com",        
         role="trainee",
         full_name="Apex Tester",
     )

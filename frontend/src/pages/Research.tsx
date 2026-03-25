@@ -520,20 +520,8 @@ export const Research = () => {
   const [exportingTranscripts, setExportingTranscripts] = useState(false)
   const [exportingSessionId, setExportingSessionId] = useState<string | null>(null)
 
-  /**
-   * Reads JWT from persisted `auth-storage` for authenticated downloads.
-   *
-   * @returns Bearer token or null
-   */
   const getToken = (): string | null => {
-    try {
-      const raw = localStorage.getItem('auth-storage')
-      if (!raw) return null
-      const parsed = JSON.parse(raw)
-      return parsed?.state?.token ?? parsed?.token ?? null
-    } catch {
-      return null
-    }
+    return useAuthStore.getState().token
   }
 
   /**

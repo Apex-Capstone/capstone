@@ -182,7 +182,7 @@ export const Dashboard = () => {
 
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900">
-                Welcome back, {user?.name || (user as any)?.full_name || user?.email}
+                Welcome back, {user?.full_name || user?.email}
               </h1>
               <p className="mt-2 text-gray-600">
                 Practice delivering difficult news using the SPIKES communication framework

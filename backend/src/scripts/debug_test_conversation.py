@@ -61,7 +61,6 @@ async def run_test_conversation():
     if not test_user:
         test_user = User(
             email="test@example.com",
-            hashed_password="test",  # Use plain password for testing
             role="trainee",
         )
         test_user = user_repo.create(test_user)

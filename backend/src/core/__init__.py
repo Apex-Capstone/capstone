@@ -23,10 +23,7 @@ from core.errors import (
 from core.events import create_start_app_handler, create_stop_app_handler
 from core.security import (
     RoleScopes,
-    create_access_token,
-    decode_access_token,
-    get_password_hash,
-    verify_password,
+    decode_supabase_token,
 )
 
 __all__ = [
@@ -50,10 +47,7 @@ __all__ = [
     "general_exception_handler",
     # Security
     "RoleScopes",
-    "create_access_token",
-    "decode_access_token",
-    "verify_password",
-    "get_password_hash",
+    "decode_supabase_token",
     # Events
     "create_start_app_handler",
     "create_stop_app_handler",
