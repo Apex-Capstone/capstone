@@ -1,7 +1,7 @@
 /**
  * Role-filtered left navigation for primary app sections (desktop + mobile slide-over).
  */
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, type Location } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { LayoutDashboard, FileText, Shield, BarChart3, Menu } from 'lucide-react'
 import { useState } from 'react'
@@ -29,24 +29,30 @@ export const Sidebar = () => {
       href: '/dashboard',
       icon: LayoutDashboard,
       roles: ['trainee', 'admin'],
+      isActive: (loc: Location) =>
+        loc.pathname === '/dashboard' && loc.hash !== '#cases',
     },
     {
       name: 'Cases',
-      href: '/dashboard',
+      href: '/dashboard#cases',
       icon: FileText,
       roles: ['trainee', 'admin'],
+      isActive: (loc: Location) =>
+        loc.pathname === '/dashboard' && loc.hash === '#cases',
     },
     {
       name: 'Research',
       href: '/research',
       icon: BarChart3,
       roles: ['admin'],
+      isActive: (loc: Location) => loc.pathname === '/research',
     },
     {
       name: 'Admin',
       href: '/admin',
       icon: Shield,
       roles: ['admin'],
+      isActive: (loc: Location) => loc.pathname === '/admin',
     },
   ].filter((item) => item.roles.includes(user?.role || 'trainee'))
 
@@ -62,7 +68,7 @@ export const Sidebar = () => {
           <span className="text-sm font-semibold">Navigation</span>
           <button
             onClick={() => setCollapsed(true)}
-            className="p-2 hover:bg-gray-100"
+            className="p-2 rounded-md hover:bg-emerald-50"
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -70,19 +76,26 @@ export const Sidebar = () => {
 
         <nav className="flex-1 space-y-1 px-2 py-4">
           {navigation.map((item) => {
-            const isActive = location.pathname === item.href
+            const isActive = item.isActive(location)
             return (
               <Link
                 key={item.name}
                 to={item.href}
                 className={cn(
-                  'flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  'group flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                   isActive
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'text-gray-700 hover:bg-gray-50'
+                    ? 'bg-emerald-100 text-emerald-900'
+                    : 'text-gray-700 hover:bg-emerald-50 hover:text-emerald-900'
                 )}
               >
-                <item.icon className="h-5 w-5" />
+                <item.icon
+                  className={cn(
+                    'h-5 w-5 shrink-0',
+                    isActive
+                      ? 'text-emerald-900'
+                      : 'text-gray-600 group-hover:text-emerald-900'
+                  )}
+                />
                 <span>{item.name}</span>
               </Link>
             )

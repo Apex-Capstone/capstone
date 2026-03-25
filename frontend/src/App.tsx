@@ -15,6 +15,8 @@ import { Sessions } from './pages/Sessions'
 import { SessionDetailPage } from './pages/SessionDetailPage'
 import { Admin } from './pages/Admin'
 import { Research } from './pages/Research'
+import { ResearchSessions } from './pages/ResearchSessions'
+import { AdminResearchSessionPage } from './pages/AdminResearchSessionPage'
 import { PluginDeveloperGuide } from './pages/PluginDeveloperGuide'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { useAuthGate } from './hooks/useAuthGate'
@@ -121,6 +123,22 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['admin']}>
               <Research />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/research/sessions"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <ResearchSessions />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/sessions/:sessionId"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminResearchSessionPage />
             </ProtectedRoute>
           }
         />

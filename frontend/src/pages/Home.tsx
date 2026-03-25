@@ -64,8 +64,8 @@ export const Home = () => {
 
           <Card>
             <CardHeader>
-              <div className="rounded-lg bg-green-100 w-12 h-12 flex items-center justify-center mb-4">
-                <BarChart3 className="h-6 w-6 text-green-600" />
+              <div className="rounded-lg bg-emerald-100 w-12 h-12 flex items-center justify-center mb-4">
+                <BarChart3 className="h-6 w-6 text-emerald-600" />
               </div>
               <CardTitle>AI-Powered Feedback</CardTitle>
               <CardDescription>

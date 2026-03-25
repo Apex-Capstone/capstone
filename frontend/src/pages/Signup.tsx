@@ -80,7 +80,7 @@ export const Signup = () => {
         : strengthPct <= 60
           ? 'bg-yellow-500'
           : strengthPct <= 80
-            ? 'bg-lime-500'
+            ? 'bg-emerald-500'
             : 'bg-emerald-500'
 
   const handleSubmit = async (e: FormEvent) => {

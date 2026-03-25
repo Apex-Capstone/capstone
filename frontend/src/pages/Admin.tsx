@@ -844,7 +844,7 @@ export const Admin = () => {
                               <span className="text-sm capitalize">{data.difficulty}</span>
                               <div className="flex items-center gap-2">
                                 <div className="w-16 h-2 bg-gray-200 rounded-full">
-                                  <div className="h-full bg-green-500 rounded-full" style={{ width: `${data.rate * 100}%` }} />
+                                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${data.rate * 100}%` }} />
                                 </div>
                                 <span className="text-sm font-medium">{Math.round(data.rate * 100)}%</span>
                               </div>
@@ -884,20 +884,22 @@ export const Admin = () => {
       case 'cases':
         return (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium">Case Management</h3>
-              <Button onClick={onCreateClick} className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Create New Case
-              </Button>
-            </div>
+            
 
             {caseLoading ? (
               <div className="text-gray-500">Loading cases…</div>
             ) : (
               <Card>
+                
                 <CardHeader>
-                  <CardTitle>Cases</CardTitle>
+                <div className="flex items-center justify-between">
+                <CardTitle>Cases</CardTitle>
+              <Button onClick={onCreateClick} className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Create New Case
+              </Button>
+            </div>
+                 
                 </CardHeader>
                 <CardContent>
                   <CasesTable items={caseItems} onEdit={onEdit} onDelete={onDelete} />
