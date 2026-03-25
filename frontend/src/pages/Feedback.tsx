@@ -203,7 +203,7 @@ export const Feedback = () => {
                   <div className="flex items-center gap-2">
                     <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-full"
+                        className="h-full bg-gradient-to-r from-red-500 via-yellow-500 to-emerald-500 rounded-full"
                         style={{ width: `${overallPercent}%` }}
                       />
                     </div>
@@ -310,7 +310,7 @@ export const Feedback = () => {
                                 <span
                                   className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                                     reached
-                                      ? 'bg-green-100 text-green-700'
+                                      ? 'bg-emerald-100 text-emerald-700'
                                       : 'bg-gray-100 text-gray-500'
                                   }`}
                                 >
@@ -344,7 +344,7 @@ export const Feedback = () => {
                         </div>
                         <div className="w-full h-4 bg-gray-200 rounded-full mt-2 overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 transition-[width]"
+                            className="h-full rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-emerald-500 transition-[width]"
                             style={{ width: `${empathyPercent}%` }}
                           />
                         </div>
@@ -352,16 +352,16 @@ export const Feedback = () => {
                       </div>
 
                       {openRatio !== null && (
-                        <div className="bg-green-50 p-4 rounded-lg">
+                        <div className="bg-emerald-50 p-4 rounded-lg">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">Open Question Ratio</span>
-                            <span className="text-lg font-bold text-green-600">
+                            <span className="text-lg font-bold text-emerald-600">
                               {openRatio}%
                             </span>
                           </div>
-                          <div className="w-full h-2 bg-green-200 rounded-full mt-2">
+                          <div className="w-full h-2 bg-emerald-200 rounded-full mt-2">
                             <div
-                              className="h-full bg-green-500 rounded-full"
+                              className="h-full bg-emerald-500 rounded-full"
                               style={{ width: `${openRatio}%` }}
                             />
                           </div>
@@ -399,7 +399,7 @@ export const Feedback = () => {
                           </div>
                           <div className="flex justify-between">
                             <span>Addressed</span>
-                            <span className="font-medium text-green-600">
+                            <span className="font-medium text-emerald-600">
                               {feedback.linkageStats.addressed_count} ({Math.round(feedback.linkageStats.addressed_rate * 100)}%)
                             </span>
                           </div>
@@ -526,13 +526,13 @@ export const Feedback = () => {
                   {strengthsList.length > 0 && (
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-green-700">Strengths</CardTitle>
+                        <CardTitle className="text-emerald-700">Strengths</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <ul className="space-y-2">
                           {strengthsList.map((strength, index) => (
                             <li key={index} className="flex items-start gap-2">
-                              <span className="text-green-600 mt-0.5">&#10003;</span>
+                              <span className="text-emerald-600 mt-0.5">&#10003;</span>
                               <span className="text-sm">{strength}</span>
                             </li>
                           ))}

@@ -976,7 +976,7 @@ export const Research = () => {
                           <span className="text-sm font-medium text-purple-900">Bias Probe Consistency</span>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                             data.fairnessMetrics.biasProbeConsistency >= 0.8 
-                              ? "bg-green-100 text-green-800" 
+                              ? "bg-emerald-100 text-emerald-800" 
                               : "bg-red-100 text-red-800"
                           }`}>
                             {data.fairnessMetrics.biasProbeConsistency >= 0.8 ? "Good" : "Needs Attention"}
@@ -996,27 +996,27 @@ export const Research = () => {
                         </p>
                       </div>
 
-                      <div className="bg-green-50 p-4 rounded-lg">
+                      <div className="bg-emerald-50 p-4 rounded-lg">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-green-900">Demographic Parity</span>
+                          <span className="text-sm font-medium text-emerald-900">Demographic Parity</span>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                             data.fairnessMetrics.demographicParity >= 0.85 
-                              ? "bg-green-100 text-green-800" 
+                              ? "bg-emerald-100 text-emerald-800" 
                               : "bg-red-100 text-red-800"
                           }`}>
                             {data.fairnessMetrics.demographicParity >= 0.85 ? "Good" : "Needs Attention"}
                           </span>
                         </div>
-                        <div className="text-2xl font-bold text-green-700 mb-1">
+                        <div className="text-2xl font-bold text-emerald-700 mb-1">
                           {(data.fairnessMetrics.demographicParity * 100).toFixed(1)}%
                         </div>
                         <div className="w-full h-2 bg-gray-200 rounded-full">
                           <div 
-                            className="h-full bg-green-600 rounded-full"
+                            className="h-full bg-emerald-600 rounded-full"
                             style={{ width: `${data.fairnessMetrics.demographicParity * 100}%` }}
                           />
                         </div>
-                        <p className="text-xs text-green-700 mt-2">
+                        <p className="text-xs text-emerald-700 mt-2">
                           Equal positive prediction rates across protected groups
                         </p>
                       </div>
@@ -1026,7 +1026,7 @@ export const Research = () => {
                           <span className="text-sm font-medium text-emerald-900">Equalized Odds</span>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                             data.fairnessMetrics.equalizedOdds >= 0.8 
-                              ? "bg-green-100 text-green-800" 
+                              ? "bg-emerald-100 text-emerald-800" 
                               : "bg-red-100 text-red-800"
                           }`}>
                             {data.fairnessMetrics.equalizedOdds >= 0.8 ? "Good" : "Needs Attention"}
