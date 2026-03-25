@@ -20,15 +20,9 @@ class Feedback(Base):
     # Aggregate scores (UI-facing, 0-100 unless noted)
     empathy_score = Column(Float, default=0.0)              # UI empathy score (0-100)
     communication_score = Column(Float, nullable=True)      # UI communication score (0-100)
-<<<<<<< HEAD
     clinical_reasoning_score = Column(Float, nullable=True)  # legacy DB column; not exposed in FeedbackResponse
     professionalism_score = Column(Float, nullable=True)  # legacy DB column; not exposed in FeedbackResponse
-    spikes_completion_score = Column(Float, default=0.0)    # SPIKES completion metric (0-10)
-=======
-    clinical_reasoning_score = Column(Float, nullable=True) # UI clinical reasoning score (0-100)
-    professionalism_score = Column(Float, nullable=True)    # UI professionalism score (0-100)
     spikes_completion_score = Column(Float, default=0.0)    # SPIKES completion metric (0-100)
->>>>>>> origin/staging
     overall_score = Column(Float, default=0.0)              # weighted blend (0-100)
 
     # ---- AFCE-structured empathy metrics
