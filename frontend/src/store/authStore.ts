@@ -10,7 +10,6 @@ export interface AppUser {
   email: string
   role: Role
   full_name?: string
-  name?: string
   gender?: string
   race?: string
   year_of_study?: string
@@ -24,6 +23,7 @@ interface AuthState {
   setSession: (session: Session | null) => void
   setUser: (user: AppUser | null) => void
   logout: () => Promise<void>
+  refreshProfile: () => Promise<void>
   initialize: () => Promise<void>
 }
 
@@ -34,9 +34,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   loading: true,
 
   setSession: (session) => {
+    const token = session?.access_token ?? null
     set({
-      token: session?.access_token ?? null,
-      isAuthenticated: !!session?.access_token,
+      token,
+      isAuthenticated: !!token,
+      ...(token ? {} : { user: null }),
     })
   },
 
@@ -47,6 +49,29 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   logout: async () => {
     await supabase.auth.signOut()
     set({ token: null, user: null, isAuthenticated: false })
+  },
+
+  refreshProfile: async () => {
+    const token = get().token
+    if (!token) {
+      set({ user: null })
+      return
+    }
+    try {
+      const { default: api } = await import('@/api/client')
+      const { data: profile } = await api.get('/v1/auth/me')
+      set({ user: profile, isAuthenticated: true })
+    } catch (err) {
+      if (
+        axios.isAxiosError(err) &&
+        (err.response?.status === 401 || err.response?.status === 403)
+      ) {
+        await get().logout()
+        set({ token: null, user: null, isAuthenticated: false })
+      } else {
+        set({ user: null, isAuthenticated: true })
+      }
+    }
   },
 
   initialize: async () => {
@@ -63,27 +88,21 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     })
 
     if (accessToken) {
-      try {
-        const { default: api } = await import('@/api/client')
-        const { data: profile } = await api.get('/v1/auth/me')
-        set({ user: profile, isAuthenticated: true })
-      } catch (err) {
-        if (
-          axios.isAxiosError(err) &&
-          (err.response?.status === 401 || err.response?.status === 403)
-        ) {
-          await get().logout()
-          set({ token: null, user: null, isAuthenticated: false })
-        } else {
-          set({ user: null, isAuthenticated: true })
-        }
-      }
+      await get().refreshProfile()
     }
 
     set({ loading: false })
 
-    supabase.auth.onAuthStateChange((_event, nextSession) => {
-      get().setSession(nextSession)
+    supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+      const token = nextSession?.access_token ?? null
+      set({
+        token,
+        isAuthenticated: !!token,
+        ...(token ? {} : { user: null }),
+      })
+      if (token) {
+        await get().refreshProfile()
+      }
     })
   },
 }))

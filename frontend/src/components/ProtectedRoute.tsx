@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import type { ReactNode } from 'react'
@@ -12,6 +13,12 @@ export const ProtectedRoute = ({
   allowedRoles,
 }: ProtectedRouteProps) => {
   const { isAuthenticated, user, loading } = useAuthStore()
+  const refreshProfile = useAuthStore((s) => s.refreshProfile)
+
+  useEffect(() => {
+    if (loading || !isAuthenticated || user) return
+    void refreshProfile()
+  }, [loading, isAuthenticated, user, refreshProfile])
 
   if (loading) {
     return (

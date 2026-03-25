@@ -2,15 +2,15 @@
  * Marketing landing for logged-out users; quick dashboard link when authenticated.
  */
 import { Link, Navigate } from 'react-router-dom'
-import { useAuthStore } from '@/store/authStore'
+import { useAuthGate } from '@/hooks/useAuthGate'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Stethoscope, FileText, BarChart3, Shield, ArrowRight } from 'lucide-react'
 
 export const Home = () => {
-  const { isAuthenticated, loading } = useAuthStore()
+  const gate = useAuthGate()
 
-  if (loading) {
+  if (gate === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center text-gray-500">
         Loading...
@@ -18,7 +18,7 @@ export const Home = () => {
     )
   }
 
-  if (isAuthenticated) {
+  if (gate === 'authed') {
     return <Navigate to="/dashboard" replace />
   }
 

@@ -17,6 +17,7 @@ import { Admin } from './pages/Admin'
 import { Research } from './pages/Research'
 import { PluginDeveloperGuide } from './pages/PluginDeveloperGuide'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { useAuthGate } from './hooks/useAuthGate'
 
 /**
  * Renders the login page or redirects authenticated users to the dashboard.
@@ -27,9 +28,9 @@ import { ProtectedRoute } from './components/ProtectedRoute'
  * @returns Login screen or a client-side redirect
  */
 const LoginRoute = () => {
-  const { isAuthenticated, loading } = useAuthStore()
+  const gate = useAuthGate()
 
-  if (loading) {
+  if (gate === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center text-gray-500">
         Loading...
@@ -37,7 +38,7 @@ const LoginRoute = () => {
     )
   }
 
-  if (isAuthenticated) {
+  if (gate === 'authed') {
     return <Navigate to="/dashboard" replace />
   }
   return <Login />
