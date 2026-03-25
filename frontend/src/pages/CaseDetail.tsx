@@ -896,7 +896,7 @@ export const CaseDetail = () => {
                               onClick={() => setBriefingTab('patientBackground')}
                               className={`rounded-full px-3.5 py-2 text-xs font-medium ${
                                 briefingTab === 'patientBackground'
-                                  ? 'bg-blue-100 text-blue-800'
+                                  ? 'bg-emerald-100 text-emerald-900'
                                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                               }`}
                             >
@@ -909,7 +909,7 @@ export const CaseDetail = () => {
                               onClick={() => setBriefingTab('objectives')}
                               className={`rounded-full px-3.5 py-2 text-xs font-medium ${
                                 briefingTab === 'objectives'
-                                  ? 'bg-blue-100 text-blue-800'
+                                  ? 'bg-emerald-100 text-emerald-900'
                                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                               }`}
                             >
@@ -921,7 +921,7 @@ export const CaseDetail = () => {
                             onClick={() => setBriefingTab('script')}
                             className={`rounded-full px-3.5 py-2 text-xs font-medium ${
                               briefingTab === 'script'
-                                ? 'bg-blue-100 text-blue-800'
+                                ? 'bg-emerald-100 text-emerald-900'
                                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                             }`}
                           >
@@ -933,7 +933,7 @@ export const CaseDetail = () => {
                               onClick={() => setBriefingTab('expectedSpikesFlow')}
                               className={`rounded-full px-3.5 py-2 text-xs font-medium ${
                                 briefingTab === 'expectedSpikesFlow'
-                                  ? 'bg-blue-100 text-blue-800'
+                                  ? 'bg-emerald-100 text-emerald-900'
                                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                               }`}
                             >

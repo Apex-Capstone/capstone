@@ -10,6 +10,7 @@ from config.logging import setup_logging
 from config.settings import get_local_storage_path, get_settings
 from controllers import (
     admin_controller,
+    analytics_controller,
     auth_controller,
     cases_controller,
     sessions_controller,
@@ -72,6 +73,7 @@ app.add_exception_handler(Exception, general_exception_handler)
 # Register routers with /v1 prefix
 app.include_router(auth_controller.router, prefix="/v1")
 app.include_router(cases_controller.router, prefix="/v1")
+app.include_router(analytics_controller.router, prefix="/v1")
 app.include_router(sessions_controller.router, prefix="/v1")
 app.include_router(turns_controller.router, prefix="/v1")
 app.include_router(admin_controller.router, prefix="/v1")
