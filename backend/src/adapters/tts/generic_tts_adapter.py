@@ -1,5 +1,6 @@
 """Generic TTS adapter implementation."""
 
+from adapters.tts.base import TTSAudioResult
 from config.logging import get_logger
 
 logger = get_logger(__name__)
@@ -16,7 +17,8 @@ class GenericTTSAdapter:
         self,
         text: str,
         voice_id: str = "default",
-    ) -> bytes:
+        instructions: str | None = None,
+    ) -> TTSAudioResult:
         """Convert text to speech.
         
         Note: This is a placeholder implementation.
@@ -27,9 +29,16 @@ class GenericTTSAdapter:
         - ElevenLabs
         """
         logger.warning("Generic TTS adapter called - no actual audio synthesis")
-        logger.info(f"Would synthesize: '{text[:50]}...' with voice: {voice_id}")
+        logger.info(
+            "Would synthesize: '%s...' with voice: %s instructions: %s",
+            text[:50],
+            voice_id,
+            instructions,
+        )
         
-        # Return empty bytes as placeholder
-        # In production, this would return actual audio data
-        return b""
+        return TTSAudioResult(
+            audio_data=b"",
+            content_type="audio/mpeg",
+            file_extension="mp3",
+        )
 

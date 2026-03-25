@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from adapters.llm.base import LLMAdapter
 from adapters.nlu.simple_rule_nlu import SimpleRuleNLU
+from adapters.tts.base import TTSAudioResult
 from db.base import Base
 from domain.entities.case import Case
 from domain.entities.session import Session as SessionEntity
@@ -49,23 +51,67 @@ class _DummyPatientModel:
         return "plugin patient reply"
 
 
+class _DummyTTSAdapter:
+    def __init__(self, should_fail: bool = False) -> None:
+        self.should_fail = should_fail
+        self.calls: list[dict] = []
+
+    async def synthesize_speech(
+        self,
+        text: str,
+        voice_id: str = "default",
+        instructions: str | None = None,
+    ) -> TTSAudioResult:
+        self.calls.append(
+            {
+                "text": text,
+                "voice_id": voice_id,
+                "instructions": instructions,
+            }
+        )
+        if self.should_fail:
+            raise RuntimeError("tts unavailable")
+        return TTSAudioResult(
+            audio_data=b"assistant-audio",
+            content_type="audio/mpeg",
+            file_extension="mp3",
+        )
+
+
+class _DummyStorageAdapter:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    async def put_file(self, file_data: bytes, file_name: str, content_type: str = "application/octet-stream") -> str:
+        self.calls.append(
+            {
+                "file_data": file_data,
+                "file_name": file_name,
+                "content_type": content_type,
+            }
+        )
+        return file_name
+
+
 @pytest.fixture
 def test_db():
     engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(bind=engine)
-    TestingSessionLocal = sessionmaker(bind=engine)
+    connection = engine.connect()
+    connection.exec_driver_sql("ATTACH DATABASE ':memory:' AS core")
+    Base.metadata.create_all(connection)
+    TestingSessionLocal = sessionmaker(bind=connection)
     db = TestingSessionLocal()
     try:
         yield db
     finally:
         db.close()
+        connection.close()
 
 
 @pytest.fixture
 def seeded_session(test_db):
     user = User(
-        email="dialogue_plugin_tester@example.com",
-        hashed_password="not_used_in_tests",
+        email="dialogue_plugin_tester@example.com",        
         role="trainee",
         full_name="Dialogue Plugin Tester",
     )
@@ -118,4 +164,100 @@ async def test_dialogue_service_uses_patient_model_plugin(test_db, seeded_sessio
     assert response.text == "plugin patient reply"
     # And our dummy plugin should have been called at least once
     assert dummy_patient_model.calls
+
+
+@pytest.mark.asyncio
+async def test_dialogue_service_generates_assistant_audio_when_enabled(
+    test_db,
+    seeded_session,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import services.dialogue_service as dialogue_service_module
+
+    dummy_patient_model = _DummyPatientModel()
+    monkeypatch.setattr(dialogue_service_module, "get_patient_model", lambda: dummy_patient_model)
+
+    tts = _DummyTTSAdapter()
+    storage = _DummyStorageAdapter()
+    service = DialogueService(
+        test_db,
+        llm_adapter=_DummyLLMAdapter(),
+        nlu_adapter=SimpleRuleNLU(),
+        tts_adapter=tts,
+        storage_adapter=storage,
+    )
+
+    response = await service.process_user_turn(
+        seeded_session.id,
+        TurnCreate(text="Can you tell me what the results mean?", enable_tts=True),
+    )
+
+    assert response.audio_url is not None
+    assert response.audio_url.startswith("sessions/")
+    assert response.audio_expires_at is not None
+    assert response.audio_expires_at > datetime.utcnow()
+    assert tts.calls
+    assert storage.calls
+
+
+@pytest.mark.asyncio
+async def test_dialogue_service_leaves_tts_off_by_default(
+    test_db,
+    seeded_session,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import services.dialogue_service as dialogue_service_module
+
+    dummy_patient_model = _DummyPatientModel()
+    monkeypatch.setattr(dialogue_service_module, "get_patient_model", lambda: dummy_patient_model)
+
+    tts = _DummyTTSAdapter()
+    storage = _DummyStorageAdapter()
+    service = DialogueService(
+        test_db,
+        llm_adapter=_DummyLLMAdapter(),
+        nlu_adapter=SimpleRuleNLU(),
+        tts_adapter=tts,
+        storage_adapter=storage,
+    )
+
+    response = await service.process_user_turn(
+        seeded_session.id,
+        TurnCreate(text="Hello, I wanted to check in about my diagnosis."),
+    )
+
+    assert response.audio_url is None
+    assert tts.calls == []
+    assert storage.calls == []
+
+
+@pytest.mark.asyncio
+async def test_dialogue_service_skips_assistant_audio_when_tts_fails(
+    test_db,
+    seeded_session,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import services.dialogue_service as dialogue_service_module
+
+    dummy_patient_model = _DummyPatientModel()
+    monkeypatch.setattr(dialogue_service_module, "get_patient_model", lambda: dummy_patient_model)
+
+    tts = _DummyTTSAdapter(should_fail=True)
+    storage = _DummyStorageAdapter()
+    service = DialogueService(
+        test_db,
+        llm_adapter=_DummyLLMAdapter(),
+        nlu_adapter=SimpleRuleNLU(),
+        tts_adapter=tts,
+        storage_adapter=storage,
+    )
+
+    response = await service.process_user_turn(
+        seeded_session.id,
+        TurnCreate(text="I am worried about what happens next.", enable_tts=True),
+    )
+
+    assert response.audio_url is None
+    assert tts.calls
+    assert storage.calls == []
 

@@ -1,13 +1,23 @@
+/**
+ * Tabular list of cases with edit/delete actions for the admin console.
+ */
 import { Button } from '@/components/ui/button'
 import { Pencil, Trash2 } from 'lucide-react'
 import type { Case } from '@/types/case'
 
+/** Props for {@link CasesTable}. */
 type Props = {
   items: Case[]
   onEdit: (c: Case) => void
   onDelete: (id: number) => void
 }
 
+/**
+ * Renders case rows or an empty state when `items` is empty.
+ *
+ * @param props - Case rows and edit/delete callbacks
+ * @returns Table markup
+ */
 export const CasesTable = ({ items, onEdit, onDelete }: Props) => {
   return (
     <div className="overflow-x-auto">

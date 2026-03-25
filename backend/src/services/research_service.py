@@ -173,6 +173,12 @@ class ResearchService:
             "turn_number",
             "speaker",
             "text",
+            "voice_tone_primary",
+            "voice_tone_confidence",
+            "voice_tone_valence",
+            "voice_tone_arousal",
+            "voice_tone_pace_wpm",
+            "voice_tone_pitch_hz",
         ]
         rows: list[dict[str, Any]] = []
         for session in sessions:
@@ -196,6 +202,12 @@ class ResearchService:
                         "turn_number": turn["turn_number"],
                         "speaker": turn["role"],
                         "text": turn["text"],
+                        "voice_tone_primary": turn.get("voice_tone_primary", ""),
+                        "voice_tone_confidence": turn.get("voice_tone_confidence", ""),
+                        "voice_tone_valence": turn.get("voice_tone_valence", ""),
+                        "voice_tone_arousal": turn.get("voice_tone_arousal", ""),
+                        "voice_tone_pace_wpm": turn.get("voice_tone_pace_wpm", ""),
+                        "voice_tone_pitch_hz": turn.get("voice_tone_pitch_hz", ""),
                     }
                 )
         output = StringIO()
@@ -251,7 +263,20 @@ class ResearchService:
 
     def stream_transcripts_csv(self) -> Iterator[bytes]:
         """Stream all transcripts CSV: flattened rows with anonymized text."""
-        header = ["anon_session_id", "case_id", "turn_number", "speaker", "text", "timestamp"]
+        header = [
+            "anon_session_id",
+            "case_id",
+            "turn_number",
+            "speaker",
+            "text",
+            "timestamp",
+            "voice_tone_primary",
+            "voice_tone_confidence",
+            "voice_tone_valence",
+            "voice_tone_arousal",
+            "voice_tone_pace_wpm",
+            "voice_tone_pitch_hz",
+        ]
         buf = StringIO()
         writer = csv.writer(buf)
         writer.writerow(header)
@@ -266,6 +291,7 @@ class ResearchService:
             anon_id = generate_anon_session_id(session.id)
             turns = self.turn_repo.get_by_session(session.id)
             for turn in turns:
+                voice_tone = self._extract_voice_tone_fields(turn.metrics_json)
                 row = [
                     anon_id,
                     session.case_id,
@@ -273,6 +299,12 @@ class ResearchService:
                     turn.role,
                     self._anonymize_text(turn.text or ""),
                     turn.timestamp.isoformat() if turn.timestamp else "",
+                    voice_tone["voice_tone_primary"],
+                    voice_tone["voice_tone_confidence"],
+                    voice_tone["voice_tone_valence"],
+                    voice_tone["voice_tone_arousal"],
+                    voice_tone["voice_tone_pace_wpm"],
+                    voice_tone["voice_tone_pitch_hz"],
                 ]
                 writer.writerow(row)
                 yield buf.getvalue().encode("utf-8")
@@ -288,7 +320,20 @@ class ResearchService:
         if not session:
             raise ValueError("Session not found")
 
-        header = ["anon_session_id", "case_id", "turn_number", "speaker", "text", "timestamp"]
+        header = [
+            "anon_session_id",
+            "case_id",
+            "turn_number",
+            "speaker",
+            "text",
+            "timestamp",
+            "voice_tone_primary",
+            "voice_tone_confidence",
+            "voice_tone_valence",
+            "voice_tone_arousal",
+            "voice_tone_pace_wpm",
+            "voice_tone_pitch_hz",
+        ]
         buf = StringIO()
         writer = csv.writer(buf)
         writer.writerow(header)
@@ -299,6 +344,7 @@ class ResearchService:
         turns = self.turn_repo.get_by_session(session.id)
         aid = generate_anon_session_id(session.id)
         for turn in turns:
+            voice_tone = self._extract_voice_tone_fields(turn.metrics_json)
             row = [
                 aid,
                 session.case_id,
@@ -306,6 +352,12 @@ class ResearchService:
                 turn.role,
                 self._anonymize_text(turn.text or ""),
                 turn.timestamp.isoformat() if turn.timestamp else "",
+                voice_tone["voice_tone_primary"],
+                voice_tone["voice_tone_confidence"],
+                voice_tone["voice_tone_valence"],
+                voice_tone["voice_tone_arousal"],
+                voice_tone["voice_tone_pace_wpm"],
+                voice_tone["voice_tone_pitch_hz"],
             ]
             writer.writerow(row)
             yield buf.getvalue().encode("utf-8")
@@ -338,12 +390,15 @@ class ResearchService:
             turns = self.turn_repo.get_by_session(session.id)
             data["turn_count"] = len(turns)
             data["turns"] = [
-                {
-                    "turn_number": turn.turn_number,
-                    "role": turn.role,
-                    "text": self._anonymize_text(turn.text) if export_request.anonymize else turn.text,
-                    "spikes_stage": turn.spikes_stage,
-                }
+                (
+                    {
+                        "turn_number": turn.turn_number,
+                        "role": turn.role,
+                        "text": self._anonymize_text(turn.text) if export_request.anonymize else turn.text,
+                        "spikes_stage": turn.spikes_stage,
+                    }
+                    | self._extract_voice_tone_fields(turn.metrics_json)
+                )
                 for turn in turns
             ]
         
@@ -420,4 +475,42 @@ class ResearchService:
         writer.writerows(data)
         
         return output.getvalue()
+
+    def _extract_voice_tone_fields(self, metrics_json: str | None) -> dict[str, Any]:
+        """Flatten persisted voice tone metrics for research exports."""
+        default_fields = {
+            "voice_tone_primary": "",
+            "voice_tone_confidence": "",
+            "voice_tone_valence": "",
+            "voice_tone_arousal": "",
+            "voice_tone_pace_wpm": "",
+            "voice_tone_pitch_hz": "",
+        }
+        if not metrics_json:
+            return default_fields
+
+        try:
+            metrics = json.loads(metrics_json)
+        except (TypeError, json.JSONDecodeError):
+            try:
+                metrics = json.loads(metrics_json.replace("'", '"'))
+            except (AttributeError, TypeError, json.JSONDecodeError):
+                return default_fields
+
+        voice_tone = metrics.get("voice_tone")
+        if not isinstance(voice_tone, dict):
+            return default_fields
+
+        dimensions = voice_tone.get("dimensions")
+        if not isinstance(dimensions, dict):
+            dimensions = {}
+
+        return {
+            "voice_tone_primary": voice_tone.get("primary", ""),
+            "voice_tone_confidence": voice_tone.get("confidence", ""),
+            "voice_tone_valence": dimensions.get("valence", ""),
+            "voice_tone_arousal": dimensions.get("arousal", ""),
+            "voice_tone_pace_wpm": dimensions.get("pace_wpm", ""),
+            "voice_tone_pitch_hz": dimensions.get("pitch_hz", ""),
+        }
 

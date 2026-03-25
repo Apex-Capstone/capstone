@@ -1,6 +1,7 @@
 """Feedback repository for database operations."""
 
-from typing import Optional, Any
+from collections import defaultdict
+from typing import Any, Optional
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -131,4 +132,27 @@ class FeedbackRepository:
             "spikes": 0.0,
             "overall": 0.0,
         }
+
+    def get_average_overall_by_month(self) -> list[dict[str, Any]]:
+        """Average overall_score per calendar month from feedback.created_at (YYYY-MM keys)."""
+        rows = (
+            self.db.query(Feedback.created_at, Feedback.overall_score)
+            .filter(Feedback.created_at.isnot(None))
+            .all()
+        )
+        sums: dict[str, float] = defaultdict(float)
+        counts: dict[str, int] = defaultdict(int)
+        for created_at, overall_score in rows:
+            if overall_score is None:
+                continue
+            key = created_at.strftime("%Y-%m")
+            sums[key] += float(overall_score)
+            counts[key] += 1
+        out: list[dict[str, Any]] = []
+        for month in sorted(sums.keys()):
+            n = counts[month]
+            if n == 0:
+                continue
+            out.append({"month": month, "score": round(sums[month] / n, 2)})
+        return out
 

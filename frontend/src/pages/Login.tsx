@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
+import axios from 'axios'
 import { useAuthStore } from '@/store/authStore'
-import { loginUser } from '@/api/client'
+import { supabase } from '@/lib/supabase'
+import api from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,7 +15,7 @@ export const Login = () => {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
-  const { login } = useAuthStore()
+  const { setSession, setUser } = useAuthStore()
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -21,12 +23,37 @@ export const Login = () => {
     setLoading(true)
 
     try {
-      const response = await loginUser(email, password)
-      login(response.token, response.user)
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (authError) {
+        setError(authError.message)
+        return
+      }
+
+      setSession(data.session)
+
+      try {
+        const { data: profile } = await api.get('/v1/auth/me')
+        setUser(profile)
+      } catch (err) {
+        if (
+          axios.isAxiosError(err) &&
+          (err.response?.status === 401 || err.response?.status === 403)
+        ) {
+          await useAuthStore.getState().logout()
+          setError(
+            'This account is not available in the app. It may have been removed — try another email or sign up again.'
+          )
+          return
+        }
+      }
+
       navigate('/dashboard')
-    } catch (err) {
-      setError('Invalid email or password. Please try again.')
-      console.error('Login error:', err)
+    } catch {
+      setError('Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -36,7 +63,7 @@ export const Login = () => {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">APEX (AI Patient Experience Simulator)</CardTitle>
+          <CardTitle className="text-2xl font-bold">APEX</CardTitle>
           <CardDescription>
             Sign in to your account to continue
           </CardDescription>
@@ -80,9 +107,14 @@ export const Login = () => {
               {loading ? 'Signing in...' : 'Sign in'}
             </Button>
           </form>
+          <p className="mt-4 text-center text-sm text-gray-600">
+            Don't have an account?{' '}
+            <Link to="/signup" className="font-medium text-emerald-600 hover:text-emerald-700">
+              Sign up
+            </Link>
+          </p>
         </CardContent>
       </Card>
     </div>
   )
 }
-

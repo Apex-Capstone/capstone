@@ -1,3 +1,6 @@
+/**
+ * Post-session feedback view: scores, SPIKES checklist, and conversation analysis.
+ */
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { fetchFeedback } from '@/api/feedback.api'
@@ -11,9 +14,9 @@ import { Sidebar } from '@/components/Sidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
-// Canonical SPIKES stage order using the word-form values the backend records
-// in turn.spikes_stage (e.g. "setting", "perception", "summary").
-// The `key` is what the backend stores; `label` is what the UI shows.
+/**
+ * Canonical SPIKES stage order: `key` matches `turn.spikes_stage`, `label` is UI text.
+ */
 const SPIKES_STAGE_ORDER: Array<{ key: string; label: string }> = [
   { key: 'setting',    label: 'Setting' },
   { key: 'perception', label: 'Perception' },
@@ -23,9 +26,7 @@ const SPIKES_STAGE_ORDER: Array<{ key: string; label: string }> = [
   { key: 'strategy',   label: 'Strategy' },
 ]
 
-// Normalise any value from spikesCoverage.covered to the canonical word form
-// so that letter codes ("S", "P", "S2", …) returned by older backend versions
-// are handled as well.
+/** Maps legacy letter codes from `spikesCoverage.covered` to canonical stage keys. */
 const LETTER_TO_WORD: Record<string, string> = {
   S:  'setting',
   P:  'perception',
@@ -36,21 +37,44 @@ const LETTER_TO_WORD: Record<string, string> = {
   summary: 'strategy',  // alias used in some backend versions
 }
 
+/**
+ * Normalizes covered stage tokens to lowercase word keys for checklist comparison.
+ *
+ * @param covered - Raw covered list from feedback
+ * @returns Set of canonical keys
+ */
 function normaliseSpikesCovered(covered: string[]): Set<string> {
   return new Set(
     covered.map((s) => LETTER_TO_WORD[s] ?? s.toLowerCase())
   )
 }
 
+/**
+ * Splits multiline feedback text into trimmed non-empty lines.
+ *
+ * @param text - Raw paragraph text
+ * @returns Line array
+ */
 function splitLines(text: string | null | undefined): string[] {
   if (!text) return []
   return text.split('\n').map((s) => s.trim()).filter(Boolean)
 }
 
+/**
+ * Clamps a 0–100 score to an integer percentage.
+ *
+ * @param score - Raw score
+ * @returns Rounded percent
+ */
 function scoreToPercent(score: number): number {
-  return Math.round((score / 10) * 100)
+  return Math.min(100, Math.max(0, Math.round(score)))
 }
 
+/**
+ * Loads feedback + session detail for `sessionId` and renders charts and timeline.
+ *
+ * @returns Full-page feedback UI or loading/error states
+ */
 export const Feedback = () => {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
@@ -60,6 +84,9 @@ export const Feedback = () => {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    /**
+     * Fetches normalized feedback and session turns in parallel.
+     */
     const loadFeedback = async () => {
       if (!sessionId) return
 
@@ -181,7 +208,7 @@ export const Feedback = () => {
                       />
                     </div>
                     <span className="text-lg font-bold text-gray-900">
-                      {feedback.overallScore.toFixed(1)}/10
+                      {feedback.overallScore.toFixed(1)}/100
                     </span>
                   </div>
                 </div>
@@ -192,7 +219,7 @@ export const Feedback = () => {
                 <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-6 text-center">
                   <div className="text-sm font-medium text-emerald-800 uppercase tracking-wide">Empathy Score</div>
                   <div className="text-4xl font-bold text-emerald-600 mt-1">
-                    {feedback.empathyScore.toFixed(1)}<span className="text-xl font-semibold text-emerald-500">/10</span>
+                    {feedback.empathyScore.toFixed(1)}<span className="text-xl font-semibold text-emerald-500">/100</span>
                   </div>
                   <p className="text-xs text-emerald-700 mt-1">Session empathy recognition</p>
                 </div>
@@ -295,7 +322,7 @@ export const Feedback = () => {
                         </div>
 
                         <div className="text-xs text-gray-500 pt-2 border-t">
-                          SPIKES Completion Score: {feedback.spikesCompletionScore.toFixed(1)}/10
+                          SPIKES Completion Score: {feedback.spikesCompletionScore.toFixed(1)}/100
                         </div>
                       </div>
                     )}
@@ -312,7 +339,7 @@ export const Feedback = () => {
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">Empathy Score</span>
                           <span className="text-xl font-bold text-emerald-600">
-                            {feedback.empathyScore.toFixed(1)}/10
+                            {feedback.empathyScore.toFixed(1)}/100
                           </span>
                         </div>
                         <div className="w-full h-4 bg-gray-200 rounded-full mt-2 overflow-hidden">
@@ -425,7 +452,7 @@ export const Feedback = () => {
                       </div>
                       <div>
                         <span className="font-medium">Overall Score:</span>{' '}
-                        <span className="font-bold">{feedback.overallScore.toFixed(1)}/10</span>
+                        <span className="font-bold">{feedback.overallScore.toFixed(1)}/100</span>
                       </div>
                       {feedback.latencyMsAvg > 0 && (
                         <div>

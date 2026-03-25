@@ -38,7 +38,6 @@ async def main() -> None:
         # Shared user and case for all three transcripts
         user = User(
             email="apex_eval@example.com",
-            hashed_password="not_used_in_eval",
             role="trainee",
             full_name="APEX Eval User",
         )

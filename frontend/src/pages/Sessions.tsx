@@ -1,6 +1,9 @@
+/**
+ * Paginated list of the user’s sessions with filters and links to case/detail/feedback.
+ */
 import { useEffect, useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { listSessions } from '@/api/sessions.api'
+import { listActiveSessions, listCompletedSessions } from '@/api/sessions.api'
 import { getCase } from '@/api/cases.api'
 import type { Session } from '@/types/session'
 import type { Case } from '@/types/case'
@@ -13,6 +16,12 @@ import { cn } from '@/lib/utils'
 
 type FilterState = 'all' | 'active' | 'completed'
 
+/**
+ * Formats elapsed seconds as `Xm Ys` or `Ys`.
+ *
+ * @param seconds - Duration in seconds
+ * @returns Short label
+ */
 function formatDuration(seconds: number): string {
   if (seconds <= 0) return '0s'
   const m = Math.floor(seconds / 60)
@@ -21,6 +30,12 @@ function formatDuration(seconds: number): string {
   return `${m}m ${s}s`
 }
 
+/**
+ * Formats an ISO timestamp for list rows.
+ *
+ * @param iso - ISO date string
+ * @returns Locale date/time string
+ */
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
     year: 'numeric',
@@ -31,6 +46,7 @@ function formatDate(iso: string): string {
   })
 }
 
+/** Human-readable SPIKES stage labels keyed by backend slug. */
 const SPIKES_DISPLAY: Record<string, string> = {
   setting: 'Setting',
   perception: 'Perception',
@@ -41,6 +57,11 @@ const SPIKES_DISPLAY: Record<string, string> = {
   summary: 'Strategy',
 }
 
+/**
+ * Session history page with filter tabs and prefetch of related case titles.
+ *
+ * @returns Full layout with session cards
+ */
 export const Sessions = () => {
   const navigate = useNavigate()
   const [sessions, setSessions] = useState<Session[]>([])
@@ -49,12 +70,21 @@ export const Sessions = () => {
   const [filter, setFilter] = useState<FilterState>('all')
 
   useEffect(() => {
+    /**
+     * Loads all sessions then hydrates case metadata for displayed titles.
+     */
     const load = async () => {
       try {
-        const sessionData = await listSessions()
-        setSessions(sessionData.sessions)
+        const [activeResult, completedResult] = await Promise.allSettled([
+          listActiveSessions(),
+          listCompletedSessions(),
+        ])
+        const all: Session[] = []
+        if (activeResult.status === 'fulfilled') all.push(...activeResult.value.sessions)
+        if (completedResult.status === 'fulfilled') all.push(...completedResult.value.sessions)
+        setSessions(all)
 
-        const caseIds = [...new Set(sessionData.sessions.map((s) => s.caseId))]
+        const caseIds = [...new Set(all.map((s) => s.caseId))]
         const cases = await Promise.all(
           caseIds.map((id) => getCase(id).catch(() => null))
         )

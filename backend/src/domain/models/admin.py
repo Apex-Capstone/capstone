@@ -1,9 +1,9 @@
 """Admin and analytics schemas."""
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class UserStats(BaseModel):
@@ -24,13 +24,21 @@ class SessionStats(BaseModel):
     sessions_by_case: dict[str, int]
 
 
+class MonthScoreAverage(BaseModel):
+    """Average overall score for a calendar month (YYYY-MM)."""
+
+    month: str
+    score: float
+
+
 class PerformanceStats(BaseModel):
     """Performance statistics schema."""
-    
+
     average_empathy_score: float
     average_communication_score: float
     average_spikes_completion: float
     average_overall_score: float
+    average_score_by_month: list[MonthScoreAverage] = Field(default_factory=list)
 
 
 class CaseStats(BaseModel):
@@ -88,6 +96,30 @@ class ResearchSessionsEnvelope(BaseModel):
     """Envelope for paginated anonymized research sessions."""
 
     sessions: list[ResearchSessionSummary]
+    total: int
+    skip: int
+    limit: int
+
+
+class AdminUserOverviewRow(BaseModel):
+    """Per-user aggregates for the admin user management table."""
+
+    id: int
+    email: str
+    full_name: Optional[str] = None
+    role: str
+    created_at: datetime
+    session_count: int
+    completed_session_count: int
+    last_session_at: Optional[datetime] = None
+    average_overall_score: Optional[float] = None
+    average_empathy_score: Optional[float] = None
+
+
+class AdminUserOverviewResponse(BaseModel):
+    """Paginated user overview for admin."""
+
+    users: list[AdminUserOverviewRow]
     total: int
     skip: int
     limit: int

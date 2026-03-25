@@ -1,10 +1,12 @@
-// src/api/research.api.ts
+/**
+ * Admin-only research endpoints: anonymized sessions and export download.
+ */
 import api from '@/api/client'
 import type { AxiosError } from 'axios'
 
 const BASE = '/v1/research'
 
-/** Backend anonymized session shape from GET /v1/research/sessions */
+/** Backend anonymized session row from `GET /v1/research/sessions`. */
 export interface ResearchSessionDTO {
   session_id: string | number
   case_id: number
@@ -17,6 +19,7 @@ export interface ResearchSessionDTO {
   timestamp?: string | null
 }
 
+/** Paginated research session list response. */
 export interface ResearchSessionsResponse {
   sessions: ResearchSessionDTO[]
   total: number
@@ -24,7 +27,7 @@ export interface ResearchSessionsResponse {
   limit: number
 }
 
-/** Mapped shape for Research page (backend does not provide demographics/scores) */
+/** Dashboard-ready research bundle (mapped from {@link ResearchSessionsResponse}). */
 export interface ResearchData {
   anonymizedSessions: Array<{
     sessionId: string
@@ -42,14 +45,37 @@ export interface ResearchData {
   }
 }
 
+/**
+ * Returns true when the error is an Axios 403 Forbidden response.
+ *
+ * @param err - Unknown caught error
+ * @returns Whether `err` represents HTTP 403
+ */
 function isForbidden(err: unknown): boolean {
   return (err as AxiosError)?.response?.status === 403
 }
 
 /**
- * Fetch anonymized sessions from research API.
- * Requires admin auth; JWT sent via Authorization header.
- * @throws Error with message including "403" or "access denied" when non-admin
+ * Clamps a numeric score to the inclusive 0–100 range, or null if not a finite number.
+ *
+ * @param value - Raw score from the API
+ * @returns Clamped number or null
+ */
+function clampScoreOrNull(value: number | null | undefined): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null
+  return Math.max(0, Math.min(100, value))
+}
+
+/**
+ * Fetches anonymized sessions for the Research dashboard (admin only).
+ *
+ * @remarks
+ * JWT is attached by the shared API client. Throws a friendly error on 403.
+ *
+ * @param skip - Pagination offset (default 0)
+ * @param limit - Page size (default 100)
+ * @returns {@link ResearchSessionsResponse}
+ * @throws Error with an access-denied message when the user is not admin
  */
 export async function fetchResearchSessions(
   skip = 0,
@@ -69,9 +95,13 @@ export async function fetchResearchSessions(
 }
 
 /**
- * Trigger download of anonymized research data as JSON.
- * Requires admin auth.
- * @throws Error with message including "access denied" when 403
+ * Downloads the anonymized research export as `research_export.json` in the browser.
+ *
+ * @remarks
+ * Creates a temporary object URL and triggers a programmatic click on a hidden anchor.
+ *
+ * @returns Resolves when the download has been triggered (not when the file is saved)
+ * @throws Error with an access-denied message on HTTP 403
  */
 export async function fetchResearchExport(): Promise<void> {
   try {
@@ -96,35 +126,42 @@ export async function fetchResearchExport(): Promise<void> {
 }
 
 /**
- * Fetch research data for the Research dashboard.
- * Maps backend sessions to ResearchData. Backend does not provide demographics
- * or fairness metrics; those fields use placeholders.
+ * Builds {@link ResearchData} for the Research page from paginated anonymized sessions.
+ *
+ * @remarks
+ * Demographics and fairness metrics are placeholders when the backend omits them.
+ *
+ * @returns Mapped {@link ResearchData}
+ * @throws Error with an access-denied message on HTTP 403
  */
 export async function fetchResearchData(): Promise<ResearchData> {
-  const res = await fetchResearchSessions(0, 500)
-  const clampOrNull = (value: number | null | undefined): number | null => {
-    if (typeof value !== 'number' || !Number.isFinite(value)) return null
-    return Math.max(0, Math.min(100, value))
-  }
+  try {
+    const res = await fetchResearchSessions(0, 500)
 
-  const anonymizedSessions = res.sessions.map((s) => {
-    const empathy = clampOrNull(s.empathy_score)
-    const communication = clampOrNull(s.communication_score)
-    const clinical = clampOrNull(s.clinical_score)
+    const anonymizedSessions = res.sessions.map((s) => {
+      const empathy = clampScoreOrNull(s.empathy_score)
+      const communication = clampScoreOrNull(s.communication_score)
+      const clinical = clampScoreOrNull(s.clinical_score)
 
+      return {
+        sessionId: String(s.session_id),
+        demographics: { ageGroup: '—', gender: '—' } as const,
+        scores: { empathy, communication, clinical } as const,
+        timestamp: s.timestamp ?? '',
+        duration_seconds: s.duration_seconds,
+        state: s.state,
+        spikes_stage: s.spikes_stage ?? null,
+      }
+    })
     return {
-      sessionId: String(s.session_id),
-      demographics: { ageGroup: '—', gender: '—' } as const,
-      scores: { empathy, communication, clinical } as const,
-      timestamp: s.timestamp ?? '',
-      duration_seconds: s.duration_seconds,
-      state: s.state,
-      spikes_stage: s.spikes_stage ?? null,
+      anonymizedSessions,
+      // Backend does not provide fairness metrics; omit so UI hides that section
+      fairnessMetrics: undefined,
     }
-  })
-  return {
-    anonymizedSessions,
-    // Backend does not provide fairness metrics; omit so UI hides that section
-    fairnessMetrics: undefined,
+  } catch (err) {
+    if (isForbidden(err)) {
+      throw new Error('Access denied. Admin privileges required.')
+    }
+    throw err
   }
 }

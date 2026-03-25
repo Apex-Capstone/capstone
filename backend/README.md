@@ -115,9 +115,18 @@ The dialogue service implements the SPIKES protocol for breaking bad news:
 ### AI Adapters
 - **LLM**: OpenAI GPT-4 or Google Gemini for patient simulation
 - **ASR**: Whisper for speech-to-text
-- **TTS**: Generic TTS adapter (extensible)
+- **TTS**: OpenAI TTS via an extensible adapter interface
 - **NLU**: Rule-based NLU for empathy detection and question classification
-- **Storage**: S3 for audio file storage
+- **Storage**: Supabase object storage for assistant audio with a backend disk cache
+
+### Audio Input Notes
+- `POST /v1/sessions/{session_id}/audio` accepts `wav`, `ogg`, `mp3`, `webm`, and `m4a` uploads up to 10 MB.
+- Audio input requires a real `openai_api_key` because transcription uses Whisper.
+- The upload route validates that the session belongs to the authenticated user and is still active.
+- User uploads are transcribed but not persisted after processing.
+- Assistant text-to-speech uses OpenAI when the frontend audio toggle is enabled.
+- Assistant audio is stored in Supabase, served through `GET /v1/turns/{turn_id}/audio`, and cached on local disk for repeat reads.
+- Expired assistant audio can be purged with `poetry run cleanup-expired-audio` and scheduled in Render as a cron job.
 
 ### Scoring & Feedback
 Automated scoring based on:
@@ -182,9 +191,65 @@ poetry run mypy src/
 
 ## Deployment
 
-1. Set production environment variables
-2. Use production database (PostgreSQL)
-3. Run with production ASGI server:
+### Render (recommended flow)
+
+**Pre-deploy command — use migrations only**
+
+Never run a script that **drops** the `core` schema in pre-deploy; that wipes production data. Use Alembic instead:
+
+```bash
+# From the backend directory (set Render “Root Directory” to `backend` if the repo root is the capstone project)
+bash render_predeploy.sh
+```
+
+Equivalent one-liner:
+
+```bash
+PYTHONPATH=src poetry run alembic upgrade head
+```
+
+**Start command**
+
+Render injects `PORT`. Bind to it so the service listens correctly:
+
+```bash
+PYTHONPATH=src poetry run uvicorn src.app:app --host 0.0.0.0 --port "${PORT:-10000}"
+```
+
+**Environment variables**
+
+See [`env.render.example`](env.render.example) for a placeholder list. Copy values into the Render dashboard (secrets are not committed).
+
+- **`DATABASE_URL` / `database_url`** — Pydantic accepts either casing. For the **same PostgreSQL data** as your local machine, this value must **match** your local [`.env`](.env) connection string (host, database name, credentials).
+- **`SECRET_KEY` / `secret_key`** — Same rule: match local if you want tokens issued in one environment to be valid when debugging the other; otherwise use a production-only secret and re-login after deploys.
+- **`CORS_ORIGINS`** — Set to your deployed frontend origin (JSON array or comma-separated), e.g. `["https://your-frontend.onrender.com"]`.
+
+**Frontend (separate Render static site)**
+
+Set `VITE_API_URL` to your **backend** public URL at **build** time so the SPA calls the correct API.
+
+**Storage vs database**
+
+PostgreSQL data (sessions, users, etc.) lives in the database configured by `DATABASE_URL` and **persists** across deploys unless you manually drop schema or truncate data.
+
+Files under `local_storage_path` (default `./storage`) on Render’s **ephemeral filesystem** are **not** preserved across deploys. Assistant audio is also stored in **Supabase** per your settings; prefer relying on Supabase (or similar) for durable media, and treat local cache as disposable.
+
+**Verification checklist**
+
+| Check | Action |
+|--------|--------|
+| Same DB as local | Compare `DATABASE_URL` in Render with local `database_url` character-for-character. |
+| JWT parity | Compare `SECRET_KEY` with local if you expect shared token behavior. |
+| Pre-deploy | Confirm logs show `alembic upgrade head`. |
+| Missing media only | If DB rows exist but files 404, check Supabase vs wiped `./storage`. |
+
+### Generic production
+
+1. Set production environment variables (see above).
+2. Use a managed PostgreSQL database.
+3. Run migrations: `poetry run alembic upgrade head`.
+4. Run with a production ASGI server, for example:
+
 ```bash
 gunicorn src.app:app -w 4 -k uvicorn.workers.UvicornWorker
 ```

@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text  
 from sqlalchemy.orm import Session
@@ -12,16 +12,33 @@ from sqlalchemy.orm import Session
 from config.settings import get_settings
 from core.deps import get_db, require_admin
 from domain.entities.user import User
-from domain.models.admin import AnalyticsDashboard
+from domain.models.admin import (
+    AdminUserOverviewResponse,
+    AdminUserOverviewRow,
+    AnalyticsDashboard,
+)
 from plugins.registry import PluginRegistry
 from domain.models.cases import CaseCreate, CaseResponse
-from domain.models.sessions import SessionDetailResponse, SessionListResponse, TurnResponse
+from domain.models.sessions import SessionDetailResponse
 from repositories.feedback_repo import FeedbackRepository
+from repositories.user_repo import UserRepository
 from services.analytics_service import AnalyticsService
 from services.case_service import CaseService
 from services.session_service import SessionService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _with_session_user_info(detail: SessionDetailResponse, row: User | None) -> SessionDetailResponse:
+    """Attach email/name from the users table for admin UI (not stored on session)."""
+    if not row:
+        return detail
+    return detail.model_copy(
+        update={
+            "user_email": row.email,
+            "user_full_name": row.full_name,
+        }
+    )
 
 
 class AdminSessionListResponse(BaseModel):
@@ -145,14 +162,21 @@ async def list_all_sessions(
         sessions = session_repo.get_by_case(case_id, skip, limit)
     else:
         sessions = session_repo.get_all(skip, limit)
-    
+
+    user_ids = list({s.user_id for s in sessions})
+    users_by_id: dict[int, User] = {}
+    if user_ids:
+        for u in db.query(User).filter(User.id.in_(user_ids)).all():
+            users_by_id[u.id] = u
+
     # Convert to detailed responses
     session_service = SessionService(db)
     detailed_sessions = []
     for sess in sessions:
         detailed = await session_service.get_session(sess.id)
+        detailed = _with_session_user_info(detailed, users_by_id.get(sess.user_id))
         detailed_sessions.append(detailed)
-    
+
     return AdminSessionListResponse(
         sessions=detailed_sessions,
         total=len(sessions),
@@ -170,6 +194,8 @@ async def get_admin_session_detail(
     """Get transcript, feedback summary, and metrics timeline for a session (admin only)."""
     session_service = SessionService(db)
     session_detail = await session_service.get_session(session_id)
+    owner = db.query(User).filter(User.id == session_detail.user_id).first()
+    session_detail = _with_session_user_info(session_detail, owner)
 
     # Fetch feedback (no ownership restriction for admin)
     feedback_repo = FeedbackRepository(db)
@@ -205,6 +231,41 @@ async def get_admin_session_detail(
         session=session_detail,
         feedback=feedback_summary,
         metrics_timeline=metrics_timeline,
+    )
+
+
+ALLOWED_USER_OVERVIEW_SORT = frozenset({"last_active_desc", "avg_score_desc", "email_asc"})
+
+
+@router.get("/users/overview", response_model=AdminUserOverviewResponse)
+async def get_users_overview(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_admin)],
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    sort: str = Query("last_active_desc"),
+    role: Optional[str] = Query(None),
+    q: Optional[str] = Query(None, description="Search email or full name (substring)"),
+):
+    """Paginated per-user session and feedback aggregates (admin only)."""
+    if sort not in ALLOWED_USER_OVERVIEW_SORT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"sort must be one of: {', '.join(sorted(ALLOWED_USER_OVERVIEW_SORT))}",
+        )
+    user_repo = UserRepository(db)
+    rows, total = user_repo.list_admin_overview(
+        skip=skip,
+        limit=limit,
+        sort=sort,
+        role=role,
+        q=q,
+    )
+    return AdminUserOverviewResponse(
+        users=[AdminUserOverviewRow(**r) for r in rows],
+        total=total,
+        skip=skip,
+        limit=limit,
     )
 
 

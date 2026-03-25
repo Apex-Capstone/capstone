@@ -1,8 +1,11 @@
-import { CheckCircle2 } from 'lucide-react'
+/**
+ * Horizontal SPIKES stage indicator for session UI.
+ */
 import { cn } from '@/lib/utils'
 
 type SpikesStageId = 'setting' | 'perception' | 'invitation' | 'knowledge' | 'emotion' | 'strategy'
 
+/** Ordered SPIKES stages for the progress visualization. */
 const STAGES: { id: SpikesStageId; label: string }[] = [
   { id: 'setting', label: 'Setting' },
   { id: 'perception', label: 'Perception' },
@@ -12,51 +15,49 @@ const STAGES: { id: SpikesStageId; label: string }[] = [
   { id: 'strategy', label: 'Strategy' },
 ]
 
+/** Props for {@link SpikesProgressBar}. */
 interface SpikesProgressBarProps {
+  /** Raw stage string from the backend (matched case-insensitively). */
   currentStage?: string
 }
 
+/**
+ * Shows six SPIKES checkpoints with completion/current/empty styling.
+ *
+ * @param props - {@link SpikesProgressBarProps}
+ * @returns Progress bar JSX
+ */
 export const SpikesProgressBar = ({ currentStage }: SpikesProgressBarProps) => {
   const normalizedStage = currentStage?.toLowerCase() as SpikesStageId | undefined
   const currentIndex = STAGES.findIndex((s) => s.id === normalizedStage)
+  const progressWidth = currentIndex >= 0 ? `${((currentIndex + 1) / STAGES.length) * 100}%` : '0%'
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between text-xs font-medium text-gray-700">
-        <span>SPIKES Progress</span>
-        <span className="capitalize text-gray-600">
-          {currentIndex >= 0 ? STAGES[currentIndex].label : 'Not started'}
-        </span>
-      </div>
-      <div className="flex items-center justify-between gap-2">
+    <div className="space-y-0.5">
+      <div className="grid grid-cols-6 gap-2 sm:gap-2.5">
         {STAGES.map((stage, index) => {
-          const isCompleted = currentIndex >= 0 && index < currentIndex
           const isCurrent = currentIndex === index
+          const isCompleted = currentIndex >= 0 && index < currentIndex
 
           return (
-            <div key={stage.id} className="flex flex-1 flex-col items-center gap-1">
+            <div key={stage.id} className="flex min-w-0 flex-col items-center gap-2 text-center">
               <div
                 className={cn(
-                  'flex h-7 w-7 items-center justify-center rounded-full border text-[10px] font-semibold',
-                  isCompleted && 'border-emerald-500 bg-emerald-500 text-white',
+                  'flex h-9 w-9 items-center justify-center rounded-full border text-xs font-medium',
+                  isCompleted && 'border-emerald-200 bg-emerald-50 text-emerald-700',
                   isCurrent &&
-                    !isCompleted &&
                     'border-emerald-500 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-100',
-                  !isCompleted && !isCurrent && 'border-gray-200 bg-gray-50 text-gray-400'
+                  !isCompleted && !isCurrent && 'border-slate-200 bg-slate-50 text-slate-400'
                 )}
               >
-                {isCompleted ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  stage.label[0]
-                )}
+                {stage.label[0]}
               </div>
               <span
                 className={cn(
-                  'truncate text-[10px]',
+                  'min-h-[22px] w-full px-0.5 text-center text-[8.5px] leading-tight whitespace-normal sm:text-[9.5px]',
                   isCompleted && 'text-emerald-700',
-                  isCurrent && !isCompleted && 'text-emerald-700',
-                  !isCompleted && !isCurrent && 'text-gray-400'
+                  isCurrent && 'font-semibold text-emerald-700',
+                  !isCompleted && !isCurrent && 'text-slate-500'
                 )}
               >
                 {stage.label}
@@ -64,6 +65,12 @@ export const SpikesProgressBar = ({ currentStage }: SpikesProgressBarProps) => {
             </div>
           )
         })}
+      </div>
+      <div className="mt-1 h-1 rounded-full bg-slate-200">
+        <div
+          className="h-full rounded-full bg-emerald-500 transition-all duration-300 ease-out"
+          style={{ width: progressWidth }}
+        />
       </div>
     </div>
   )

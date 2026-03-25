@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+/**
+ * Interactive case simulation: text/voice turns, SPIKES progress, session timer, end session.
+ */
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { getCase } from '@/api/cases.api'
-import { createSession, submitTurn, closeSession, getSession } from '@/api/sessions.api'
+import { createSession, transcribeAudioTurn, submitTurn, closeSession, getSession, fetchAssistantAudioObjectUrl } from '@/api/sessions.api'
 import type { Case as CaseType } from '@/types/case'
-import type { Message } from '@/types/session'
+import type { AudioToneAnalysis, Message } from '@/types/session'
 
 import { ChatBubble } from '@/components/ChatBubble'
 import { Navbar } from '@/components/Navbar'
@@ -15,6 +18,78 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Mic, Send, Clock, PhoneOff, ChevronDown, ChevronUp } from 'lucide-react'
 import { SpikesProgressBar } from '@/components/SpikesProgressBar'
 
+const audioExtensionByMimeType: Record<string, string> = {
+  'audio/webm;codecs=opus': 'webm',
+  'audio/webm': 'webm',
+  'audio/ogg;codecs=opus': 'ogg',
+  'audio/ogg': 'ogg',
+  'audio/mp4': 'm4a',
+  'audio/x-m4a': 'm4a',
+  'audio/mpeg': 'mp3',
+  'audio/mp3': 'mp3',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+}
+
+const preferredMimeTypes = [
+  'audio/webm;codecs=opus',
+  'audio/webm',
+  'audio/ogg;codecs=opus',
+  'audio/ogg',
+  'audio/mp4',
+]
+
+const VOICE_ACTIVITY_RMS_THRESHOLD = 0.02
+const MIN_VOICE_ACTIVE_FRAMES = 5
+
+/** Narrow axios-style error shape for user-facing messages. */
+type ApiErrorShape = {
+  response?: {
+    data?: {
+      detail?: string
+      message?: string
+    }
+  }
+}
+
+const parseVoiceToneFromMetrics = (metricsJson?: string): AudioToneAnalysis | undefined => {
+  if (!metricsJson) return undefined
+
+  try {
+    const parsed = JSON.parse(metricsJson)
+    const rawTone = parsed?.voice_tone
+    if (!rawTone || typeof rawTone !== 'object') return undefined
+
+    return {
+      primary: typeof rawTone.primary === 'string' ? rawTone.primary : 'neutral',
+      secondary: typeof rawTone.secondary === 'string' ? rawTone.secondary : undefined,
+      confidence: typeof rawTone.confidence === 'number' ? rawTone.confidence : 0,
+      dimensions: {
+        valence: typeof rawTone.dimensions?.valence === 'number' ? rawTone.dimensions.valence : undefined,
+        arousal: typeof rawTone.dimensions?.arousal === 'number' ? rawTone.dimensions.arousal : undefined,
+        paceWpm: typeof rawTone.dimensions?.pace_wpm === 'number' ? rawTone.dimensions.pace_wpm : undefined,
+        volumeDb: typeof rawTone.dimensions?.volume_db === 'number' ? rawTone.dimensions.volume_db : undefined,
+        pitchHz: typeof rawTone.dimensions?.pitch_hz === 'number' ? rawTone.dimensions.pitch_hz : undefined,
+        jitter: typeof rawTone.dimensions?.jitter === 'number' ? rawTone.dimensions.jitter : undefined,
+        shimmer: typeof rawTone.dimensions?.shimmer === 'number' ? rawTone.dimensions.shimmer : undefined,
+        pausesPerMin: typeof rawTone.dimensions?.pauses_per_min === 'number' ? rawTone.dimensions.pauses_per_min : undefined,
+      },
+      labels: Array.isArray(rawTone.labels) ? rawTone.labels.filter((label: unknown): label is string => typeof label === 'string') : [],
+      provider: typeof rawTone.provider === 'string' ? rawTone.provider : 'prosody_v1',
+    }
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Live case page: loads case + session, renders chat, briefing, voice pipeline, and close flow.
+ *
+ * @remarks
+ * Resumes `sessionId` from query string or creates a session; manages MediaRecorder and optional TTS playback.
+ *
+ * @returns Full case simulation layout
+ */
 export const CaseDetail = () => {
   const { caseId } = useParams<{ caseId: string }>()
   const navigate = useNavigate()
@@ -31,17 +106,34 @@ export const CaseDetail = () => {
   const [currentSpikesStage, setCurrentSpikesStage] = useState<string>('setting')
   const [error, setError] = useState<string | null>(null)
   const [closing, setClosing] = useState(false)
-  const [briefingExpanded, setBriefingExpanded] = useState(false)
+  const [briefingExpanded, setBriefingExpanded] = useState(true)
   type BriefingTab = 'patientBackground' | 'objectives' | 'script' | 'expectedSpikesFlow'
   const [briefingTab, setBriefingTab] = useState<BriefingTab>('patientBackground')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const createdSessionForCase = useRef<number | null>(null)
   const initializingRef = useRef(false)
-
   const sessionParam = searchParams.get('sessionId')
+  const [isRecording, setIsRecording] = useState(false)
+  const [voiceStatus, setVoiceStatus] = useState<string | null>(null)
+  const [audioResponsesEnabled, setAudioResponsesEnabled] = useState(false)
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const audioMonitorFrameRef = useRef<number | null>(null)
+  const voiceActivityRef = useRef({ maxRms: 0, activeFrames: 0 })
+  const recordingStartedAtRef = useRef<number | null>(null)
+  const activeAssistantAudioRef = useRef<HTMLAudioElement | null>(null)
+  const activeAssistantAudioObjectUrlRef = useRef<string | null>(null)
 
   // --- Load case and create or resume session ---
   useEffect(() => {
+    /**
+     * Loads case metadata and either resumes `sessionId` from the URL or creates a new session.
+     */
     const initializeSession = async () => {
       if (initializingRef.current) return
       initializingRef.current = true
@@ -80,12 +172,19 @@ export const CaseDetail = () => {
             role: turn.role as 'user' | 'assistant',
             content: turn.text,
             timestamp: turn.timestamp,
+            source:
+              turn.role === 'user' &&
+              (turn.audioUrl || parseVoiceToneFromMetrics(turn.metricsJson))
+                ? 'audio'
+                : 'text',
+            assistantAudioUrl: turn.role === 'assistant' ? turn.audioUrl : undefined,
+            voiceTone: turn.role === 'user' ? parseVoiceToneFromMetrics(turn.metricsJson) : undefined,
           }))
           setMessages(restoredMessages)
         } else {
           createdSessionForCase.current = numericCaseId
           try {
-            const session = await createSession(numericCaseId)
+            const session = await createSession(numericCaseId, { forceNew: true })
             setSessionId(session.id)
             setCurrentSpikesStage(session.currentSpikesStage || 'setting')
 
@@ -101,6 +200,13 @@ export const CaseDetail = () => {
               role: turn.role as 'user' | 'assistant',
               content: turn.text,
               timestamp: turn.timestamp,
+              source:
+                turn.role === 'user' &&
+                (turn.audioUrl || parseVoiceToneFromMetrics(turn.metricsJson))
+                  ? 'audio'
+                  : 'text',
+              assistantAudioUrl: turn.role === 'assistant' ? turn.audioUrl : undefined,
+              voiceTone: turn.role === 'user' ? parseVoiceToneFromMetrics(turn.metricsJson) : undefined,
             }))
             setMessages(restoredMessages)
           } catch (creationError) {
@@ -135,14 +241,20 @@ export const CaseDetail = () => {
   }, [messages, sending])
 
   // --- Message submission ---
+  /**
+   * Sends the current text input as a turn and appends assistant reply messages.
+   *
+   * @param e - Form submit from the composer
+   */
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (!inputValue.trim() || sending || !sessionId) return
+    if (!inputValue.trim() || sending || isRecording || !sessionId) return
 
     const userMessageContent = inputValue
     setInputValue('')
     setSending(true)
     setError(null)
+    setVoiceStatus(null)
 
     // Add user message to UI immediately
     const userMessage: Message = {
@@ -155,7 +267,7 @@ export const CaseDetail = () => {
 
     try {
       // Submit turn to backend and get patient response
-      const response = await submitTurn(sessionId, userMessageContent)
+      const response = await submitTurn(sessionId, userMessageContent, undefined, audioResponsesEnabled)
       
       // Update SPIKES stage if changed
       if (response.spikesStage) {
@@ -168,11 +280,17 @@ export const CaseDetail = () => {
         role: 'assistant',
         content: response.patientReply,
         timestamp: response.turn.timestamp,
+        source: 'text',
+        status: 'sent',
+        assistantAudioUrl: response.assistantAudioUrl,
       }
       setMessages((prev) => [...prev, assistantMessage])
-    } catch (error: any) {
+      if (response.assistantAudioUrl) {
+        void playAssistantAudio(response.assistantAudioUrl)
+      }
+    } catch (error: unknown) {
       console.error('Failed to submit turn:', error)
-      setError(error.response?.data?.detail || 'Failed to send message. Please try again.')
+      setError(getErrorMessage(error, 'Failed to send message. Please try again.'))
       
       // Add error message to chat
       const errorMessage: Message = {
@@ -187,31 +305,388 @@ export const CaseDetail = () => {
     }
   }
 
-  const handleVoiceInput = () => {
-    alert('Voice input will be implemented when ASR backend is ready')
+  /**
+   * Stops the voice activity animation frame and closes audio analysis nodes.
+   */
+  const stopAudioAnalysis = useCallback(() => {
+    if (audioMonitorFrameRef.current !== null) {
+      cancelAnimationFrame(audioMonitorFrameRef.current)
+      audioMonitorFrameRef.current = null
+    }
+
+    sourceNodeRef.current?.disconnect()
+    sourceNodeRef.current = null
+    analyserRef.current = null
+
+    if (audioContextRef.current) {
+      void audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+  }, [])
+
+  /**
+   * Stops media tracks from the active recording stream.
+   */
+  const stopMediaStream = useCallback(() => {
+    stopAudioAnalysis()
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
+    mediaStreamRef.current = null
+  }, [stopAudioAnalysis])
+
+  /**
+   * Runs an RMS-based voice activity loop to reflect mic input in the UI.
+   *
+   * @param stream - Captured microphone stream
+   */
+  const startVoiceActivityMonitoring = useCallback((stream: MediaStream) => {
+    if (typeof window === 'undefined' || typeof window.AudioContext === 'undefined') {
+      voiceActivityRef.current = { maxRms: 0, activeFrames: 0 }
+      return
+    }
+
+    const audioContext = new window.AudioContext()
+    const analyser = audioContext.createAnalyser()
+    analyser.fftSize = 2048
+    analyser.smoothingTimeConstant = 0.2
+
+    const sourceNode = audioContext.createMediaStreamSource(stream)
+    sourceNode.connect(analyser)
+
+    const samples = new Uint8Array(analyser.fftSize)
+    voiceActivityRef.current = { maxRms: 0, activeFrames: 0 }
+    audioContextRef.current = audioContext
+    analyserRef.current = analyser
+    sourceNodeRef.current = sourceNode
+
+    /**
+     * Animation frame loop: computes RMS and updates voice activity counters.
+     */
+    const monitor = () => {
+      analyser.getByteTimeDomainData(samples)
+
+      let sumSquares = 0
+      for (const sample of samples) {
+        const normalized = (sample - 128) / 128
+        sumSquares += normalized * normalized
+      }
+
+      const rms = Math.sqrt(sumSquares / samples.length)
+      if (rms > voiceActivityRef.current.maxRms) {
+        voiceActivityRef.current.maxRms = rms
+      }
+      if (rms >= VOICE_ACTIVITY_RMS_THRESHOLD) {
+        voiceActivityRef.current.activeFrames += 1
+      }
+
+      audioMonitorFrameRef.current = requestAnimationFrame(monitor)
+    }
+
+    monitor()
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      activeAssistantAudioRef.current?.pause()
+      activeAssistantAudioRef.current = null
+      if (activeAssistantAudioObjectUrlRef.current) {
+        URL.revokeObjectURL(activeAssistantAudioObjectUrlRef.current)
+        activeAssistantAudioObjectUrlRef.current = null
+      }
+      mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop())
+      mediaRecorderRef.current = null
+      stopMediaStream()
+      audioChunksRef.current = []
+    }
+  }, [stopMediaStream])
+
+  /**
+   * Fetches assistant audio as a blob URL and plays it, revoking previous object URLs.
+   *
+   * @param audioUrl - URL returned by the API for TTS
+   */
+  const playAssistantAudio = useCallback(async (audioUrl: string) => {
+    try {
+      activeAssistantAudioRef.current?.pause()
+      if (activeAssistantAudioObjectUrlRef.current) {
+        URL.revokeObjectURL(activeAssistantAudioObjectUrlRef.current)
+        activeAssistantAudioObjectUrlRef.current = null
+      }
+
+      const objectUrl = await fetchAssistantAudioObjectUrl(audioUrl)
+      activeAssistantAudioObjectUrlRef.current = objectUrl
+
+      const audio = new Audio(objectUrl)
+      activeAssistantAudioRef.current = audio
+      audio.onended = () => {
+        if (activeAssistantAudioRef.current === audio) {
+          activeAssistantAudioRef.current = null
+        }
+        if (activeAssistantAudioObjectUrlRef.current === objectUrl) {
+          URL.revokeObjectURL(objectUrl)
+          activeAssistantAudioObjectUrlRef.current = null
+        }
+      }
+      await audio.play()
+    } catch (playbackError) {
+      console.warn('Assistant audio playback failed:', playbackError)
+    }
+  }, [])
+
+  /**
+   * Merges updates into an existing chat message by id.
+   *
+   * @param messageId - Client message id
+   * @param updates - Partial message fields
+   */
+  const updateMessage = (messageId: string, updates: Partial<Message>) => {
+    setMessages((prev) =>
+      prev.map((message) => (message.id === messageId ? { ...message, ...updates } : message))
+    )
   }
 
+  /**
+   * Picks the first supported MIME type from {@link preferredMimeTypes}.
+   *
+   * @returns MIME type string or undefined
+   */
+  const getPreferredAudioMimeType = () => {
+    if (typeof MediaRecorder === 'undefined') return ''
+
+    return preferredMimeTypes.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? ''
+  }
+
+  /**
+   * Maps a recorder MIME type to a file extension for `File` construction.
+   *
+   * @param mimeType - MIME type string
+   * @returns File extension without dot
+   */
+  const getAudioExtension = (mimeType: string) => {
+    return audioExtensionByMimeType[mimeType.toLowerCase()] ?? 'webm'
+  }
+
+  /**
+   * Extracts API error detail/message for toast-style display.
+   *
+   * @param error - Caught error
+   * @param fallback - Default message
+   * @returns User-facing string
+   */
+  const getErrorMessage = (error: unknown, fallback: string) => {
+    const apiError = error as ApiErrorShape
+    return apiError.response?.data?.message || apiError.response?.data?.detail || fallback
+  }
+
+  /**
+   * Transcribes audio then submits the text turn, updating the pending message in place.
+   *
+   * @param audioFile - Recorded audio blob as a file
+   * @param pendingMessageId - Optimistic message id to replace content on success
+   */
+  const uploadRecordedAudio = async (audioFile: File, pendingMessageId: string) => {
+    if (!sessionId) return
+
+    setSending(true)
+    setVoiceStatus('Transcribing voice message...')
+
+    try {
+      const transcription = await transcribeAudioTurn(sessionId, audioFile)
+
+      updateMessage(pendingMessageId, {
+        content: transcription.transcript || 'Voice message sent.',
+        status: 'sent',
+        voiceTone: transcription.audioTone,
+      })
+
+      setVoiceStatus(null)
+
+      const response = await submitTurn(
+        sessionId,
+        transcription.transcript,
+        undefined,
+        audioResponsesEnabled,
+        transcription.audioTone,
+      )
+
+      if (response.spikesStage) {
+        setCurrentSpikesStage(response.spikesStage)
+      }
+
+      const assistantMessage: Message = {
+        id: `assistant-${response.turn.id}`,
+        role: 'assistant',
+        content: response.patientReply,
+        timestamp: response.turn.timestamp,
+        source: 'text',
+        status: 'sent',
+        assistantAudioUrl: response.assistantAudioUrl,
+      }
+      setMessages((prev) => [...prev, assistantMessage])
+      if (response.assistantAudioUrl) {
+        void playAssistantAudio(response.assistantAudioUrl)
+      }
+    } catch (uploadError: unknown) {
+      console.error('Failed to submit audio turn:', uploadError)
+      setError(getErrorMessage(uploadError, 'Failed to process voice input. Please try again.'))
+      updateMessage(pendingMessageId, {
+        content: 'Voice message failed. Please try again.',
+        status: 'error',
+      })
+    } finally {
+      setSending(false)
+      setVoiceStatus(null)
+    }
+  }
+
+  /**
+   * Starts mic capture, voice activity monitoring, and MediaRecorder; on stop, uploads audio.
+   */
+  const startVoiceRecording = async () => {
+    if (!sessionId || sending || closing) return
+
+    if (
+      typeof navigator === 'undefined' ||
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof MediaRecorder === 'undefined'
+    ) {
+      setError('Voice input is not supported in this browser.')
+      return
+    }
+
+    setError(null)
+    setVoiceStatus('Requesting microphone access...')
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = getPreferredAudioMimeType()
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+
+      audioChunksRef.current = []
+      recordingStartedAtRef.current = Date.now()
+      mediaRecorderRef.current = recorder
+      mediaStreamRef.current = stream
+      startVoiceActivityMonitoring(stream)
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+
+      recorder.onerror = () => {
+        setError('Microphone recording failed. Please try again.')
+        setIsRecording(false)
+        setVoiceStatus(null)
+        stopMediaStream()
+      }
+
+      recorder.onstop = () => {
+        setIsRecording(false)
+
+        const { activeFrames, maxRms } = voiceActivityRef.current
+        const recordingDurationMs = recordingStartedAtRef.current
+          ? Date.now() - recordingStartedAtRef.current
+          : 0
+        recordingStartedAtRef.current = null
+        const recordedMimeType = recorder.mimeType || audioChunksRef.current[0]?.type || 'audio/webm'
+        const audioBlob = new Blob(audioChunksRef.current, { type: recordedMimeType })
+        audioChunksRef.current = []
+        stopMediaStream()
+
+        if (audioBlob.size === 0) {
+          setVoiceStatus(null)
+          setError('No audio was captured. Please try again.')
+          return
+        }
+
+        const detectedSpeech =
+          maxRms >= VOICE_ACTIVITY_RMS_THRESHOLD &&
+          activeFrames >= MIN_VOICE_ACTIVE_FRAMES &&
+          recordingDurationMs > 0
+
+        if (!detectedSpeech) {
+          setVoiceStatus(null)
+          setError('No speech was detected. Please try again and speak before stopping the microphone.')
+          return
+        }
+
+        const pendingMessageId = `audio-${Date.now()}`
+        const pendingMessage: Message = {
+          id: pendingMessageId,
+          role: 'user',
+          content: 'Transcribing voice message...',
+          timestamp: new Date().toISOString(),
+          source: 'audio',
+          status: 'pending',
+        }
+        setMessages((prev) => [...prev, pendingMessage])
+
+        const extension = getAudioExtension(recordedMimeType)
+        const audioFile = new File([audioBlob], `voice-message-${Date.now()}.${extension}`, {
+          type: recordedMimeType,
+        })
+        void uploadRecordedAudio(audioFile, pendingMessageId)
+      }
+
+      recorder.start()
+      setIsRecording(true)
+      setVoiceStatus('Listening... Start speaking, then tap the microphone again to stop.')
+    } catch (recordError) {
+      console.error('Failed to start recording:', recordError)
+      setError('Microphone access was denied or is unavailable.')
+      recordingStartedAtRef.current = null
+      setVoiceStatus(null)
+      stopMediaStream()
+    }
+  }
+
+  /**
+   * Toggles recording: starts when idle, stops and uploads when active.
+   */
+  const handleVoiceInput = () => {
+    if (isRecording) {
+      mediaRecorderRef.current?.stop()
+      setVoiceStatus('Preparing voice message...')
+      return
+    }
+
+    void startVoiceRecording()
+  }
+
+  /**
+   * Closes the session server-side and navigates to feedback when successful.
+   */
   const handleEndSession = async () => {
     if (!sessionId) return
     setClosing(true)
     setError(null)
+
     try {
       await closeSession(sessionId)
       navigate(`/feedback/${sessionId}`)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to close session:', err)
-      setError(err.response?.data?.detail || 'Failed to end session. Please try again.')
+      setError(getErrorMessage(err, 'Failed to end session. Please try again.'))
       setClosing(false)
     }
-
-    navigate(`/feedback/${sessionId}`)
   }
 
+  /**
+   * Formats elapsed session seconds as `m:ss`.
+   *
+   * @param seconds - Elapsed seconds
+   * @returns Timer label
+   */
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
+
+  const showVoiceIndicator = isRecording
+  const showPatientRespondingIndicator =
+    sending && !voiceStatus
+  const listeningBarHeights = ['38%', '72%', '54%', '80%', '46%']
 
   if (loading) {
     return (
@@ -229,255 +704,337 @@ export const CaseDetail = () => {
     )
   }
 
+  const difficultyLabel = caseData.difficultyLevel
+    ? `${caseData.difficultyLevel.charAt(0).toUpperCase()}${caseData.difficultyLevel.slice(1)}`
+    : 'No difficulty'
+
   return (
     <div className="flex h-screen flex-col">
+      <style>
+        {`
+          @keyframes listening-wave {
+            0%, 100% { transform: scaleY(0.45); opacity: 0.65; }
+            50% { transform: scaleY(1); opacity: 1; }
+          }
+        `}
+      </style>
       <Navbar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto md:ml-64 flex flex-col">
-          {/* Header */}
-          <div className="border-b bg-white px-4 py-4 sm:px-6 lg:px-8">
-            <nav className="mb-3 text-sm text-gray-500">
-              <span>Dashboard</span> / <span className="text-gray-900">Case Detail</span>
-            </nav>
+        <main className="flex-1 overflow-y-auto bg-slate-50 md:ml-64 xl:overflow-hidden">
+          <div className="flex min-h-full flex-col px-4 py-4 sm:px-6 lg:px-8 xl:h-full">
+            <div className="mb-4 rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
+              <nav className="text-sm text-gray-500">
+                <span>Dashboard</span> / <span className="text-gray-900">Case</span>
+              </nav>
 
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{caseData.title}</h1>
-                {caseData.description && (
-                  <p className="mt-1 text-sm text-gray-600">{caseData.description}</p>
-                )}
-              </div>
-
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleEndSession}
-                disabled={closing}
-                className="flex items-center gap-2"
-              >
-                <PhoneOff className="h-4 w-4" />
-                {closing ? 'Generating Feedback...' : 'End Session'}
-              </Button>
-            </div>
-
-            {/* Timer + metadata cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className="bg-green-50 border-green-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Session Timer
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0 text-green-700 font-semibold text-lg">
-                  {formatTime(sessionElapsed)}
-                </CardContent>
-              </Card>
-
-              <Card className="bg-blue-50 border-blue-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Difficulty</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0 text-blue-700 font-semibold">
-                  {caseData.difficultyLevel ?? '—'}
-                </CardContent>
-              </Card>
-
-              <Card className="bg-purple-50 border-purple-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Category</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0 text-purple-700 font-semibold">
-                  {caseData.category ?? '—'}
-                </CardContent>
-              </Card>
-
-              <Card className="bg-orange-50 border-orange-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">SPIKES</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <SpikesProgressBar currentStage={currentSpikesStage} />
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Case Briefing (collapsible) */}
-            <div className="mt-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium">Case Briefing</CardTitle>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="bg-transparent border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                      onClick={() => setBriefingExpanded((e) => !e)}
-                    >
-                      {briefingExpanded ? (
-                        <>
-                          <ChevronUp className="h-4 w-4 mr-1" />
-                          Hide briefing
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="h-4 w-4 mr-1" />
-                          View full briefing
-                        </>
-                      )}
-                    </Button>
+              <div className="mt-3 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                <div className="space-y-3">
+                  <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-gray-900">{caseData.title}</h1>
+                    {caseData.description && (
+                      <p className="mt-1 max-w-3xl text-sm text-gray-600">{caseData.description}</p>
+                    )}
                   </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {!briefingExpanded ? (
-                    <p className="text-sm text-gray-600 line-clamp-2">
-                      {caseData.patientBackground?.trim() ||
-                        caseData.description ||
-                        'No briefing preview.'}
-                    </p>
-                  ) : (
-                    <>
-                      <div className="flex flex-wrap gap-1 border-b border-gray-200 pb-2 mb-3">
-                        {caseData.patientBackground != null && (
-                          <button
-                            type="button"
-                            onClick={() => setBriefingTab('patientBackground')}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-md ${
-                              briefingTab === 'patientBackground'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
-                          >
-                            Patient background
-                          </button>
-                        )}
-                        {caseData.objectives != null && (
-                          <button
-                            type="button"
-                            onClick={() => setBriefingTab('objectives')}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-md ${
-                              briefingTab === 'objectives'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
-                          >
-                            Objectives
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setBriefingTab('script')}
-                          className={`px-3 py-1.5 text-xs font-medium rounded-md ${
-                            briefingTab === 'script'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }`}
-                        >
-                          Script
-                        </button>
-                        {caseData.expectedSpikesFlow != null && (
-                          <button
-                            type="button"
-                            onClick={() => setBriefingTab('expectedSpikesFlow')}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-md ${
-                              briefingTab === 'expectedSpikesFlow'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
-                          >
-                            Expected SPIKES flow
-                          </button>
-                        )}
-                      </div>
-                      <div className="min-h-[120px] max-h-64 overflow-y-auto">
-                        {briefingTab === 'patientBackground' && (
-                          <pre className="whitespace-pre-wrap text-sm text-gray-800">
-                            {caseData.patientBackground || '—'}
-                          </pre>
-                        )}
-                        {briefingTab === 'objectives' && (
-                          <pre className="whitespace-pre-wrap text-sm text-gray-800">
-                            {caseData.objectives ?? '—'}
-                          </pre>
-                        )}
-                        {briefingTab === 'script' && (
-                          <pre className="whitespace-pre-wrap text-sm text-gray-800">
-                            {caseData.script}
-                          </pre>
-                        )}
-                        {briefingTab === 'expectedSpikesFlow' && (
-                          <pre className="whitespace-pre-wrap text-sm text-gray-800">
-                            {caseData.expectedSpikesFlow ?? '—'}
-                          </pre>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-          {/* Chat area */}
-          <div className="flex-1 overflow-y-auto bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-4xl space-y-4">
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-                  {error}
-                </div>
-              )}
-              {messages.length === 0 && !sending && (
-                <div className="text-center text-gray-500 py-8">
-                  <p className="text-lg font-medium mb-2">Start the conversation</p>
-                  <p className="text-sm">
-                    Begin by introducing yourself and following the SPIKES framework
-                  </p>
-                </div>
-              )}
-              {messages.map((message) => (
-                <ChatBubble key={message.id} message={message} />
-              ))}
-              {sending && (
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <div className="h-2 w-2 animate-pulse rounded-full bg-gray-400" />
-                  Patient is responding...
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-          </div>
 
-          {/* Input */}
-          <div className="border-t bg-white px-4 py-4 sm:px-6 lg:px-8">
-            <form onSubmit={handleSubmit} className="mx-auto max-w-4xl">
-              <div className="flex gap-2">
-                <Input
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Type your message following the SPIKES framework..."
-                  disabled={sending}
-                  className="flex-1"
-                />
+                </div>
+
                 <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={handleVoiceInput}
-                  disabled
-                  className="opacity-50 cursor-not-allowed"
-                  title="Voice input coming soon"
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleEndSession}
+                  disabled={closing}
+                  className="h-11 shrink-0 rounded-xl px-4 text-sm font-semibold"
                 >
-                  <Mic className="h-4 w-4" />
-                </Button>
-                <Button type="submit" disabled={sending || closing || !inputValue.trim() || !sessionId}>
-                  <Send className="h-4 w-4" />
+                  <PhoneOff className="mr-2 h-4 w-4" />
+                  {closing ? 'Generating Feedback...' : 'End Session'}
                 </Button>
               </div>
-              <div className="mt-2 flex justify-between items-center text-xs text-gray-500">
-                <span>Session time: {formatTime(sessionElapsed)}</span>
-                {sessionId && <span>Session ID: {sessionId}</span>}
-              </div>
-            </form>
+            </div>
+
+            <div className="grid gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1.55fr)_24.5rem]">
+              <section className="flex min-h-[520px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm xl:min-h-0">
+                <div className="flex-1 overflow-y-auto bg-gradient-to-b from-slate-50 via-white to-slate-50 px-4 py-5 sm:px-6">
+                  <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+                    {messages.length === 0 && !sending && (
+                      <div className="rounded-3xl border border-dashed border-slate-200 bg-white/80 px-6 py-12 text-center text-gray-500 shadow-sm">
+                        <p className="text-lg font-semibold text-gray-800">Start the conversation</p>
+                        <p className="mt-2 text-sm">
+                          Begin by introducing yourself and follow the SPIKES framework while you respond.
+                        </p>
+                      </div>
+                    )}
+                    {messages.map((message) => (
+                      <ChatBubble key={message.id} message={message} onReplayAudio={playAssistantAudio} />
+                    ))}
+                    {showPatientRespondingIndicator && (
+                      <div className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-sm text-gray-500">
+                        <div className="h-2 w-2 animate-pulse rounded-full bg-gray-400" />
+                        Patient is responding...
+                      </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200 bg-white px-4 py-4 sm:px-5">
+                  <form onSubmit={handleSubmit} className="space-y-3">
+                    {error && (
+                      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {error}
+                      </div>
+                    )}
+                    <div
+                      className={`rounded-2xl p-2 shadow-inner transition-colors duration-200 ${
+                        showVoiceIndicator
+                          ? 'border border-emerald-200 bg-emerald-50'
+                          : 'border border-slate-200 bg-slate-50/80'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {showVoiceIndicator ? (
+                          <div className="flex h-12 flex-1 items-center gap-3 rounded-xl px-3 text-emerald-900">
+                            <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-500" />
+                            <div className="min-w-0">
+                              <div className="font-medium">Listening</div>
+                              <div className="truncate text-xs text-emerald-700">
+                                Tap the microphone again when you are done speaking.
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <Input
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            placeholder="Type your message following the SPIKES framework..."
+                            disabled={sending || isRecording}
+                            className="h-12 flex-1 border-0 bg-transparent px-3 shadow-none focus-visible:ring-0"
+                          />
+                        )}
+                        {showVoiceIndicator && (
+                          <div className="mr-2 flex h-8 w-16 shrink-0 items-end justify-end gap-1">
+                            {listeningBarHeights.map((height, index) => (
+                              <span
+                                key={`voice-bar-${index}`}
+                                className="w-1.5 origin-bottom rounded-full bg-emerald-500"
+                                style={{
+                                  height,
+                                  animation: `listening-wave 0.9s ease-in-out ${index * 0.12}s infinite`,
+                                }}
+                              />
+                            ))}
+                          </div>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={handleVoiceInput}
+                          disabled={sending || closing || !sessionId}
+                          className={isRecording ? 'h-12 w-12 shrink-0 rounded-2xl border-red-500 bg-red-50 text-red-600 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]' : 'h-12 w-12 shrink-0 rounded-2xl border-slate-200 bg-white'}
+                          title={isRecording ? 'Stop recording' : 'Start voice input'}
+                        >
+                          <Mic className="h-5 w-5" />
+                        </Button>
+                        <Button
+                          type="submit"
+                          size="icon"
+                          disabled={sending || closing || isRecording || !inputValue.trim() || !sessionId}
+                          className="h-12 w-12 shrink-0 rounded-2xl"
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </section>
+
+              <aside className="flex flex-col gap-4 xl:h-full xl:min-h-0 xl:overflow-y-auto xl:pr-1">
+                <Card className="shrink-0 rounded-[28px] border-slate-200 shadow-sm">
+                  <CardHeader className="space-y-1 border-b border-slate-100 pb-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <CardTitle className="text-base">Case Briefing</CardTitle>
+                        <p className="text-sm text-gray-500">
+                          Reference the brief without letting it compete with the conversation.
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-slate-700 hover:bg-slate-50"
+                        onClick={() => setBriefingExpanded((expanded) => !expanded)}
+                      >
+                        {briefingExpanded ? (
+                          <>
+                            <ChevronUp className="mr-2 h-4 w-4" />
+                            Hide
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="mr-2 h-4 w-4" />
+                            Show
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="min-w-0 space-y-4 px-6 pb-6 pt-5">
+                    {!briefingExpanded ? (
+                      <div className="rounded-2xl bg-slate-50 px-4 py-4">
+                        <p className="text-[15px] leading-7 text-gray-600">
+                          {caseData.patientBackground?.trim() || caseData.description || 'No briefing preview.'}
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="min-w-0 flex flex-wrap gap-2 border-b border-gray-200 pb-4">
+                          {caseData.patientBackground != null && (
+                            <button
+                              type="button"
+                              onClick={() => setBriefingTab('patientBackground')}
+                              className={`rounded-full px-3.5 py-2 text-xs font-medium ${
+                                briefingTab === 'patientBackground'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              Patient background
+                            </button>
+                          )}
+                          {caseData.objectives != null && (
+                            <button
+                              type="button"
+                              onClick={() => setBriefingTab('objectives')}
+                              className={`rounded-full px-3.5 py-2 text-xs font-medium ${
+                                briefingTab === 'objectives'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              Objectives
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setBriefingTab('script')}
+                            className={`rounded-full px-3.5 py-2 text-xs font-medium ${
+                              briefingTab === 'script'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            Script
+                          </button>
+                          {caseData.expectedSpikesFlow != null && (
+                            <button
+                              type="button"
+                              onClick={() => setBriefingTab('expectedSpikesFlow')}
+                              className={`rounded-full px-3.5 py-2 text-xs font-medium ${
+                                briefingTab === 'expectedSpikesFlow'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              Expected SPIKES flow
+                            </button>
+                          )}
+                        </div>
+                        <div className="min-w-0 rounded-2xl bg-slate-50 px-4 py-4">
+                          {briefingTab === 'patientBackground' && (
+                            <pre className="max-w-full whitespace-pre-wrap break-words text-[15px] leading-7 text-gray-800">
+                              {caseData.patientBackground || '—'}
+                            </pre>
+                          )}
+                          {briefingTab === 'objectives' && (
+                            <pre className="max-w-full whitespace-pre-wrap break-words text-[15px] leading-7 text-gray-800">
+                              {caseData.objectives ?? '—'}
+                            </pre>
+                          )}
+                          {briefingTab === 'script' && (
+                            <pre className="max-w-full whitespace-pre-wrap break-words text-[15px] leading-7 text-gray-800">
+                              {caseData.script}
+                            </pre>
+                          )}
+                          {briefingTab === 'expectedSpikesFlow' && (
+                            <pre className="max-w-full whitespace-pre-wrap break-words text-[15px] leading-7 text-gray-800">
+                              {caseData.expectedSpikesFlow ?? '—'}
+                            </pre>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="shrink-0 rounded-[28px] border-slate-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Session Overview</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-5 px-5 pb-5 pt-0">
+                    <div>
+                      <SpikesProgressBar currentStage={currentSpikesStage} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div
+                        className={`rounded-2xl border border-slate-200 bg-white p-4 ${
+                          sessionId ? '' : 'col-span-2'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+                            <Clock className="h-3.5 w-3.5" />
+                          </span>
+                          Session time
+                        </div>
+                        <div className="mt-2 text-xl font-semibold text-slate-900">
+                          {formatTime(sessionElapsed)}
+                        </div>
+                      </div>
+                      {sessionId && (
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                            Session ID
+                          </div>
+                          <div className="mt-2 text-sm font-semibold text-slate-900">{sessionId}</div>
+                        </div>
+                      )}
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                          Level
+                        </div>
+                        <div className="mt-2 text-sm font-semibold text-slate-900">{difficultyLabel}</div>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                          Type
+                        </div>
+                        <div className="mt-2 text-sm font-semibold text-slate-900">
+                          {caseData.category ?? 'No category'}
+                        </div>
+                      </div>
+                      <div className="col-span-2 rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                          Audio responses
+                        </div>
+                        <label className="mt-2 inline-flex items-center gap-2 text-sm text-slate-900">
+                          <input
+                            type="checkbox"
+                            checked={audioResponsesEnabled}
+                            onChange={(e) => setAudioResponsesEnabled(e.target.checked)}
+                            disabled={sending || closing}
+                            className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <span>Enable spoken replies</span>
+                        </label>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </aside>
+            </div>
           </div>
         </main>
       </div>

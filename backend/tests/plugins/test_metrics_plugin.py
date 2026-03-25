@@ -37,8 +37,7 @@ def scored_session_id(test_db):
     no patch needed since PluginRegistry resolves the default evaluator.
     """
     user = User(
-        email="metrics_plugin_tester@example.com",
-        hashed_password="not_used_in_tests",
+        email="metrics_plugin_tester@example.com",        
         role="trainee",
         full_name="Metrics Plugin Tester",
     )

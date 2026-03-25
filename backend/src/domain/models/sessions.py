@@ -45,6 +45,32 @@ class TurnCreate(BaseModel):
     
     text: str
     audio_url: Optional[str] = None
+    voice_tone: Optional[dict] = None
+    enable_tts: bool = False
+
+
+class AudioToneDimensions(BaseModel):
+    """Structured acoustic tone feature set."""
+
+    valence: float | None = None
+    arousal: float | None = None
+    pace_wpm: float | None = None
+    volume_db: float | None = None
+    pitch_hz: float | None = None
+    jitter: float | None = None
+    shimmer: float | None = None
+    pauses_per_min: float | None = None
+
+
+class AudioToneAnalysis(BaseModel):
+    """Acoustic tone summary returned from audio analysis."""
+
+    primary: str
+    secondary: str | None = None
+    confidence: float
+    dimensions: AudioToneDimensions
+    labels: list[str] = []
+    provider: str
 
 
 class TurnResponse(BaseModel):
@@ -56,12 +82,25 @@ class TurnResponse(BaseModel):
     role: str
     text: str
     audio_url: Optional[str]
+    audio_expires_at: Optional[datetime] = None
     metrics_json: Optional[str]
     spikes_stage: Optional[str]
     timestamp: datetime
     spans_json: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True, extra="ignore")
+
+
+class TurnResponseWithAudio(BaseModel):
+    """Turn response with transcript metadata and optional assistant TTS."""
+
+    turn: TurnResponse
+    patient_reply: str
+    transcript: str | None = None
+    audio_tone: AudioToneAnalysis | None = None
+    audio_url: str | None = None
+    assistant_audio_url: str | None = None
+    spikes_stage: str | None = None
 
 
 
@@ -83,6 +122,9 @@ class SessionResponse(BaseModel):
     patient_model_version: Optional[str] = None
     metrics_plugins: Optional[list] = None  # JSON array of plugin names
     case_title: Optional[str] = None
+    # Populated on admin session endpoints for display (not stored on session row)
+    user_email: Optional[str] = None
+    user_full_name: Optional[str] = None
     # Computed: "closed" when ended_at is set, else "active"
     status: Literal["active", "closed"]
 

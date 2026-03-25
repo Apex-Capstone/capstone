@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from domain.models.admin import (
     AnalyticsDashboard,
     CaseStats,
+    MonthScoreAverage,
     PerformanceStats,
     SessionStats,
     UserStats,
@@ -59,24 +60,27 @@ class AnalyticsService:
         total_sessions = self.session_repo.count()
         sessions_by_state = self.session_repo.count_by_state()
         avg_duration = self.session_repo.get_average_duration()
-        
+        sessions_by_case = self.session_repo.count_by_case()
+
         return SessionStats(
             total_sessions=total_sessions,
             completed_sessions=sessions_by_state.get("completed", 0),
             active_sessions=sessions_by_state.get("active", 0),
             average_duration_seconds=avg_duration,
-            sessions_by_case={},  # Would need additional query
+            sessions_by_case=sessions_by_case,
         )
     
     async def _get_performance_stats(self) -> PerformanceStats:
         """Get performance statistics."""
         avg_scores = self.feedback_repo.get_average_scores()
-        
+        by_month = self.feedback_repo.get_average_overall_by_month()
+
         return PerformanceStats(
             average_empathy_score=avg_scores["empathy"],
             average_communication_score=avg_scores["communication"],
             average_spikes_completion=avg_scores["spikes"],
             average_overall_score=avg_scores["overall"],
+            average_score_by_month=[MonthScoreAverage(**row) for row in by_month],
         )
 
     async def _get_case_stats(self) -> CaseStats:

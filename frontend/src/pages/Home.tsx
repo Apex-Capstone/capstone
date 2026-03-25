@@ -1,29 +1,25 @@
-import { Link } from 'react-router-dom'
-import { useAuthStore } from '@/store/authStore'
+/**
+ * Marketing landing for logged-out users; quick dashboard link when authenticated.
+ */
+import { Link, Navigate } from 'react-router-dom'
+import { useAuthGate } from '@/hooks/useAuthGate'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Stethoscope, FileText, BarChart3, Shield, ArrowRight } from 'lucide-react'
 
 export const Home = () => {
-  const { isAuthenticated, user } = useAuthStore()
+  const gate = useAuthGate()
 
-  if (isAuthenticated) {
-    // If authenticated, redirect to dashboard
+  if (gate === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            Welcome back, {user?.name || user?.email}!
-          </h1>
-          <Link to="/dashboard">
-            <Button size="lg">
-              Go to Dashboard
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Link>
-        </div>
+      <div className="flex min-h-screen items-center justify-center text-gray-500">
+        Loading...
       </div>
     )
+  }
+
+  if (gate === 'authed') {
+    return <Navigate to="/dashboard" replace />
   }
 
   return (

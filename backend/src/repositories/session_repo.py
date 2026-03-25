@@ -6,6 +6,7 @@ from typing import Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from domain.entities.case import Case as CaseEntity
 from domain.entities.session import Session as SessionEntity
 
 
@@ -24,15 +25,20 @@ class SessionRepository:
         user_id: int,
         skip: int = 0,
         limit: int = 100,
+        state: str | None = None,
     ) -> list[SessionEntity]:
-        """Get all sessions for a user."""
+        """Get sessions for a user, optionally filtered by state."""
+        q = self.db.query(SessionEntity).filter(SessionEntity.user_id == user_id)
+        if state:
+            q = q.filter(SessionEntity.state == state)
+        return q.order_by(SessionEntity.started_at.desc()).offset(skip).limit(limit).all()
+
+    def count_by_user_and_state(self, user_id: int, state: str) -> int:
+        """Count sessions for a user in a given state."""
         return (
             self.db.query(SessionEntity)
-            .filter(SessionEntity.user_id == user_id)
-            .order_by(SessionEntity.started_at.desc())
-            .offset(skip)
-            .limit(limit)
-            .all()
+            .filter(SessionEntity.user_id == user_id, SessionEntity.state == state)
+            .count()
         )
     
     def get_by_case(
@@ -108,7 +114,18 @@ class SessionRepository:
             .all()
         )
         return {state: count for state, count in results}
-    
+
+    def count_by_case(self) -> dict[str, int]:
+        """Count sessions per case, keyed by case title (joins cases for labels)."""
+        results = (
+            self.db.query(CaseEntity.title, func.count(SessionEntity.id))
+            .select_from(SessionEntity)
+            .join(CaseEntity, SessionEntity.case_id == CaseEntity.id)
+            .group_by(CaseEntity.title)
+            .all()
+        )
+        return {title: count for title, count in results}
+
     def get_average_duration(self) -> float:
         """Get average session duration in seconds."""
         result = self.db.query(func.avg(SessionEntity.duration_seconds)).scalar()

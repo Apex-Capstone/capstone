@@ -32,8 +32,7 @@ def test_db():
 @pytest.fixture
 def test_user(test_db):
     user = User(
-        email="freeze_evaluator_tester@example.com",
-        hashed_password="not_used_in_tests",
+        email="freeze_evaluator_tester@example.com",        
         role="trainee",
         full_name="Freeze Evaluator Tester",
     )

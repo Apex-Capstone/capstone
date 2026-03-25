@@ -1,10 +1,10 @@
+import { useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import type { ReactNode } from 'react'
 
 interface ProtectedRouteProps {
   children: ReactNode
-  /** Allow access if user role is in this list. */
   allowedRoles?: ('admin' | 'trainee')[]
 }
 
@@ -12,7 +12,21 @@ export const ProtectedRoute = ({
   children,
   allowedRoles,
 }: ProtectedRouteProps) => {
-  const { isAuthenticated, user } = useAuthStore()
+  const { isAuthenticated, user, loading } = useAuthStore()
+  const refreshProfile = useAuthStore((s) => s.refreshProfile)
+
+  useEffect(() => {
+    if (loading || !isAuthenticated || user) return
+    void refreshProfile()
+  }, [loading, isAuthenticated, user, refreshProfile])
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    )
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
@@ -24,4 +38,3 @@ export const ProtectedRoute = ({
 
   return <>{children}</>
 }
-

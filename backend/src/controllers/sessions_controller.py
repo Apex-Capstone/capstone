@@ -1,22 +1,29 @@
 """Sessions controller/router."""
 
 import json
+from datetime import datetime
+from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from adapters.audio_tone_adapter import AudioToneAdapter
 from adapters.asr.whisper_adapter import WhisperAdapter
 from adapters.llm.openai_adapter import OpenAIAdapter
 from adapters.nlu.simple_rule_nlu import SimpleRuleNLU
-from adapters.storage.s3_storage import S3StorageAdapter
+from adapters.storage import get_storage_adapter
+from adapters.tts import get_tts_adapter
+from config.logging import get_logger
+from config.settings import get_settings
 from core.deps import get_current_user, get_db, verify_session_access
-from core.errors import NotFoundError
+from core.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
 from domain.entities.user import User
 from repositories.feedback_repo import FeedbackRepository
 from repositories.session_repo import SessionRepository
 from domain.models.sessions import (
+    AudioToneAnalysis,
     FeedbackResponse,
     SessionCreate,
     SessionDetailResponse,
@@ -24,12 +31,26 @@ from domain.models.sessions import (
     SessionResponse,
     TurnCreate,
     TurnResponse,
+    TurnResponseWithAudio,
 )
 from services.dialogue_service import DialogueService
 from services.scoring_service import ScoringService
 from services.session_service import SessionService
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+logger = get_logger(__name__)
+ALLOWED_AUDIO_EXTENSIONS = {"wav", "ogg", "mp3", "webm", "m4a"}
+MAX_AUDIO_UPLOAD_BYTES = 10 * 1024 * 1024
+
+
+def _build_turn_audio_url(turn_id: int, audio_url: str | None, audio_expires_at=None) -> str | None:
+    """Build the backend assistant audio endpoint URL when audio is available."""
+    if not audio_url:
+        return None
+    if audio_expires_at is not None and audio_expires_at <= datetime.utcnow():
+        return None
+    base_url = get_settings().public_base_url.rstrip("/")
+    return f"{base_url}/v1/turns/{turn_id}/audio"
 
 
 def _deserialize_json_field(value: str | None) -> dict | list | None:
@@ -45,12 +66,81 @@ def _deserialize_json_field(value: str | None) -> dict | list | None:
     return value if isinstance(value, (dict, list)) else None
 
 
-class TurnResponseWithAudio(BaseModel):
-    """Turn response with patient reply and audio."""
-    turn: TurnResponse
-    patient_reply: str
-    audio_url: str | None = None
-    spikes_stage: str | None = None
+def _normalize_audio_extension(upload: UploadFile) -> str:
+    """Get a supported extension from the uploaded file."""
+    suffix = Path(upload.filename or "").suffix.lower().lstrip(".")
+    if suffix in ALLOWED_AUDIO_EXTENSIONS:
+        return suffix
+
+    content_type = (upload.content_type or "").lower()
+    content_type_map = {
+        "audio/wav": "wav",
+        "audio/x-wav": "wav",
+        "audio/mpeg": "mp3",
+        "audio/mp3": "mp3",
+        "audio/ogg": "ogg",
+        "audio/webm": "webm",
+        "audio/mp4": "m4a",
+        "audio/x-m4a": "m4a",
+    }
+    normalized = content_type_map.get(content_type)
+    if normalized:
+        return normalized
+
+    raise ValidationError(
+        f"Unsupported audio format. Allowed formats: {', '.join(sorted(ALLOWED_AUDIO_EXTENSIONS))}"
+    )
+
+
+def _validate_audio_payload(audio_data: bytes) -> None:
+    """Validate uploaded audio bytes."""
+    if not audio_data:
+        raise ValidationError("Audio file is empty")
+    if len(audio_data) > MAX_AUDIO_UPLOAD_BYTES:
+        raise ValidationError(
+            f"Audio file is too large. Maximum size is {MAX_AUDIO_UPLOAD_BYTES // (1024 * 1024)} MB"
+        )
+
+
+def _validate_session_write_access(session_id: int, db: Session, current_user: User):
+    """Ensure the current user can add turns to the session."""
+    session_repo = SessionRepository(db)
+    session = session_repo.get_by_id(session_id)
+    if not session:
+        raise NotFoundError(f"Session with ID {session_id} not found")
+    if session.user_id != current_user.id:
+        raise AuthorizationError("You do not have permission to update this session")
+    if session.state != "active":
+        raise ConflictError("Session is not active")
+    return session
+
+
+class AudioTranscriptionResponse(BaseModel):
+    """Audio transcription payload before patient response generation."""
+    transcript: str
+    audio_tone: AudioToneAnalysis | None = None
+
+
+async def _transcribe_and_analyze_audio(
+    audio_file: UploadFile,
+) -> tuple[str, dict | None]:
+    """Run ASR and best-effort acoustic tone analysis on the uploaded audio."""
+    audio_format = _normalize_audio_extension(audio_file)
+
+    audio_data = await audio_file.read()
+    _validate_audio_payload(audio_data)
+
+    asr_adapter = WhisperAdapter()
+    transcribed_text = await asr_adapter.transcribe_audio(
+        audio_data,
+        audio_format=audio_format,
+    )
+    audio_tone = await AudioToneAdapter().analyze_audio(
+        audio_data,
+        audio_format=audio_format,
+        transcript=transcribed_text,
+    )
+    return transcribed_text, audio_tone
 
 
 class TurnListResponse(BaseModel):
@@ -89,7 +179,13 @@ async def submit_turn(
     # Initialize services
     llm_adapter = OpenAIAdapter()
     nlu_adapter = SimpleRuleNLU()
-    dialogue_service = DialogueService(db, llm_adapter, nlu_adapter)
+    dialogue_service = DialogueService(
+        db,
+        llm_adapter,
+        nlu_adapter,
+        tts_adapter=get_tts_adapter(),
+        storage_adapter=get_storage_adapter(),
+    )
     
     # Process turn and get patient response
     patient_turn = await dialogue_service.process_user_turn(session_id, turn_data)
@@ -97,11 +193,18 @@ async def submit_turn(
     # Get updated session for SPIKES stage
     session_service = SessionService(db)
     session_detail = await session_service.get_session(session_id)
+    resolved_assistant_audio_url = _build_turn_audio_url(
+        patient_turn.id,
+        patient_turn.audio_url,
+        patient_turn.audio_expires_at,
+    )
     
     return TurnResponseWithAudio(
-        turn=patient_turn,
+        turn=patient_turn.model_copy(update={"audio_url": resolved_assistant_audio_url}),
         patient_reply=patient_turn.text,
-        audio_url=patient_turn.audio_url,
+        transcript=turn_data.text,
+        audio_url=None,
+        assistant_audio_url=resolved_assistant_audio_url,
         spikes_stage=session_detail.current_spikes_stage,
     )
 
@@ -112,52 +215,67 @@ async def submit_audio_turn(
     audio_file: Annotated[UploadFile, File(...)],
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    enable_tts: Annotated[bool, Form()] = False,
 ):
-    """Upload audio file (wav/ogg/mp3). Server performs ASR and processes as turn."""
-    session_repo = SessionRepository(db)
-    sess = session_repo.get_by_id(session_id)
-    if not sess:
-        raise NotFoundError(f"Session with ID {session_id} not found")
-    verify_session_access(sess, current_user)
+    """Upload audio file and process it as a normal conversation turn."""
+    _validate_session_write_access(session_id, db, current_user)
+    transcript, audio_tone = await _transcribe_and_analyze_audio(audio_file)
 
-    # Read audio file
-    audio_data = await audio_file.read()
-    
-    # Transcribe with ASR
-    asr_adapter = WhisperAdapter()
-    transcribed_text = await asr_adapter.transcribe_audio(
-        audio_data,
-        audio_format=audio_file.filename.split(".")[-1] if audio_file.filename else "wav",
-    )
-    
-    # Store audio file
-    storage_adapter = S3StorageAdapter()
-    audio_url = await storage_adapter.put_file(
-        audio_data,
-        f"sessions/{session_id}/{audio_file.filename}",
-        content_type=audio_file.content_type or "audio/wav",
-    )
-    
     # Process as turn
-    turn_data = TurnCreate(text=transcribed_text, audio_url=audio_url)
-    
+    turn_data = TurnCreate(
+        text=transcript,
+        voice_tone=audio_tone,
+        enable_tts=enable_tts,
+    )
+
     # Initialize dialogue service
     llm_adapter = OpenAIAdapter()
     nlu_adapter = SimpleRuleNLU()
-    dialogue_service = DialogueService(db, llm_adapter, nlu_adapter)
-    
+    dialogue_service = DialogueService(
+        db,
+        llm_adapter,
+        nlu_adapter,
+        tts_adapter=get_tts_adapter(),
+        storage_adapter=get_storage_adapter(),
+    )
+
     # Process turn
     patient_turn = await dialogue_service.process_user_turn(session_id, turn_data)
-    
+
     # Get updated session
     session_service = SessionService(db)
     session_detail = await session_service.get_session(session_id)
-    
+    resolved_assistant_audio_url = _build_turn_audio_url(
+        patient_turn.id,
+        patient_turn.audio_url,
+        patient_turn.audio_expires_at,
+    )
+
     return TurnResponseWithAudio(
-        turn=patient_turn,
+        turn=patient_turn.model_copy(update={"audio_url": resolved_assistant_audio_url}),
         patient_reply=patient_turn.text,
-        audio_url=patient_turn.audio_url,
+        transcript=transcript,
+        audio_tone=audio_tone,
+        audio_url=None,
+        assistant_audio_url=resolved_assistant_audio_url,
         spikes_stage=session_detail.current_spikes_stage,
+    )
+
+
+@router.post("/{session_id}/audio:transcribe", response_model=AudioTranscriptionResponse)
+async def transcribe_audio_turn(
+    session_id: int,
+    audio_file: Annotated[UploadFile, File(...)],
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Upload audio file and return only the transcript."""
+    _validate_session_write_access(session_id, db, current_user)
+    transcribed_text, audio_tone = await _transcribe_and_analyze_audio(audio_file)
+
+    return AudioTranscriptionResponse(
+        transcript=transcribed_text,
+        audio_tone=audio_tone,
     )
 
 
@@ -200,7 +318,12 @@ async def get_session_turns(
     total_turns = turn_repo.get_by_session(session_id)  # Get all for count
     
     return TurnListResponse(
-        turns=[TurnResponse.model_validate(turn) for turn in turns],
+        turns=[
+            TurnResponse.model_validate(turn).model_copy(
+                update={"audio_url": _build_turn_audio_url(turn.id, turn.audio_url, turn.audio_expires_at)}
+            )
+            for turn in turns
+        ],
         total=len(total_turns),
         skip=skip,
         limit=limit,
@@ -290,10 +413,11 @@ async def get_session_feedback(
 async def list_user_sessions(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    state: str = Query(..., regex="^(active|completed)$"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
 ):
-    """List current user's sessions."""
+    """List current user's sessions filtered by state."""
     session_service = SessionService(db)
-    return await session_service.list_user_sessions(current_user.id, skip, limit)
+    return await session_service.list_user_sessions(current_user.id, skip, limit, state=state)
 

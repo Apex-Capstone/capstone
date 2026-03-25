@@ -1,10 +1,15 @@
-import { useEffect, useState, useMemo } from 'react'
+/**
+ * Admin research dashboard: anonymized session analytics, score trends, and JSON exports.
+ */
+import { useEffect, useState, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { fetchResearchData, type ResearchData } from '@/api/research.api'
 import { useAuthStore } from '@/store/authStore'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { AlertTriangle, Database, Download, Shield, BarChart3, TrendingUp } from 'lucide-react'
 import {
   LineChart,
@@ -21,11 +26,41 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+/** Trailing window for rolling average of daily means (Score Trends, daily view). */
+const DAILY_ROLLING_WINDOW_DAYS = 7
+
+/** Minimum width per bucket for horizontal scroll in hourly view (px). */
+const HOURLY_POINT_WIDTH_PX = 44
+
+/**
+ * Clamps a nullable numeric score to the inclusive 0–100 range for charts.
+ *
+ * @param value - Raw score or null/undefined
+ * @returns Finite percent 0–100
+ */
 const safePercent = (value: number | null | undefined) => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 0
   return Math.max(0, Math.min(100, value))
 }
 
+/**
+ * Percent string for chart tooltips: clamped 0–100, max 2 decimal places.
+ *
+ * @param value - Tooltip payload value
+ * @returns Percentage string
+ */
+const formatScoreTooltipPercent = (value: unknown) => {
+  const n = typeof value === 'number' ? value : Number.parseFloat(String(value))
+  const clamped = safePercent(Number.isFinite(n) ? n : 0)
+  return `${Number.parseFloat(String(clamped)).toFixed(2)}%`
+}
+
+/**
+ * Formats session timestamps for tables; falls back to em dash when invalid.
+ *
+ * @param value - ISO string or empty
+ * @returns Locale string or `—`
+ */
 const formatTimestamp = (value: string | null | undefined) => {
   if (!value) return '—'
   const date = new Date(value)
@@ -33,25 +68,468 @@ const formatTimestamp = (value: string | null | undefined) => {
   return date.toLocaleString()
 }
 
+/**
+ * X-axis tick label for daily trend charts.
+ *
+ * @param ms - Epoch ms for the bucket
+ * @returns Short date label
+ */
+const formatTrendAxisTick = (ms: number) => {
+  const d = new Date(ms)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+/**
+ * X-axis tick label for hourly trend charts.
+ *
+ * @param ms - Epoch ms
+ * @returns Date + hour label
+ */
+const formatTrendAxisTickHourly = (ms: number) => {
+  const d = new Date(ms)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+  })
+}
+
+/**
+ * Tooltip title for day-level trend points (local calendar date only).
+ *
+ * @param label - Recharts label (epoch ms)
+ * @returns Long-form date string
+ */
+const formatScoreTrendTooltipLabel = (label: unknown) => {
+  const ms = typeof label === 'number' ? label : Number(label)
+  if (!Number.isFinite(ms)) return ''
+  const d = new Date(ms)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+/**
+ * Tooltip title for hourly trend points.
+ *
+ * @param label - Recharts label (epoch ms)
+ * @returns Date + time string
+ */
+const formatScoreTrendHourlyTooltipLabel = (label: unknown) => {
+  const ms = typeof label === 'number' ? label : Number(label)
+  if (!Number.isFinite(ms)) return ''
+  const d = new Date(ms)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+/**
+ * Tooltip title for weekly buckets (week-of range).
+ *
+ * @param label - Week start epoch ms
+ * @returns Range string
+ */
+const formatScoreTrendWeeklyTooltipLabel = (label: unknown) => {
+  const ms = typeof label === 'number' ? label : Number(label)
+  if (!Number.isFinite(ms)) return ''
+  const start = new Date(ms)
+  if (Number.isNaN(start.getTime())) return ''
+  const end = new Date(start)
+  end.setDate(end.getDate() + 6)
+  const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+  return `Week of ${start.toLocaleDateString(undefined, { ...opts, year: 'numeric' })} – ${end.toLocaleDateString(undefined, opts)}`
+}
+
+/**
+ * Builds a local calendar `YYYY-MM-DD` key for grouping.
+ *
+ * @param timestamp - ISO timestamp
+ * @returns Day key or null
+ */
+const localDayKeyFromTimestamp = (timestamp: string): string | null => {
+  const d = new Date(timestamp)
+  if (Number.isNaN(d.getTime())) return null
+  const y = d.getFullYear()
+  const m = d.getMonth() + 1
+  const day = d.getDate()
+  return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+/**
+ * Converts a day key to epoch ms at local midnight.
+ *
+ * @param dayKey - `YYYY-MM-DD`
+ * @returns Epoch ms or NaN
+ */
+const localMidnightMsFromDayKey = (dayKey: string): number => {
+  const [ys, ms, ds] = dayKey.split('-').map((x) => Number(x))
+  if (![ys, ms, ds].every((n) => Number.isFinite(n))) return NaN
+  return new Date(ys, ms - 1, ds).getTime()
+}
+
+type DailyMeanRow = {
+  dayKey: string
+  empathy: number
+  communication: number
+  clinical: number
+}
+
+type TrendSession = {
+  timestamp: string
+  scores: {
+    empathy: number | null
+    communication: number | null
+    clinical: number | null
+  }
+}
+
+type TrendPoint = {
+  time: number
+  empathy: number
+  communication: number
+  clinical: number
+}
+
+/**
+ * Hourly bucket key including local hour for intraday aggregation.
+ *
+ * @param timestamp - ISO timestamp
+ * @returns `YYYY-MM-DD-HH` or null
+ */
+const localHourKeyFromTimestamp = (timestamp: string): string | null => {
+  const d = new Date(timestamp)
+  if (Number.isNaN(d.getTime())) return null
+  const y = d.getFullYear()
+  const m = d.getMonth() + 1
+  const day = d.getDate()
+  const h = d.getHours()
+  return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}-${String(h).padStart(2, '0')}`
+}
+
+/**
+ * Parses an hourly bucket key to epoch ms at the hour start.
+ *
+ * @param hourKey - Four-part key from {@link localHourKeyFromTimestamp}
+ * @returns Epoch ms or NaN
+ */
+const localHourStartMsFromHourKey = (hourKey: string): number => {
+  const parts = hourKey.split('-')
+  if (parts.length !== 4) return NaN
+  const ys = Number(parts[0])
+  const mo = Number(parts[1])
+  const ds = Number(parts[2])
+  const hs = Number(parts[3])
+  if (![ys, mo, ds, hs].every((n) => Number.isFinite(n))) return NaN
+  return new Date(ys, mo - 1, ds, hs, 0, 0, 0).getTime()
+}
+
+/**
+ * Sunday start-of-week (local) for weekly aggregation buckets.
+ *
+ * @param timestamp - ISO timestamp
+ * @returns Week start epoch ms or null
+ */
+const startOfWeekSundayLocalMs = (timestamp: string): number | null => {
+  const d = new Date(timestamp)
+  if (Number.isNaN(d.getTime())) return null
+  const day = d.getDay()
+  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day)
+  start.setHours(0, 0, 0, 0)
+  return start.getTime()
+}
+
+/**
+ * Aggregates sessions into hourly mean score points.
+ *
+ * @param sessions - Anonymized sessions with scores
+ * @returns Sorted trend points
+ */
+const buildHourlyTrendData = (sessions: TrendSession[]): TrendPoint[] => {
+  const buckets = new Map<
+    string,
+    { empathySum: number; communicationSum: number; clinicalSum: number; count: number }
+  >()
+
+  for (const s of sessions) {
+    const key = localHourKeyFromTimestamp(s.timestamp)
+    if (!key) continue
+    const e = safePercent(s.scores.empathy)
+    const c = safePercent(s.scores.communication)
+    const cl = safePercent(s.scores.clinical)
+    const prev = buckets.get(key)
+    if (prev) {
+      prev.empathySum += e
+      prev.communicationSum += c
+      prev.clinicalSum += cl
+      prev.count += 1
+    } else {
+      buckets.set(key, {
+        empathySum: e,
+        communicationSum: c,
+        clinicalSum: cl,
+        count: 1,
+      })
+    }
+  }
+
+  const hourKeys = [...buckets.keys()].sort()
+  return hourKeys
+    .map((hourKey) => {
+      const b = buckets.get(hourKey)!
+      const n = b.count
+      const time = localHourStartMsFromHourKey(hourKey)
+      return {
+        time,
+        empathy: b.empathySum / n,
+        communication: b.communicationSum / n,
+        clinical: b.clinicalSum / n,
+      }
+    })
+    .filter((row) => Number.isFinite(row.time))
+}
+
+/**
+ * Aggregates sessions into weekly mean score points (week starts Sunday local).
+ *
+ * @param sessions - Anonymized sessions with scores
+ * @returns Sorted weekly trend points
+ */
+const buildWeeklyTrendData = (sessions: TrendSession[]): TrendPoint[] => {
+  const buckets = new Map<
+    number,
+    { empathySum: number; communicationSum: number; clinicalSum: number; count: number }
+  >()
+
+  for (const s of sessions) {
+    const weekStart = startOfWeekSundayLocalMs(s.timestamp)
+    if (weekStart == null) continue
+    const e = safePercent(s.scores.empathy)
+    const c = safePercent(s.scores.communication)
+    const cl = safePercent(s.scores.clinical)
+    const prev = buckets.get(weekStart)
+    if (prev) {
+      prev.empathySum += e
+      prev.communicationSum += c
+      prev.clinicalSum += cl
+      prev.count += 1
+    } else {
+      buckets.set(weekStart, {
+        empathySum: e,
+        communicationSum: c,
+        clinicalSum: cl,
+        count: 1,
+      })
+    }
+  }
+
+  const weekStarts = [...buckets.keys()].sort((a, b) => a - b)
+  return weekStarts.map((t) => {
+    const b = buckets.get(t)!
+    const n = b.count
+    return {
+      time: t,
+      empathy: b.empathySum / n,
+      communication: b.communicationSum / n,
+      clinical: b.clinicalSum / n,
+    }
+  })
+}
+
+/**
+ * Builds per-day rolling averages over `rollingWindowDays` for smoother trend lines.
+ *
+ * @param sessions - Anonymized sessions with scores
+ * @param rollingWindowDays - Trailing window size in days
+ * @returns Daily points with rolling means
+ */
+const buildDailyRollingTrendData = (
+  sessions: TrendSession[],
+  rollingWindowDays: number
+): TrendPoint[] => {
+  const buckets = new Map<
+    string,
+    { empathySum: number; communicationSum: number; clinicalSum: number; count: number }
+  >()
+
+  for (const s of sessions) {
+    const key = localDayKeyFromTimestamp(s.timestamp)
+    if (!key) continue
+    const e = safePercent(s.scores.empathy)
+    const c = safePercent(s.scores.communication)
+    const cl = safePercent(s.scores.clinical)
+    const prev = buckets.get(key)
+    if (prev) {
+      prev.empathySum += e
+      prev.communicationSum += c
+      prev.clinicalSum += cl
+      prev.count += 1
+    } else {
+      buckets.set(key, {
+        empathySum: e,
+        communicationSum: c,
+        clinicalSum: cl,
+        count: 1,
+      })
+    }
+  }
+
+  const dayKeys = [...buckets.keys()].sort()
+  const daily: DailyMeanRow[] = dayKeys.map((dayKey) => {
+    const b = buckets.get(dayKey)!
+    const n = b.count
+    return {
+      dayKey,
+      empathy: b.empathySum / n,
+      communication: b.communicationSum / n,
+      clinical: b.clinicalSum / n,
+    }
+  })
+
+  return daily.map((row, i) => {
+    const start = Math.max(0, i - rollingWindowDays + 1)
+    const windowRows = daily.slice(start, i + 1)
+    const w = windowRows.length
+    const empathy = windowRows.reduce((sum, r) => sum + r.empathy, 0) / w
+    const communication = windowRows.reduce((sum, r) => sum + r.communication, 0) / w
+    const clinical = windowRows.reduce((sum, r) => sum + r.clinical, 0) / w
+    const time = localMidnightMsFromDayKey(row.dayKey)
+    return { time, empathy, communication, clinical }
+  }).filter((row) => Number.isFinite(row.time))
+}
+
+type ScoreTrendTooltipBodyProps = {
+  active?: boolean
+  payload?: readonly { name?: string | number; value?: unknown; color?: string }[]
+  label?: string | number
+  coordinate?: { x: number; y: number }
+  chartRef: React.RefObject<HTMLDivElement | null>
+  usePortal: boolean
+  labelFormatter: (label: unknown) => string
+}
+
+/**
+ * Custom Recharts tooltip body; optionally portaled for horizontally scrolled charts.
+ *
+ * @remarks
+ * Hourly view uses a wide, scrollable chart: default tooltips are clipped, so `usePortal`
+ * renders fixed-position content in `document.body`.
+ *
+ * @param props - Recharts tooltip props plus chart ref and portal mode
+ * @param props.active - Whether the tooltip is visible
+ * @param props.payload - Series rows for the hovered point
+ * @param props.label - Axis value (epoch ms)
+ * @param props.coordinate - Pointer position inside the chart SVG
+ * @param props.chartRef - Container used to convert coordinates when portaling
+ * @param props.usePortal - When true, render via `createPortal` to `document.body`
+ * @param props.labelFormatter - Formats the tooltip title from `label`
+ * @returns Tooltip content or null
+ */
+function ScoreTrendTooltipBody({
+  active,
+  payload,
+  label,
+  coordinate,
+  chartRef,
+  usePortal,
+  labelFormatter,
+}: ScoreTrendTooltipBodyProps) {
+  if (!active || !payload?.length) return null
+
+  /** Formatted hover title (date/time) for the tooltip header. */
+  const title = labelFormatter(label)
+
+  /**
+   * Tooltip card: title row plus one line per series with {@link formatScoreTooltipPercent} values.
+   */
+  const inner = (
+    <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-lg max-w-[min(100vw-2rem,16rem)]">
+      <div className="font-medium text-gray-900 mb-1 border-b border-gray-100 pb-1">{title}</div>
+      <div className="space-y-0.5">
+        {payload.map((entry, i) => {
+          const raw = entry.value
+          const num = Array.isArray(raw) ? Number(raw[0]) : Number(raw)
+          return (
+            <div key={i} className="flex justify-between gap-4" style={{ color: entry.color }}>
+              <span>{entry.name != null ? String(entry.name) : ''}</span>
+              <span>{formatScoreTooltipPercent(num)}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+
+  if (usePortal && coordinate != null && chartRef.current) {
+    /** Chart container bounding rect for mapping SVG coords to viewport-fixed tooltip position. */
+    const rect = chartRef.current.getBoundingClientRect()
+    const x = rect.left + coordinate.x
+    const y = rect.top + coordinate.y
+    const margin = 8
+    /** Half estimated tooltip width for horizontal clamping. */
+    const approxHalfWidth = 110
+    /** Clamped left offset so the tooltip stays on-screen horizontally. */
+    const clampedLeft = Math.min(
+      Math.max(x, approxHalfWidth + margin),
+      window.innerWidth - approxHalfWidth - margin
+    )
+
+    return createPortal(
+      <div
+        className="pointer-events-none fixed z-[9999]"
+        style={{
+          left: clampedLeft,
+          top: y,
+          transform: 'translate(-50%, calc(-100% - 10px))',
+        }}
+      >
+        {inner}
+      </div>,
+      document.body
+    )
+  }
+
+  return <div className="pointer-events-none">{inner}</div>
+}
+
+type ScoreTrendGranularity = 'hourly' | 'daily' | 'weekly'
+
+/**
+ * Admin research page: dataset summary, fairness placeholders, exports, and score trend charts.
+ *
+ * @returns Research dashboard layout
+ */
 export const Research = () => {
   const { user } = useAuthStore()
   const [data, setData] = useState<ResearchData | null>(null)
+  const [scoreTrendGranularity, setScoreTrendGranularity] =
+    useState<ScoreTrendGranularity>('daily')
+  const scoreTrendChartRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
   const [exportingMetrics, setExportingMetrics] = useState(false)
   const [exportingTranscripts, setExportingTranscripts] = useState(false)
   const [exportingSessionId, setExportingSessionId] = useState<string | null>(null)
 
   const getToken = (): string | null => {
-    try {
-      const raw = localStorage.getItem('auth-storage')
-      if (!raw) return null
-      const parsed = JSON.parse(raw)
-      return parsed?.state?.token ?? parsed?.token ?? null
-    } catch {
-      return null
-    }
+    return useAuthStore.getState().token
   }
 
+  /**
+   * Triggers a browser download for an in-memory blob.
+   *
+   * @param blob - File contents
+   * @param filename - Suggested download name
+   */
   const downloadBlob = (blob: Blob, filename: string) => {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -61,6 +539,12 @@ export const Research = () => {
     window.URL.revokeObjectURL(url)
   }
 
+  /**
+   * Fetches anonymized session metrics as CSV (Bearer auth) and triggers download.
+   *
+   * @remarks
+   * No-op when `getToken()` returns null.
+   */
   const handleDownloadMetricsCsv = async () => {
     const token = getToken()
     if (!token) return
@@ -79,6 +563,12 @@ export const Research = () => {
     }
   }
 
+  /**
+   * Fetches all transcript rows as CSV (Bearer auth) and triggers download.
+   *
+   * @remarks
+   * No-op when `getToken()` returns null.
+   */
   const handleDownloadTranscriptsCsv = async () => {
     const token = getToken()
     if (!token) return
@@ -97,6 +587,13 @@ export const Research = () => {
     }
   }
 
+  /**
+   * Downloads a single anonymized session transcript CSV by `anonSessionId`.
+   *
+   * @param anonSessionId - Session identifier from the anonymized list
+   * @remarks
+   * Sanitizes the id for the filename; no-op when `getToken()` returns null.
+   */
   const handleExportSessionTranscript = async (anonSessionId: string) => {
     const token = getToken()
     if (!token) return
@@ -117,23 +614,69 @@ export const Research = () => {
     }
   }
 
-  const trendChartData = useMemo(() => {
+  /**
+   * Trend series for the score chart: hourly, weekly, or daily rolling means per {@link scoreTrendGranularity}.
+   *
+   * @remarks
+   * Delegates to {@link buildHourlyTrendData}, {@link buildWeeklyTrendData}, or {@link buildDailyRollingTrendData}.
+   */
+  const trendChartData = useMemo((): TrendPoint[] => {
     if (!data?.anonymizedSessions?.length) return []
-    const sorted = [...data.anonymizedSessions].sort(
-      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-    )
-    return sorted.map((s) => ({
-      date: new Date(s.timestamp).toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        year: '2-digit',
-      }),
-      empathy: s.scores.empathy,
-      communication: s.scores.communication,
-      clinical: s.scores.clinical,
-    }))
-  }, [data?.anonymizedSessions])
+    const sessions = data.anonymizedSessions
+    switch (scoreTrendGranularity) {
+      case 'hourly':
+        return buildHourlyTrendData(sessions)
+      case 'weekly':
+        return buildWeeklyTrendData(sessions)
+      case 'daily':
+      default:
+        return buildDailyRollingTrendData(sessions, DAILY_ROLLING_WINDOW_DAYS)
+    }
+  }, [data?.anonymizedSessions, scoreTrendGranularity])
 
+  /**
+   * Minimum chart width for hourly view so horizontal scroll has room per bucket.
+   *
+   * @returns Pixel width or `undefined` when not hourly
+   */
+  const scoreTrendChartWidthPx = useMemo(() => {
+    if (scoreTrendGranularity !== 'hourly') return undefined
+    const n = trendChartData.length
+    return Math.max(640, n * HOURLY_POINT_WIDTH_PX)
+  }, [scoreTrendGranularity, trendChartData.length])
+
+  /**
+   * Tooltip title formatter for the score trend chart, chosen by granularity.
+   */
+  const scoreTrendTooltipLabelFormatter = useMemo(() => {
+    switch (scoreTrendGranularity) {
+      case 'hourly':
+        return formatScoreTrendHourlyTooltipLabel
+      case 'weekly':
+        return formatScoreTrendWeeklyTooltipLabel
+      case 'daily':
+      default:
+        return formatScoreTrendTooltipLabel
+    }
+  }, [scoreTrendGranularity])
+
+  /**
+   * X-axis tick formatter for the score trend chart (hourly vs day/week labels).
+   */
+  const scoreTrendAxisTickFormatter = useMemo(() => {
+    switch (scoreTrendGranularity) {
+      case 'hourly':
+        return formatTrendAxisTickHourly
+      case 'weekly':
+      case 'daily':
+      default:
+        return formatTrendAxisTick
+    }
+  }, [scoreTrendGranularity])
+
+  /**
+   * Bar chart data: mean empathy, communication, and clinical scores across anonymized sessions.
+   */
   const averageScoresChartData = useMemo(() => {
     if (!data?.anonymizedSessions?.length) return []
     const empathyValues = data.anonymizedSessions
@@ -183,6 +726,9 @@ export const Research = () => {
   }, [data?.anonymizedSessions])
 
   useEffect(() => {
+    /**
+     * Fetches anonymized research data on mount for charts and tables.
+     */
     const loadData = async () => {
       try {
         const researchData = await fetchResearchData()
@@ -298,28 +844,118 @@ export const Research = () => {
               {/* Score trend over time */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-blue-600" />
-                    Score Trends
-                  </CardTitle>
-                  <p className="text-sm text-gray-500 font-normal">
-                    Empathy, communication, and clinical scores by session date
-                  </p>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <CardTitle className="flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-blue-600 shrink-0" />
+                        Score Trends
+                      </CardTitle>
+                      <p className="text-sm text-gray-500 font-normal mt-1">
+                        {scoreTrendGranularity === 'hourly' &&
+                          'Mean scores per clock hour (local time). Scroll horizontally when there are many hours.'}
+                        {scoreTrendGranularity === 'daily' &&
+                          `${DAILY_ROLLING_WINDOW_DAYS}-day rolling average of daily mean scores (empathy, communication, clinical). One point per calendar day with sessions.`}
+                        {scoreTrendGranularity === 'weekly' &&
+                          'Mean scores per calendar week (weeks start Sunday, local time). One point per week with sessions.'}
+                      </p>
+                    </div>
+                    <div
+                      className="flex flex-wrap gap-2 shrink-0"
+                      role="group"
+                      aria-label="Score trend time grouping"
+                    >
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={scoreTrendGranularity === 'hourly' ? 'default' : 'outline'}
+                        onClick={() => setScoreTrendGranularity('hourly')}
+                      >
+                        Hourly
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={scoreTrendGranularity === 'daily' ? 'default' : 'outline'}
+                        onClick={() => setScoreTrendGranularity('daily')}
+                      >
+                        Daily
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={scoreTrendGranularity === 'weekly' ? 'default' : 'outline'}
+                        onClick={() => setScoreTrendGranularity('weekly')}
+                      >
+                        Weekly
+                      </Button>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-72 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={trendChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
-                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                        <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
-                        <Tooltip formatter={(value: unknown) => [`${Number(value)}%`, ''] as [React.ReactNode, string]} />
-                        <Legend />
-                        <Line type="monotone" dataKey="empathy" stroke="#10b981" strokeWidth={2} name="Empathy %" />
-                        <Line type="monotone" dataKey="communication" stroke="#22c55e" strokeWidth={2} name="Communication %" />
-                        <Line type="monotone" dataKey="clinical" stroke="#7c3aed" strokeWidth={2} name="Clinical %" />
-                      </LineChart>
-                    </ResponsiveContainer>
+                  <div
+                    className={cn(
+                      'w-full',
+                      scoreTrendGranularity === 'hourly' &&
+                        'overflow-x-auto pb-1 overscroll-x-contain [overflow-anchor:none]'
+                    )}
+                  >
+                    <div
+                      ref={scoreTrendChartRef}
+                      className="h-72 w-full"
+                      style={
+                        scoreTrendChartWidthPx != null
+                          ? { width: scoreTrendChartWidthPx, minWidth: '100%' }
+                          : undefined
+                      }
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={trendChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
+                          <XAxis
+                            dataKey="time"
+                            type="number"
+                            scale="time"
+                            domain={['dataMin', 'dataMax']}
+                            tickFormatter={scoreTrendAxisTickFormatter}
+                            minTickGap={scoreTrendGranularity === 'hourly' ? 8 : 12}
+                            tick={{ fontSize: 12 }}
+                          />
+                          <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
+                          <Tooltip
+                            content={(props) => (
+                              <ScoreTrendTooltipBody
+                                active={props.active}
+                                payload={
+                                  props.payload as ScoreTrendTooltipBodyProps['payload']
+                                }
+                                label={props.label}
+                                coordinate={props.coordinate}
+                                chartRef={scoreTrendChartRef}
+                                usePortal={scoreTrendGranularity === 'hourly'}
+                                labelFormatter={scoreTrendTooltipLabelFormatter}
+                              />
+                            )}
+                            wrapperStyle={
+                              scoreTrendGranularity === 'hourly'
+                                ? {
+                                    opacity: 0,
+                                    width: 0,
+                                    height: 0,
+                                    overflow: 'hidden',
+                                    pointerEvents: 'none',
+                                  }
+                                : undefined
+                            }
+                            isAnimationActive={false}
+                            allowEscapeViewBox={{ x: true, y: true }}
+                          />
+                          <Legend />
+                          <Line type="monotone" dataKey="empathy" stroke="#10b981" strokeWidth={2} name="Empathy %" />
+                          <Line type="monotone" dataKey="communication" stroke="#22c55e" strokeWidth={2} name="Communication %" />
+                          <Line type="monotone" dataKey="clinical" stroke="#7c3aed" strokeWidth={2} name="Clinical %" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -554,7 +1190,11 @@ export const Research = () => {
                           <CartesianGrid strokeDasharray="3 3" className="stroke-gray-100" />
                           <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                           <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
-                          <Tooltip formatter={(value: unknown) => [`${Number(value)}%`, 'Average'] as [React.ReactNode, string]} />
+                          <Tooltip
+                            formatter={(value: unknown) =>
+                              [formatScoreTooltipPercent(value), 'Average'] as [React.ReactNode, string]
+                            }
+                          />
                           <Bar dataKey="value" fill="#7c3aed" name="Average %" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>

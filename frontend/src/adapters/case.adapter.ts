@@ -1,6 +1,14 @@
+/**
+ * Maps case DTOs to domain objects and builds create/update payloads for `/v1/cases`.
+ */
 import type { Case, CaseDTO } from '@/types/case'
 
-// dto -> domain (camelCase)
+/**
+ * Maps a {@link CaseDTO} from the API to a camelCase {@link Case}.
+ *
+ * @param dto - Wire-format case
+ * @returns Domain case for React state
+ */
 export const caseFromDTO = (dto: CaseDTO): Case => ({
   id: dto.id,
   title: dto.title,
@@ -18,7 +26,15 @@ export const caseFromDTO = (dto: CaseDTO): Case => ({
   updatedAt: dto.updated_at,
 })
 
-// domain -> create payload (snake_case)
+/**
+ * Builds a create-case JSON body with required title/script and snake_case plugin fields.
+ *
+ * @remarks
+ * Uses non-null assertions on `title` and `script`; callers must validate before create.
+ *
+ * @param c - Partial domain case
+ * @returns Request body for `POST /v1/cases`
+ */
 export const toCreatePayload = (c: Partial<Case>) => ({
   title: c.title!,
   script: c.script!,
@@ -33,7 +49,12 @@ export const toCreatePayload = (c: Partial<Case>) => ({
   metrics_plugins: c.metricsPlugins ?? null,
 })
 
-// domain -> update payload (partial)
+/**
+ * Builds a partial PATCH body including only keys present on the domain object.
+ *
+ * @param c - Partial domain case with fields to update
+ * @returns Record suitable for `PATCH /v1/cases/:id`
+ */
 export const toUpdatePayload = (c: Partial<Case>) => {
   const p: Record<string, unknown> = {}
   if (c.title !== undefined) p.title = c.title

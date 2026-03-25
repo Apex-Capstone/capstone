@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { useAuthStore } from '@/store/authStore'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -7,30 +8,28 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// attach JWT from persisted store/localStorage
 apiClient.interceptors.request.use((config) => {
-  const raw = localStorage.getItem('auth-storage')
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw)
-      const token = parsed?.state?.token ?? parsed?.token
-      if (token) {
-        config.headers = config.headers ?? {}
-        config.headers.Authorization = `Bearer ${token}`
-      }
-    } catch {}
+  const token = useAuthStore.getState().token
+  if (token) {
+    config.headers = config.headers ?? {}
+    config.headers.Authorization = `Bearer ${token}`
   }
   return config
 })
 
-// ---- Auth (keep here so Login.tsx can import it) ----
-export const loginUser = async (email: string, password: string) => {
-  const { data } = await apiClient.post('/v1/auth/login', { email, password })
-  return {
-    token: data.access_token,
-    user: data.user,
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error?.response?.status === 401) {
+      await useAuthStore.getState().logout()
+      const path = window.location.pathname
+      const onPublicAuthPath = path === '/login' || path === '/signup'
+      if (!onPublicAuthPath) {
+        window.location.href = '/login'
+      }
+    }
+    return Promise.reject(error)
   }
-}
-
+)
 
 export default apiClient

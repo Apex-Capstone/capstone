@@ -39,6 +39,16 @@ class SessionService:
         # Only map real table columns -> values, avoiding SA's `.metadata`
         return {col.key: getattr(row, col.key) for col in row.__table__.columns}
 
+    @staticmethod
+    def _resolve_turn_audio_url(turn_id: int, audio_url: str | None, audio_expires_at: datetime | None) -> str | None:
+        if not audio_url:
+            return None
+        if audio_expires_at is not None and audio_expires_at <= datetime.utcnow():
+            return None
+
+        base_url = get_settings().public_base_url.rstrip("/")
+        return f"{base_url}/v1/turns/{turn_id}/audio"
+
     def _session_to_response(self, session: SessionEntity, case_title: str | None = None) -> SessionResponse:
         data = self._row_to_dict(session)
         derived_title = case_title or (session.case.title if getattr(session, "case", None) else None)
@@ -121,24 +131,33 @@ class SessionService:
 
         # Resolve metrics plugins: case override else settings. Validate each and freeze list on session.
         metrics_list: list[str] = []
+        case_metrics_override = False
         raw_case_metrics = getattr(case, "metrics_plugins", None)
         if isinstance(raw_case_metrics, str) and raw_case_metrics.strip():
             try:
                 parsed = json.loads(raw_case_metrics)
                 if isinstance(parsed, list):
                     metrics_list = [str(x) for x in parsed]
+                    case_metrics_override = True
             except (json.JSONDecodeError, TypeError):
                 pass
         if not metrics_list:
             metrics_list = list(getattr(settings, "metrics_plugins", []) or [])
+        resolved_metrics_plugins: list[str] = []
         for name in metrics_list:
             if not name:
                 continue
             try:
-                PluginRegistry.get_metrics_plugin(name)
+                metrics_cls = PluginRegistry.get_metrics_plugin(name)
             except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid plugin configuration")
-        metrics_plugins_json: str | None = json.dumps(metrics_list) if metrics_list else None
+                if case_metrics_override:
+                    raise HTTPException(status_code=400, detail="Invalid plugin configuration")
+                metrics_cls = _load_class_from_path(name)
+                PluginRegistry.register_metrics_plugin(name, metrics_cls)
+            resolved_metrics_plugins.append(getattr(metrics_cls, "name", name))
+        metrics_plugins_json: str | None = (
+            json.dumps(resolved_metrics_plugins) if resolved_metrics_plugins else None
+        )
 
         # Create session entity
         session = SessionEntity(
@@ -182,9 +201,24 @@ class SessionService:
         turns = self.turn_repo.get_by_session(session_id)
         
         session_response = self._session_to_response(session)
+        turn_responses: list[TurnResponse] = []
+        for turn in turns:
+            turn_response = TurnResponse.model_validate(self._row_to_dict(turn))
+            turn_responses.append(
+                turn_response.model_copy(
+                    update={
+                        "audio_url": self._resolve_turn_audio_url(
+                            turn_response.id,
+                            turn_response.audio_url,
+                            turn_response.audio_expires_at,
+                        )
+                    }
+                )
+            )
+
         return SessionDetailResponse(
             **session_response.model_dump(),
-            turns=[TurnResponse.model_validate(self._row_to_dict(turn)) for turn in turns],
+            turns=turn_responses,
         )
     
     async def list_user_sessions(
@@ -192,10 +226,11 @@ class SessionService:
         user_id: int,
         skip: int = 0,
         limit: int = 100,
+        state: str | None = None,
     ) -> SessionListResponse:
-        """List sessions for a user."""
-        sessions = self.session_repo.get_by_user(user_id, skip, limit)
-        total = len(sessions)
+        """List sessions for a user, optionally filtered by state."""
+        sessions = self.session_repo.get_by_user(user_id, skip, limit, state=state)
+        total = self.session_repo.count_by_user_and_state(user_id, state) if state else len(sessions)
         
         return SessionListResponse(
             sessions=[self._session_to_response(s) for s in sessions],
