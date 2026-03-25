@@ -1,5 +1,5 @@
 PYTHONPATH_BACKEND_SRC := $(subst \,/,$(abspath backend/src))
-.PHONY: backend backend-dev backend-install frontend frontend-dev frontend-install seed
+.PHONY: backend backend-dev backend-install frontend frontend-dev frontend-install db-migrate
 
 backend: backend-install backend-dev
 
@@ -17,6 +17,6 @@ frontend-install:
 frontend-dev:
 	@cd frontend && npm run dev
 
-seed:
-	@powershell -NoProfile -Command "cd 'backend'; $$env:PYTHONPATH = '$(PYTHONPATH_BACKEND_SRC)'; poetry run python -m src.scripts.reset_and_seed"
+db-migrate:
+	@powershell -NoProfile -Command "cd 'backend'; $$env:PYTHONPATH = '$(PYTHONPATH_BACKEND_SRC)'; poetry run alembic upgrade head"
 

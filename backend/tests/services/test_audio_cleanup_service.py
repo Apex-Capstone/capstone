@@ -60,8 +60,7 @@ def test_db():
 
 def _seed_turns(test_db):
     user = User(
-        email="cleanup_tester@example.com",
-        hashed_password="unused",
+        email="cleanup_tester@example.com",        
         role="trainee",
         full_name="Cleanup Tester",
     )

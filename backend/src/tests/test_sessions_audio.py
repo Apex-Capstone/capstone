@@ -49,7 +49,6 @@ def owner_user(test_db):
     """Create the session owner."""
     user = User(
         email="owner@example.com",
-        hashed_password="hashed_password",
         role="trainee",
         full_name="Owner User",
     )
@@ -63,8 +62,7 @@ def owner_user(test_db):
 def other_user(test_db):
     """Create another user."""
     user = User(
-        email="other@example.com",
-        hashed_password="hashed_password",
+        email="other@example.com",        
         role="trainee",
         full_name="Other User",
     )

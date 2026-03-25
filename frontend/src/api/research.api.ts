@@ -6,16 +6,79 @@ import type { AxiosError } from 'axios'
 
 const BASE = '/v1/research'
 
+const API_ORIGIN = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+function readAuthTokenFromStorage(): string | null {
+  try {
+    const raw = localStorage.getItem('auth-storage')
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { state?: { token?: string }; token?: string }
+    return parsed?.state?.token ?? parsed?.token ?? null
+  } catch {
+    return null
+  }
+}
+
+function triggerBlobDownload(blob: Blob, filename: string): void {
+  const url = window.URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  window.URL.revokeObjectURL(url)
+}
+
+/**
+ * Downloads session metrics as CSV (`session_metrics.csv`) using Bearer auth from `auth-storage`.
+ *
+ * @remarks
+ * No-op when no token is present. Throws if the HTTP response is not OK.
+ */
+export async function downloadMetricsCSV(): Promise<void> {
+  const token = readAuthTokenFromStorage()
+  if (!token) return
+  const response = await fetch(`${API_ORIGIN}/v1/research/export/metrics.csv`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!response.ok) throw new Error('Metrics export failed')
+  const blob = await response.blob()
+  triggerBlobDownload(blob, 'session_metrics.csv')
+}
+
+/**
+ * Downloads all transcripts as CSV (`all_transcripts.csv`) using Bearer auth from `auth-storage`.
+ *
+ * @remarks
+ * No-op when no token is present. Throws if the HTTP response is not OK.
+ */
+export async function downloadTranscriptsCSV(): Promise<void> {
+  const token = readAuthTokenFromStorage()
+  if (!token) return
+  const response = await fetch(`${API_ORIGIN}/v1/research/export/transcripts.csv`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!response.ok) throw new Error('Transcripts export failed')
+  const blob = await response.blob()
+  triggerBlobDownload(blob, 'all_transcripts.csv')
+}
+
 /** Backend anonymized session row from `GET /v1/research/sessions`. */
 export interface ResearchSessionDTO {
   session_id: string | number
   case_id: number
+  case_name?: string | null
   duration_seconds: number
   state: string
+  patient_model_plugin?: string | null
+  evaluator_plugin?: string | null
+  metrics_plugins?: string | null
   spikes_stage?: string | null
+  spikes_coverage_percent?: number | null
+  spikes_coverage?: number | null
   empathy_score?: number | null
   communication_score?: number | null
   clinical_score?: number | null
+  spikes_completion_score?: number | null
   timestamp?: string | null
 }
 
@@ -34,9 +97,18 @@ export interface ResearchData {
     demographics: { ageGroup: string; gender: string }
     scores: { empathy: number | null; communication: number | null; clinical: number | null }
     timestamp: string
+    caseId?: number
+    /** Display title from backend `case_name` (case title). */
+    caseName?: string | null
+    patientModelPlugin?: string | null
+    evaluatorPlugin?: string | null
+    metricsPlugins?: string | null
     duration_seconds?: number
     state?: string
     spikes_stage?: string | null
+    spikes_coverage_percent?: number | null
+    spikes_coverage?: number | null
+    spikes_completion_score?: number | null
   }>
   fairnessMetrics?: {
     biasProbeConsistency: number
@@ -85,6 +157,27 @@ export async function fetchResearchSessions(
     const { data } = await api.get<ResearchSessionsResponse>(`${BASE}/sessions`, {
       params: { skip, limit },
     })
+    return data
+  } catch (err) {
+    if (isForbidden(err)) {
+      throw new Error('Access denied. Admin privileges required.')
+    }
+    throw err
+  }
+}
+
+/**
+ * Fetches a single anonymized research session by `anon_session_id` (admin only).
+ *
+ * @throws Error on 403 or when the session is not found
+ */
+export async function fetchResearchSessionByAnonId(
+  anonSessionId: string
+): Promise<Record<string, unknown>> {
+  try {
+    const { data } = await api.get<Record<string, unknown>>(
+      `${BASE}/sessions/${encodeURIComponent(anonSessionId)}`
+    )
     return data
   } catch (err) {
     if (isForbidden(err)) {
@@ -148,9 +241,17 @@ export async function fetchResearchData(): Promise<ResearchData> {
         demographics: { ageGroup: '—', gender: '—' } as const,
         scores: { empathy, communication, clinical } as const,
         timestamp: s.timestamp ?? '',
+        caseId: s.case_id,
+        caseName: s.case_name ?? null,
+        patientModelPlugin: s.patient_model_plugin ?? null,
+        evaluatorPlugin: s.evaluator_plugin ?? null,
+        metricsPlugins: s.metrics_plugins ?? null,
         duration_seconds: s.duration_seconds,
         state: s.state,
         spikes_stage: s.spikes_stage ?? null,
+        spikes_coverage_percent: s.spikes_coverage_percent ?? null,
+        spikes_coverage: s.spikes_coverage ?? null,
+        spikes_completion_score: s.spikes_completion_score ?? null,
       }
     })
     return {

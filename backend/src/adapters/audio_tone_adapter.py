@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-import audioop
+try:
+    import audioop
+except ModuleNotFoundError:
+    import audioop_lts as audioop
 import math
 import shutil
 import subprocess

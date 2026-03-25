@@ -28,27 +28,27 @@ export const ChatBubble = ({ message, onReplayAudio }: ChatBubbleProps) => {
   return (
     <div
       className={cn(
-        'flex w-full items-start gap-3',
+        'flex w-full items-end gap-3',
         isUser ? 'justify-end' : 'justify-start'
       )}
     >
       {!isUser && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-100 bg-emerald-50 shadow-sm">
           <Bot className="h-4 w-4 text-emerald-600" />
         </div>
       )}
 
       <div
         className={cn(
-          'max-w-[80%] rounded-lg px-4 py-2',
+          'max-w-[88%] rounded-[22px] px-4 py-3 shadow-sm sm:max-w-[82%] xl:max-w-[78%]',
           isUser
             ? 'bg-emerald-600 text-white'
-            : 'bg-gray-100 text-gray-900'
+            : 'border border-slate-200 bg-white text-gray-900'
         )}
       >
         <p
           className={cn(
-            'text-sm whitespace-pre-wrap',
+            'whitespace-pre-wrap text-sm leading-6',
             message.status === 'pending' && 'italic opacity-90',
             message.status === 'error' && 'font-medium'
           )}
@@ -90,7 +90,7 @@ export const ChatBubble = ({ message, onReplayAudio }: ChatBubbleProps) => {
       </div>
 
       {isUser && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-200">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-100 shadow-sm">
           <User className="h-4 w-4 text-gray-600" />
         </div>
       )}

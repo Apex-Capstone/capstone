@@ -30,7 +30,7 @@ project-root/
 │   │   ├── services/
 │   │   ├── repositories/
 │   │   ├── controllers/
-│   │   └── scripts/seed.py   # database seeding script
+│   │   └── scripts/
 │   └── README.md
 │
 ├── frontend/        # React + Vite + TypeScript client
@@ -56,7 +56,7 @@ project-root/
 - **Feedback and scoring engine** – Session summary, empathy scores, SPIKES completion, AFCE-style breakdowns, and conversation timelines.
 - **Admin dashboard and research analytics** – Case management, session metrics, fairness-oriented analytics, and anonymized data export for research.
 - **Bias & fairness views** – Visualizations to inspect score consistency across anonymized cohorts (where data is available).
-- **Security & role-based access** – JWT-based auth, trainee/admin roles, and separation between training and research views.
+- **Security & role-based access** – Supabase Auth with email verification, JWT-based API authorization, trainee/admin roles, and separation between training and research views.
 
 ---
 
@@ -127,6 +127,7 @@ Plugins are registered via configuration and loaded by the backend plugin manage
    ```bash
    git clone https://github.com/AsherHaroon/capstone.git
    cd capstone
+   ```
 
 ### 1. Backend Setup
 
@@ -137,16 +138,30 @@ cd backend
 poetry install
 ```
 
-Create a `.env` file in `/backend`:
+Create a `.env` file in `/backend` (see `.env.example` for reference):
 
 ```
-APP_ENV=development
-DATABASE_URL=sqlite:///./app.db
-SECRET_KEY=supersecretkey
-ACCESS_TOKEN_EXPIRE_MINUTES=120
-CORS_ORIGINS=http://localhost:5173
-API_V1_PREFIX=/v1
+# Database
+database_url=postgresql+psycopg2://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require
+
+# LLM keys
+openai_api_key=your-openai-key
+gemini_api_key=your-gemini-key
+
+# Supabase storage (for assistant audio)
+supabase_url=https://your-project.supabase.co
+supabase_service_role_key=your-service-role-key
+supabase_storage_bucket="patient audio files"
+
+# Supabase Auth JWT verification
+SUPABASE_JWT_SECRET=your-supabase-jwt-secret
+
+# Local paths
+local_storage_path=./storage
+public_base_url=http://localhost:8000
 ```
+
+The `SUPABASE_JWT_SECRET` is found in your Supabase dashboard under **Project Settings > API > JWT Settings > Legacy JWT Secret**.
 
 Set `PYTHONPATH` so the backend imports resolve before running:
 
@@ -184,7 +199,11 @@ Create a `.env` file in `/frontend`:
 
 ```
 VITE_API_URL=http://localhost:8000
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
+
+The `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are found in your Supabase dashboard under **Project Settings > API**. The anon key is safe for frontend use.
 
 Run the development server:
 
@@ -196,27 +215,17 @@ The interface will be available at `http://localhost:5173`.
 
 ---
 
-## Seeding Development Data
+## Creating Users
 
-You can populate the database with example users and cases for testing.
+Authentication is handled by **Supabase Auth**. Users sign up through the frontend at `/signup` with email verification.
 
-Run the seeding script from `/backend`:
+To create an admin user:
 
-```bash
-poetry run python -m src.scripts.seed
-```
+1. Create the user through the `/signup` page or the Supabase dashboard (**Authentication > Users > Add user**).
+2. Set their role to admin MANUALLY in the database:
 
-This creates demo accounts:
-
-| Role    | Email                                                         | Password |
-| ------- | ------------------------------------------------------------- | -------- |
-| Admin   | [admin@example.com](mailto:admin@example.com)                 | admin123 |
-| Trainee | [alice.trainee@example.com](mailto:alice.trainee@example.com) | changeme |
-
-You can re-run with `--reset` to clear and reseed:
-
-```bash
-poetry run python -m src.scripts.seed --reset
+```sql
+UPDATE core.users SET role = 'admin' WHERE email = 'admin@example.com';
 ```
 
 ---
@@ -234,9 +243,8 @@ poetry run python -m src.scripts.seed --reset
 
 1. Start backend (`poetry run uvicorn src.app:app --reload`)
 2. Start frontend (`npm run dev`)
-3. Log in with a seeded account
+3. Sign up at `/signup` or log in with an existing account
 4. Navigate through:
-
    - `/dashboard` → trainee dashboard
    - `/case/:id` → chat interface
    - `/feedback/:sessionId` → feedback summary
@@ -261,5 +269,3 @@ APEX is designed to support research in clinical communication training and LLM-
 Developed by
 **Tung Ho**, **Asher Haroon**, **Michael Fedotov**, **Hammad Ur Rehman**, **Christian Canlas**, **Aaryan Kandwal**, and **Samir Matani**
 as part of the McMaster University 4ZP6A Capstone Project.
-
-

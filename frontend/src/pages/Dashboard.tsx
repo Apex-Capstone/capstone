@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { listCases } from '@/api/cases.api'
 import { createSession, closeSession, listActiveSessions, listCompletedSessions } from '@/api/sessions.api'
 import type { Case } from '@/types/case'
 import type { Session } from '@/types/session'
 import { Button } from '@/components/ui/button'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { CaseCard } from '@/components/CaseCard'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
@@ -30,6 +30,19 @@ export const Dashboard = () => {
   const [confirmCloseSession, setConfirmCloseSession] = useState<Session | null>(null)
   const { user } = useAuthStore()
   const navigate = useNavigate()
+  const location = useLocation()
+  const mainRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    if (loading) return
+    requestAnimationFrame(() => {
+      if (location.hash === '#cases') {
+        document.getElementById('cases')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } else {
+        mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+    })
+  }, [location.hash, loading])
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -40,19 +53,19 @@ export const Dashboard = () => {
           listCompletedSessions({ limit: 3 }),
         ])
         if (casesResult.status === 'fulfilled') {
-          setCases(casesResult.value.items)
+          setCases(casesResult.value.items ?? [])
         } else {
           console.error('Failed to fetch cases:', casesResult.reason)
         }
         if (activeResult.status === 'fulfilled') {
-          setActiveSessions(activeResult.value.sessions)
-          setActiveTotal(activeResult.value.total)
+          setActiveSessions(activeResult.value.sessions ?? [])
+          setActiveTotal(activeResult.value.total ?? 0)
         } else {
           console.error('Failed to fetch active sessions:', activeResult.reason)
         }
         if (completedResult.status === 'fulfilled') {
-          setCompletedSessions(completedResult.value.sessions)
-          setCompletedTotal(completedResult.value.total)
+          setCompletedSessions(completedResult.value.sessions ?? [])
+          setCompletedTotal(completedResult.value.total ?? 0)
         } else {
           console.error('Failed to fetch completed sessions:', completedResult.reason)
         }
@@ -152,7 +165,7 @@ export const Dashboard = () => {
             {session.caseTitle ?? `Case #${session.caseId}`}
           </p>
           <p className="mt-0.5 text-xs text-gray-400">
-            Session {session.id} · {formatDurationLabel(session.durationSeconds)}
+            Session {session.id} · {formatDurationLabel(session.durationSeconds ?? 0)}
           </p>
         </div>
         <span className="px-3 py-1 text-[10px] font-semibold uppercase rounded-full bg-gray-100 border border-gray-200 text-gray-600">
@@ -176,13 +189,13 @@ export const Dashboard = () => {
       <Navbar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto md:ml-64">
+        <main ref={mainRef} className="flex-1 overflow-y-auto md:ml-64">
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             <nav className="mb-4 text-sm text-gray-500">Dashboard</nav>
 
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900">
-                Welcome back, {user?.name || (user as any)?.full_name || user?.email}
+                Welcome back, {user?.full_name || user?.email}
               </h1>
               <p className="mt-2 text-gray-600">
                 Practice delivering difficult news using the SPIKES communication framework
@@ -277,55 +290,54 @@ export const Dashboard = () => {
                   </div>
                 </div>
 
-                {cases.length === 0 ? (
-                  <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
-                    <p className="text-gray-500">No virtual patient cases available. Contact your administrator.</p>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="mb-6">
-                      <h2 className="text-xl font-semibold text-gray-900 mb-2">Virtual Patient Cases</h2>
-                      <p className="text-gray-600">
-                        Select a case to practice your communication skills using the SPIKES framework
-                      </p>
+                <div id="cases">
+                  {cases.length === 0 ? (
+                    <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
+                      <p className="text-gray-500">No virtual patient cases available. Contact your administrator.</p>
                     </div>
+                  ) : (
+                    <Fragment>
+                      <div className="mb-6">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-2">Virtual Patient Cases</h2>
+                        <p className="text-gray-600">
+                          Select a case to practice your communication skills using the SPIKES framework
+                        </p>
+                      </div>
 
-                    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                      {cases.map((caseItem) => (
-                        <CaseCard key={caseItem.id} caseData={caseItem as any} onClick={handleStartNewSession} />
-                      ))}
-                    </div>
+                      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                        {cases.map((caseItem) => (
+                          <CaseCard
+                            key={caseItem.id}
+                            caseData={caseItem as any}
+                            onClick={handleStartNewSession}
+                            selected={creatingSessionForCase === caseItem.id}
+                          />
+                        ))}
+                      </div>
 
-                    <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                      <div className="bg-white rounded-lg border p-4 text-center">
-                        <div className="text-2xl font-bold text-emerald-600">
-                          {completedTotal}
+                      <div className="mt-12 grid gap-4 sm:grid-cols-3">
+                        <div className="bg-white rounded-lg border p-4 text-center">
+                          <div className="text-2xl font-bold text-emerald-600">
+                            {completedTotal}
+                          </div>
+                          <div className="text-sm text-gray-600">Completed Sessions</div>
                         </div>
-                        <div className="text-sm text-gray-600">Completed Sessions</div>
-                      </div>
-                      <div className="bg-white rounded-lg border p-4 text-center">
-                        <div className="text-2xl font-bold text-orange-600">
-                          {inProgressCount}
+                        <div className="bg-white rounded-lg border p-4 text-center">
+                          <div className="text-2xl font-bold text-orange-600">
+                            {inProgressCount}
+                          </div>
+                          <div className="text-sm text-gray-600">In Progress</div>
                         </div>
-                        <div className="text-sm text-gray-600">In Progress</div>
-                      </div>
-                      <div className="bg-white rounded-lg border p-4 text-center">
-                        <div className="text-2xl font-bold text-gray-600">
-                          {cases.length}
+                        <div className="bg-white rounded-lg border p-4 text-center">
+                          <div className="text-2xl font-bold text-gray-600">
+                            {cases.length}
+                          </div>
+                          <div className="text-sm text-gray-600">Available Cases</div>
                         </div>
-                        <div className="text-sm text-gray-600">Available Cases</div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => navigate('/analytics')}
-                        className="bg-white rounded-lg border p-4 text-left hover:shadow-md hover:border-blue-300 transition-shadow"
-                      >
-                        <div className="text-sm font-semibold text-blue-700">My Analytics</div>
-                        <div className="mt-1 text-sm text-gray-600">View My Analytics →</div>
-                      </button>
-                    </div>
-                  </div>
-                )}
+                    </Fragment>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -345,7 +357,7 @@ export const Dashboard = () => {
               <span className="font-medium text-gray-900">
                 {confirmCloseSession?.caseTitle ?? `Case #${confirmCloseSession?.caseId}`}
               </span>
-              ? This will end the session and generate feedback. You won't be able to continue it afterward.
+              {`? This will end the session and generate feedback. You won't be able to continue it afterward.`}
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4 flex justify-end gap-3">

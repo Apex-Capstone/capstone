@@ -355,7 +355,7 @@ const renderTextWithSpans = (
     } else if (isResponse) {
       className = 'underline decoration-emerald-400 decoration-2 underline-offset-2'
     } else if (isElicitation) {
-      className = 'underline decoration-blue-400 decoration-2 underline-offset-2'
+      className = 'underline decoration-emerald-600 decoration-2 underline-offset-2'
     }
 
     pieces.push(

@@ -174,7 +174,7 @@ export const Analytics = () => {
         <Navbar />
         <div className="flex flex-1 min-h-0">
           <Sidebar />
-          <main className="flex flex-col gap-6 overflow-y-auto pb-10 md:ml-64">
+          <main className="flex-1 min-h-0 overflow-y-auto md:ml-64">
             <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
               <div className="h-8 w-64 bg-gray-200 rounded animate-pulse mb-2" />
               <div className="h-4 w-80 bg-gray-200 rounded animate-pulse" />
@@ -190,7 +190,7 @@ export const Analytics = () => {
       <Navbar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main className="flex flex-col gap-6 overflow-y-auto pb-10 md:ml-64">
+        <main className="flex-1 min-h-0 overflow-y-auto md:ml-64">
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             <nav className="mb-4 text-sm text-gray-500">
               <span className="cursor-pointer hover:text-gray-700" onClick={() => navigate('/dashboard')}>

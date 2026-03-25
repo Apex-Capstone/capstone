@@ -20,6 +20,10 @@ class UserRepository:
         """Get user by ID."""
         return self.db.query(User).filter(User.id == user_id).first()
     
+    def get_by_supabase_id(self, supabase_auth_id: str) -> Optional[User]:
+        """Get user by Supabase Auth UUID."""
+        return self.db.query(User).filter(User.supabase_auth_id == supabase_auth_id).first()
+
     def get_by_email(self, email: str) -> Optional[User]:
         """Get user by email."""
         return self.db.query(User).filter(User.email == email).first()
