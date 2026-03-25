@@ -63,6 +63,15 @@ def _extract_json_object_with_diagnostics(raw_text: str) -> tuple[Optional[Dict[
         return None, diagnostics
 
 
+def extract_llm_json_dict(raw_text: str) -> tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
+    """Parse a best-effort JSON object from raw LLM text (shared by v1 reviewer and hybrid v2)."""
+    return _extract_json_object_with_diagnostics(raw_text)
+
+
+# Shared with hybrid v2 orchestrator for log previews.
+safe_preview_llm_raw = _safe_preview
+
+
 class LLMReviewerService:
     """Adapter-agnostic transcript-only LLM evaluator."""
 

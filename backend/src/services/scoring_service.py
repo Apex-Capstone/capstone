@@ -82,6 +82,50 @@ def _compact_llm_output_for_evaluator_meta(llm_out: Any) -> dict[str, Any]:
         d["areas_for_improvement"] = areas[:25]
         truncated = True
 
+    max_eo_bullets, max_stage_map = 40, 60
+    if "empathic_opportunities" in d:
+        eo_bullets = list(d.get("empathic_opportunities") or [])
+        if len(eo_bullets) > max_eo_bullets:
+            eo_bullets = eo_bullets[:max_eo_bullets]
+            truncated = True
+        new_eo: list[str] = []
+        for s in eo_bullets:
+            if isinstance(s, str):
+                t = _truncate_meta_str(s, str_cap)
+                if t != s:
+                    truncated = True
+                new_eo.append(t or "")
+            else:
+                new_eo.append(str(s))
+        d["empathic_opportunities"] = new_eo
+
+    if "stage_turn_mapping" in d:
+        stm_raw = list(d.get("stage_turn_mapping") or [])
+        if len(stm_raw) > max_stage_map:
+            stm_raw = stm_raw[:max_stage_map]
+            truncated = True
+        new_stm: list[dict[str, Any]] = []
+        for row in stm_raw:
+            if not isinstance(row, dict):
+                continue
+            new_stm.append(dict(row))
+        d["stage_turn_mapping"] = new_stm
+
+    for text_key in (
+        "empathy_review_reasoning",
+        "spikes_sequencing_notes",
+        "clarity_observation",
+        "organization_observation",
+        "professionalism_observation",
+        "question_quality_observation",
+        "notes",
+    ):
+        if text_key in d and isinstance(d.get(text_key), str):
+            t = _truncate_meta_str(d[text_key], str_cap)
+            if t != d[text_key]:
+                truncated = True
+            d[text_key] = t
+
     if truncated:
         d["_meta_truncated"] = True
     return d
@@ -553,6 +597,150 @@ class ScoringService:
                 },
             )
 
+    async def _hybrid_v2_llm_merge_scores(
+        self,
+        state: _RuleFeedbackState,
+        session_id: int,
+    ) -> tuple[float, float, float, float, dict[str, Any] | None]:
+        """Three-call LLM transcript review + same 70/30 component merge as v1."""
+        rule_snapshot = {
+            "empathy_score": float(state.empathy_score),
+            "communication_score": float(state.communication_score),
+            "spikes_completion_score": float(state.spikes_score),
+            "overall_score": float(state.overall_score),
+        }
+        real_llm_enabled = os.getenv("LLM_REVIEWER_REAL_CALLS", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        if not real_llm_enabled:
+            return (
+                state.empathy_score,
+                state.communication_score,
+                state.spikes_score,
+                state.overall_score,
+                None,
+            )
+
+        from schemas.llm_reviewer import LLMReviewerInput, TranscriptTurnLite
+        from services.hybrid_v2_llm_service import (
+            HybridV2LLMOrchestrator,
+            build_compiled_review_and_llm_scores,
+            overall_v2_status,
+        )
+        from adapters.llm.openai_adapter import OpenAIAdapter
+
+        try:
+            transcript_context: list[Any] = []
+            for t in state.turns:
+                speaker = "clinician" if t.role == "user" else "patient"
+                transcript_context.append(
+                    TranscriptTurnLite(
+                        turn_number=t.turn_number,
+                        speaker=speaker,
+                        text=t.text or "",
+                    )
+                )
+
+            payload = LLMReviewerInput(
+                session_id=session_id,
+                case_id=getattr(state.session, "case_id", None),
+                transcript_context=transcript_context,
+                reviewer_version="v2",
+            )
+
+            orchestrator = HybridV2LLMOrchestrator(OpenAIAdapter())
+            outcome = await orchestrator.run(payload)
+            agg_status = overall_v2_status(outcome.prompt_status)
+
+            adapter_calls = orchestrator.adapter_call_count
+
+            if agg_status == "failed":
+                return (
+                    state.empathy_score,
+                    state.communication_score,
+                    state.spikes_score,
+                    state.overall_score,
+                    {
+                        "phase": "hybrid_llm_v2",
+                        "status": "failed",
+                        "prompt_status": outcome.prompt_status,
+                        "error": "all_llm_prompts_failed",
+                        "rule_scores": rule_snapshot,
+                        "llm_scores": None,
+                        "merged_scores": None,
+                        "llm_adapter_calls": adapter_calls,
+                    },
+                )
+
+            r_e = rule_snapshot["empathy_score"]
+            r_c = rule_snapshot["communication_score"]
+            r_s = rule_snapshot["spikes_completion_score"]
+            eff_llm_e = float(outcome.empathy.empathy_score) if outcome.empathy else r_e
+            eff_llm_c = (
+                float(outcome.communication.communication_score) if outcome.communication else r_c
+            )
+            eff_llm_s = (
+                float(outcome.spikes.spikes_completion_score) if outcome.spikes else r_s
+            )
+
+            me, mc, ms, mo = self._merge_rule_and_llm_component_scores(
+                r_e,
+                r_c,
+                r_s,
+                eff_llm_e,
+                eff_llm_c,
+                eff_llm_s,
+            )
+            merged_snapshot = {
+                "empathy_score": me,
+                "communication_score": mc,
+                "spikes_completion_score": ms,
+                "overall_score": mo,
+            }
+
+            compiled, llm_scores = build_compiled_review_and_llm_scores(
+                rule_snapshot,
+                outcome.empathy,
+                outcome.spikes,
+                outcome.communication,
+            )
+
+            evaluator_meta: dict[str, Any] = {
+                "phase": "hybrid_llm_v2",
+                "status": agg_status,
+                "prompt_status": outcome.prompt_status,
+                "merge_policy": {
+                    "components": "0.7 * rule + 0.3 * llm",
+                    "overall": "0.5 * merged_empathy + 0.2 * merged_communication + 0.3 * merged_spikes",
+                    "llm_component_fallback": "failed prompt uses rule score as LLM slot before merge",
+                },
+                "rule_scores": rule_snapshot,
+                "llm_scores": llm_scores,
+                "merged_scores": merged_snapshot,
+                "llm_output": _compact_llm_output_for_evaluator_meta(compiled),
+                "llm_adapter_calls": adapter_calls,
+            }
+            return (me, mc, ms, mo, evaluator_meta)
+        except Exception as e:
+            return (
+                state.empathy_score,
+                state.communication_score,
+                state.spikes_score,
+                state.overall_score,
+                {
+                    "phase": "hybrid_llm_v2",
+                    "status": "failed",
+                    "prompt_status": {"empathy": "failed", "spikes": "failed", "communication": "failed"},
+                    "error": str(e)[:500],
+                    "rule_scores": rule_snapshot,
+                    "llm_scores": None,
+                    "merged_scores": None,
+                },
+            )
+
     async def _persist_feedback_from_rule_state(
         self,
         state: _RuleFeedbackState,
@@ -680,6 +868,19 @@ class ScoringService:
         """Rule-based core then optional LLM merge + 70/30 (hybrid evaluator path)."""
         state = await self._compute_rule_feedback_state(session_id)
         e, c, s, o, meta = await self._hybrid_llm_merge_scores(state, session_id)
+        return await self._persist_feedback_from_rule_state(
+            state,
+            empathy_score=e,
+            communication_score=c,
+            spikes_score=s,
+            overall_score=o,
+            evaluator_meta=meta,
+        )
+
+    async def generate_feedback_hybrid_v2(self, session_id: int) -> FeedbackResponse:
+        """Rule-based core + three-call LLM merge (hybrid v2)."""
+        state = await self._compute_rule_feedback_state(session_id)
+        e, c, s, o, meta = await self._hybrid_v2_llm_merge_scores(state, session_id)
         return await self._persist_feedback_from_rule_state(
             state,
             empathy_score=e,

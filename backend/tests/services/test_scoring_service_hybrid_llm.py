@@ -6,7 +6,11 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from schemas.llm_reviewer import LLMMissedOpportunityItem, LLMReviewerOutput
+from schemas.llm_reviewer import (
+    HybridV2CompiledLLMReview,
+    LLMMissedOpportunityItem,
+    LLMReviewerOutput,
+)
 from services.scoring_service import ScoringService, _compact_llm_output_for_evaluator_meta
 from tests.utils.transcript_runner import create_all_for_test_engine
 
@@ -61,3 +65,19 @@ def test_compact_llm_output_for_evaluator_meta_caps_list_length() -> None:
     d = _compact_llm_output_for_evaluator_meta(out)
     assert len(d["missed_opportunities"]) == 40
     assert d.get("_meta_truncated") is True
+
+
+def test_compact_hybrid_v2_compiled_includes_v2_fields() -> None:
+    compiled = HybridV2CompiledLLMReview(
+        empathy_score=1.0,
+        communication_score=2.0,
+        spikes_completion_score=3.0,
+        overall_score=2.2,
+        empathic_opportunities=["a"],
+        stage_turn_mapping=[{"turn_number": 1, "stage": "setting"}],
+        llm_score_source={"empathy": "llm", "communication": "llm", "spikes": "llm"},
+    )
+    d = _compact_llm_output_for_evaluator_meta(compiled)
+    assert d["reviewer_version"] == "v2"
+    assert d["empathic_opportunities"] == ["a"]
+    assert d["stage_turn_mapping"] == [{"turn_number": 1, "stage": "setting"}]
