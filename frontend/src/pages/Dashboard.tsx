@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { listCases } from '@/api/cases.api'
 import { createSession, closeSession, listActiveSessions, listCompletedSessions } from '@/api/sessions.api'
 import type { Case } from '@/types/case'
@@ -31,11 +31,16 @@ export const Dashboard = () => {
   const { user } = useAuthStore()
   const navigate = useNavigate()
   const location = useLocation()
+  const mainRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
-    if (location.hash !== '#cases' || loading) return
+    if (loading) return
     requestAnimationFrame(() => {
-      document.getElementById('cases')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      if (location.hash === '#cases') {
+        document.getElementById('cases')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } else {
+        mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+      }
     })
   }, [location.hash, loading])
 
@@ -184,7 +189,7 @@ export const Dashboard = () => {
       <Navbar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto md:ml-64">
+        <main ref={mainRef} className="flex-1 overflow-y-auto md:ml-64">
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             <nav className="mb-4 text-sm text-gray-500">Dashboard</nav>
 
