@@ -229,7 +229,7 @@ export const Sessions = () => {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[420px] overflow-y-auto scroll-smooth pr-1 pb-2">
                 {displaySessions.map((session) => {
                   const caseTitle =
                     caseMap[session.caseId]?.title ?? session.caseTitle ?? `Case #${session.caseId}`
