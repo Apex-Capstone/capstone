@@ -448,16 +448,7 @@ export const Dashboard = () => {
 
                 {/* Sessions */}
                 <div className="mb-8">
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-semibold text-gray-900">Sessions</h2>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate('/sessions')}
-                    >
-                      View all sessions
-                    </Button>
-                  </div>
+                  <h2 className="text-xl font-semibold text-gray-900 mb-6">Recent Sessions</h2>
 
                   {/* Active */}
                   <div className="mb-6">
