@@ -1,7 +1,6 @@
 """Tests for audio turn submission."""
 
 import os
-from datetime import datetime
 from io import BytesIO
 from types import SimpleNamespace
 
@@ -12,10 +11,12 @@ from starlette.datastructures import Headers, UploadFile
 
 os.environ.setdefault("database_url", "sqlite:///./test_audio.db")
 os.environ.setdefault("secret_key", "test-secret")
+os.environ.setdefault("supabase_jwt_secret", "test-supabase-jwt")
 os.environ.setdefault("gemini_api_key", "test-gemini-key")
 os.environ.setdefault("openai_api_key", "test-openai-key")
 
 from controllers.sessions_controller import submit_audio_turn, transcribe_audio_turn
+from core.time import utc_now
 from core.errors import AuthorizationError, ConflictError, ExternalServiceError, ValidationError
 from db.base import Base
 from adapters.audio_tone_adapter import AudioToneAdapter
@@ -175,7 +176,7 @@ async def test_submit_audio_turn_success(monkeypatch, test_db, owner_user, activ
             audio_expires_at=None,
             metrics_json=None,
             spikes_stage="perception",
-            timestamp=datetime.utcnow(),
+            timestamp=utc_now(),
         )
 
     async def fake_get_session(self, session_id: int):
@@ -301,7 +302,7 @@ async def test_submit_audio_turn_survives_storage_failure(monkeypatch, test_db, 
             audio_url=None,
             metrics_json=None,
             spikes_stage="perception",
-            timestamp=datetime.utcnow(),
+            timestamp=utc_now(),
         )
 
     async def fake_get_session(self, session_id: int):

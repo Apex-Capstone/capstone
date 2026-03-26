@@ -5,6 +5,7 @@ import type { TraineeSessionAnalytics } from '@/types/analytics'
 import { formatPercentWhole } from '@/utils/format'
 import { ANALYTICS_METRICS } from '@/components/analytics/analyticsMetricConfig'
 import { AnalyticsSessionPreview } from '@/components/analytics/AnalyticsSessionPreview'
+import { formatDateTimeInUserTimeZone, utcTimestampMs } from '@/lib/dateTime'
 import { cn } from '@/lib/utils'
 
 type SortKey =
@@ -112,8 +113,8 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
           right = b.spikesCoveragePercent
           break
         case 'createdAt':
-          left = new Date(a.createdAt).getTime()
-          right = new Date(b.createdAt).getTime()
+          left = utcTimestampMs(a.createdAt)
+          right = utcTimestampMs(b.createdAt)
           break
       }
 
@@ -317,7 +318,7 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
                         <td className="px-3 py-3 align-middle">{metricBar(s.clinicalScore, 'bg-apex-700')}</td>
                         <td className="px-3 py-3 align-middle">{metricBar(s.spikesCoveragePercent, 'bg-orange-500')}</td>
                         <td className="whitespace-nowrap px-4 py-3 align-middle text-gray-600">
-                          {new Date(s.createdAt).toLocaleString()}
+                          {formatDateTimeInUserTimeZone(s.createdAt)}
                         </td>
                         <td className="px-4 py-3 align-middle">
                           <button

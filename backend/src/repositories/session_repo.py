@@ -1,11 +1,12 @@
 """Session repository for database operations."""
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Optional
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from core.time import utc_now
 from domain.entities.case import Case as CaseEntity
 from domain.entities.session import Session as SessionEntity
 
@@ -133,7 +134,7 @@ class SessionRepository:
     
     def count_active_in_period(self, days: int = 30) -> int:
         """Count active sessions in the last N days."""
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = utc_now() - timedelta(days=days)
         return (
             self.db.query(SessionEntity)
             .filter(SessionEntity.started_at >= cutoff_date)

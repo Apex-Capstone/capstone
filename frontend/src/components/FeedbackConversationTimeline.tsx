@@ -6,6 +6,7 @@ import type React from 'react'
 import type { Turn } from '@/types/session'
 import type { Feedback } from '@/api/feedback.api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatTimeInUserTimeZone } from '@/lib/dateTime'
 import { cn } from '@/lib/utils'
 
 /** Props for {@link FeedbackConversationTimeline}. */
@@ -545,7 +546,7 @@ export const FeedbackConversationTimeline = ({
                           side === 'right' ? 'text-apex-100' : 'text-gray-500'
                         )}
                       >
-                        {new Date(turn.timestamp).toLocaleTimeString()}
+                        {formatTimeInUserTimeZone(turn.timestamp)}
                       </span>
                     </div>
 

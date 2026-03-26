@@ -8,6 +8,7 @@ import { getCase } from '@/api/cases.api'
 import { createSession, transcribeAudioTurn, submitTurn, closeSession, getSession, fetchAssistantAudioObjectUrl } from '@/api/sessions.api'
 import type { Case as CaseType } from '@/types/case'
 import type { AudioToneAnalysis, Message } from '@/types/session'
+import { parseUtcDateTime } from '@/lib/dateTime'
 
 import { ChatBubble } from '@/components/ChatBubble'
 import { Navbar } from '@/components/Navbar'
@@ -161,7 +162,10 @@ export const CaseDetail = () => {
           }
           setSessionId(existingSession.id)
           setCurrentSpikesStage(existingSession.currentSpikesStage || 'setting')
-          const startedAt = new Date(existingSession.startedAt)
+          const startedAt = parseUtcDateTime(existingSession.startedAt)
+          if (!startedAt) {
+            throw new Error('Invalid session start time')
+          }
           const now = Date.now()
           const rawElapsed = Math.floor((now - startedAt.getTime()) / 1000)
           const clampedElapsed = Math.max(rawElapsed, 0)

@@ -11,6 +11,7 @@ import { FeedbackChart } from '@/components/FeedbackChart'
 import { FeedbackConversationTimeline } from '@/components/FeedbackConversationTimeline'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
+import { formatDateTimeInUserTimeZone } from '@/lib/dateTime'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -448,7 +449,7 @@ export const Feedback = () => {
                       <div className="rounded-lg border border-gray-100 bg-gray-50/80 p-3">
                         <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Date</div>
                         <div className="mt-1 text-sm text-gray-900">
-                          {new Date(feedback.createdAt).toLocaleString()}
+                          {formatDateTimeInUserTimeZone(feedback.createdAt)}
                         </div>
                       </div>
                       <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">

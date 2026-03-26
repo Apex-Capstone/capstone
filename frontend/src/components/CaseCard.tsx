@@ -1,6 +1,7 @@
 import type { KeyboardEvent } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card'
 import type { Case } from '@/types/case'
+import { formatDateInUserTimeZone } from '@/lib/dateTime'
 import { cn } from '@/lib/utils'
 
 const difficultyConfig: Record<string, { label: string; color: string }> = {
@@ -72,9 +73,9 @@ export const CaseCard = ({ caseData, onClick, selected }: CaseCardProps) => {
 
         <CardContent className="pt-0">
           <div className="flex items-center justify-between text-xs text-gray-400">
-            <span>Created: {new Date(caseData.createdAt).toLocaleDateString()}</span>
+            <span>Created: {formatDateInUserTimeZone(caseData.createdAt)}</span>
             {caseData.updatedAt !== caseData.createdAt && (
-              <span>Updated: {new Date(caseData.updatedAt).toLocaleDateString()}</span>
+              <span>Updated: {formatDateInUserTimeZone(caseData.updatedAt)}</span>
             )}
           </div>
         </CardContent>

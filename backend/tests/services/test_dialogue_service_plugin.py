@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import timezone
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from adapters.llm.base import LLMAdapter
 from adapters.nlu.simple_rule_nlu import SimpleRuleNLU
 from adapters.tts.base import TTSAudioResult
+from core.time import utc_now
 from db.base import Base
 from domain.entities.case import Case
 from domain.entities.session import Session as SessionEntity
@@ -195,7 +196,8 @@ async def test_dialogue_service_generates_assistant_audio_when_enabled(
     assert response.audio_url is not None
     assert response.audio_url.startswith("sessions/")
     assert response.audio_expires_at is not None
-    assert response.audio_expires_at > datetime.utcnow()
+    assert response.audio_expires_at.tzinfo == timezone.utc
+    assert response.audio_expires_at > utc_now()
     assert tts.calls
     assert storage.calls
 

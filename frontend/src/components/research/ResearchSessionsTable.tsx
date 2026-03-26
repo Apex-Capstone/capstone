@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import type { ResearchData } from '@/api/research.api'
+import { formatDateTimeInUserTimeZone, utcTimestampMs } from '@/lib/dateTime'
 import { formatPluginName as formatPluginNameFromLib } from '@/lib/formatPluginName'
 import { cn } from '@/lib/utils'
 
@@ -21,10 +22,7 @@ const safePercent = (value: number | null | undefined) => {
 }
 
 const formatTimestamp = (value: string | null | undefined) => {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleString()
+  return formatDateTimeInUserTimeZone(value)
 }
 
 const formatDuration = (value: number | undefined) => {
@@ -209,7 +207,7 @@ export function ResearchSessionsTable({
       }
 
       if (dateFilter !== 'all') {
-        const timestampMs = new Date(session.timestamp).getTime()
+        const timestampMs = utcTimestampMs(session.timestamp)
         if (Number.isNaN(timestampMs)) return false
         const dayMs = 24 * 60 * 60 * 1000
         if (dateFilter === '24h' && nowMs - timestampMs > dayMs) return false
@@ -288,8 +286,8 @@ export function ResearchSessionsTable({
           break
         case 'date':
         default:
-          left = Number.isNaN(new Date(a.timestamp).getTime()) ? 0 : new Date(a.timestamp).getTime()
-          right = Number.isNaN(new Date(b.timestamp).getTime()) ? 0 : new Date(b.timestamp).getTime()
+          left = Number.isNaN(utcTimestampMs(a.timestamp)) ? 0 : utcTimestampMs(a.timestamp)
+          right = Number.isNaN(utcTimestampMs(b.timestamp)) ? 0 : utcTimestampMs(b.timestamp)
           break
       }
       if (left < right) return -1 * direction

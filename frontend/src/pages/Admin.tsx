@@ -21,6 +21,7 @@ import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
 import { Users, FileText, Activity, TrendingUp, Download, Plus, BarChart3, MessageSquare, Puzzle, ExternalLink, Clock, UserCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatDateInUserTimeZone, formatDateTimeInUserTimeZone } from '@/lib/dateTime'
 import { cn } from '@/lib/utils'
 
 // ---- Session detail panel ----
@@ -68,7 +69,7 @@ function SessionDetailPanel({
                     Turn {t.turn_number} ({t.role})
                   </span>
                   <span className="text-gray-500 ml-2 text-xs">
-                    {new Date(t.timestamp).toLocaleString()}
+                    {formatDateTimeInUserTimeZone(t.timestamp)}
                   </span>
                   <p className="mt-1 text-gray-900">{t.text}</p>
                 </div>
@@ -118,7 +119,7 @@ function SessionDetailPanel({
               {metrics_timeline.map((m, i) => (
                 <li key={i} className="text-sm flex justify-between gap-4">
                   <span>Turn {m.turn_number}</span>
-                  <span>{new Date(m.timestamp).toLocaleString()}</span>
+                  <span>{formatDateTimeInUserTimeZone(m.timestamp)}</span>
                   <span>Empathy: {m.empathy_score.toFixed(1)}</span>
                   <span>{m.question_type}</span>
                   <span>{m.spikes_stage}</span>
@@ -553,7 +554,7 @@ export const Admin = () => {
                           </p>
                         </div>
                         <p className="text-xs text-gray-500 shrink-0">
-                          {new Date(session.started_at).toLocaleString()}
+                          {formatDateTimeInUserTimeZone(session.started_at)}
                         </p>
                       </div>
                     ))
@@ -661,11 +662,11 @@ export const Admin = () => {
                               </td>
                               <td className="px-4 py-2.5 text-left whitespace-nowrap">
                                 {user.last_session_at
-                                  ? new Date(user.last_session_at).toLocaleString()
+                                  ? formatDateTimeInUserTimeZone(user.last_session_at)
                                   : '—'}
                               </td>
                               <td className="px-4 py-2.5 text-left whitespace-nowrap text-gray-600">
-                                {new Date(user.created_at).toLocaleDateString()}
+                                {formatDateInUserTimeZone(user.created_at)}
                               </td>
                             </tr>
                           ))}
@@ -753,7 +754,7 @@ export const Admin = () => {
                             <td className="py-2">{s.id}</td>
                             <td className="py-2">{formatSessionUserLabel(s)}</td>
                             <td className="py-2">{s.case_id}</td>
-                            <td className="py-2">{new Date(s.started_at).toLocaleString()}</td>
+                            <td className="py-2">{formatDateTimeInUserTimeZone(s.started_at)}</td>
                           </tr>
                         ))}
                       </tbody>

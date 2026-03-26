@@ -1,6 +1,5 @@
 """Feedback entity model (expanded, theory-grounded)."""
 
-from datetime import datetime
 from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, Text, String, Boolean
 from sqlalchemy.orm import relationship
 
@@ -8,7 +7,9 @@ from sqlalchemy.orm import relationship
 
 JSONType = Text  # store stringified JSON
 
+from core.time import utc_now
 from db.base import Base
+from db.types import UTCDateTimeType
 
 
 class Feedback(Base):
@@ -61,7 +62,7 @@ class Feedback(Base):
     areas_for_improvement = Column(Text)        # AI-generated improvement areas
     detailed_feedback = Column(Text)            # Comprehensive AI feedback
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(UTCDateTimeType(), default=utc_now)
 
     # Relationships
     session = relationship("Session", back_populates="feedback")

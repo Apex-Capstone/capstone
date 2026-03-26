@@ -11,6 +11,7 @@ import type { Case } from '@/types/case'
 import type { Feedback } from '@/api/feedback.api'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
+import { formatDateInUserTimeZone, formatTimeInUserTimeZone } from '@/lib/dateTime'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -58,7 +59,7 @@ function formatDuration(seconds: number): string {
  * @returns Localized date/time
  */
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
+  return formatDateInUserTimeZone(iso, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -372,7 +373,7 @@ export const SessionDetailPage = () => {
                                         isUser ? 'text-apex-100' : 'text-gray-500'
                                       )}
                                     >
-                                      {new Date(turn.timestamp).toLocaleTimeString()}
+                                      {formatTimeInUserTimeZone(turn.timestamp)}
                                     </p>
                                   </div>
                                 </div>

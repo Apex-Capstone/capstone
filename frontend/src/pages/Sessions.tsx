@@ -12,6 +12,7 @@ import { Sidebar } from '@/components/Sidebar'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ClipboardList, BookOpen } from 'lucide-react'
+import { utcTimestampMs } from '@/lib/dateTime'
 import { cn } from '@/lib/utils'
 import {
   Dialog,
@@ -105,9 +106,7 @@ export const Sessions = () => {
 
   const displaySessions = useMemo(() => {
     const byStartedAtDesc = (items: Session[]) =>
-      [...items].sort(
-        (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
-      )
+      [...items].sort((a, b) => utcTimestampMs(b.startedAt) - utcTimestampMs(a.startedAt))
 
     const active = sessions.filter((s) => s.state === 'active')
     const completed = sessions.filter((s) => s.state === 'completed')

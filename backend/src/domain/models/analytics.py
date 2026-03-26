@@ -1,9 +1,10 @@
 """Trainee analytics schemas."""
 
-from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel
+
+from core.time import UTCDateTime
 
 
 class TraineeSessionAnalytics(BaseModel):
@@ -18,7 +19,7 @@ class TraineeSessionAnalytics(BaseModel):
     spikes_completion_score: float
     spikes_coverage_percent: float
     duration_seconds: int
-    created_at: datetime
+    created_at: UTCDateTime
     eo_addressed_rate: Optional[float] = None
     spikes_stages_covered: Optional[list[str]] = None
 

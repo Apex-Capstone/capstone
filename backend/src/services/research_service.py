@@ -4,7 +4,6 @@ import csv
 import hashlib
 import json
 import re
-from datetime import datetime
 from io import StringIO
 from typing import Any, Iterator
 from uuid import uuid4
@@ -12,6 +11,7 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from config.settings import get_settings
+from core.time import json_utc_default, serialize_utc_datetime, utc_now
 from domain.entities.case import Case
 from domain.models.admin import ResearchExportRequest, ResearchExportResponse
 from repositories.case_repo import CaseRepository
@@ -79,7 +79,7 @@ class ResearchService:
         return ResearchExportResponse(
             export_id=export_id,
             download_url=download_url,
-            generated_at=datetime.utcnow(),
+            generated_at=utc_now(),
             record_count=len(export_data),
         )
     
@@ -120,7 +120,7 @@ class ResearchService:
 
             timestamp: str | None
             if getattr(session, "started_at", None):
-                timestamp = session.started_at.isoformat()
+                timestamp = serialize_utc_datetime(session.started_at)
             else:
                 timestamp = None
 
@@ -164,7 +164,7 @@ class ResearchService:
         request = export_request or ResearchExportRequest(anonymize=True)
         sessions = self._get_filtered_sessions(request)
         export_data = [self._anonymize_session(s, request) for s in sessions]
-        return json.dumps(export_data, indent=2, default=str)
+        return json.dumps(export_data, indent=2, default=json_utc_default)
 
     def get_export_csv_content(
         self,
@@ -198,7 +198,7 @@ class ResearchService:
             empathy = feedback.get("empathy_score", "")
             spikes = feedback.get("spikes_completion_score", "")
             started_at_str = (
-                session.started_at.isoformat()
+                serialize_utc_datetime(session.started_at)
                 if session.started_at
                 else ""
             )
@@ -258,7 +258,7 @@ class ResearchService:
             row = [
                 generate_anon_session_id(session.id),
                 session.case_id,
-                session.started_at.isoformat() if session.started_at else "",
+                serialize_utc_datetime(session.started_at) if session.started_at else "",
                 session.duration_seconds or 0,
                 feedback.empathy_score if feedback else "",
                 feedback.spikes_completion_score if feedback else "",
@@ -309,7 +309,7 @@ class ResearchService:
                     turn.turn_number,
                     turn.role,
                     self._anonymize_text(turn.text or ""),
-                    turn.timestamp.isoformat() if turn.timestamp else "",
+                    serialize_utc_datetime(turn.timestamp) if turn.timestamp else "",
                     voice_tone["voice_tone_primary"],
                     voice_tone["voice_tone_confidence"],
                     voice_tone["voice_tone_valence"],
@@ -362,7 +362,7 @@ class ResearchService:
                 turn.turn_number,
                 turn.role,
                 self._anonymize_text(turn.text or ""),
-                turn.timestamp.isoformat() if turn.timestamp else "",
+                serialize_utc_datetime(turn.timestamp) if turn.timestamp else "",
                 voice_tone["voice_tone_primary"],
                 voice_tone["voice_tone_confidence"],
                 voice_tone["voice_tone_valence"],
