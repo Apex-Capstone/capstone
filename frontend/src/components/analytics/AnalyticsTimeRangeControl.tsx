@@ -39,7 +39,7 @@ export function AnalyticsTimeRangeControl({
             onClick={() => onChange(opt.value)}
             className={cn(
               'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-1',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-apex-500/40 focus-visible:ring-offset-1',
               disabled && 'cursor-not-allowed opacity-50',
               active
                 ? 'bg-gray-900 text-white shadow-sm'

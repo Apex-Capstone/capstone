@@ -203,7 +203,7 @@ export const Feedback = () => {
                   <div className="flex items-center gap-2">
                     <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-red-500 via-yellow-500 to-emerald-500 rounded-full"
+                        className="h-full rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-apex-500"
                         style={{ width: `${overallPercent}%` }}
                       />
                     </div>
@@ -216,12 +216,12 @@ export const Feedback = () => {
 
               {/* Hero: Empathy Score & SPIKES Coverage */}
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-6 text-center">
-                  <div className="text-sm font-medium text-emerald-800 uppercase tracking-wide">Empathy Score</div>
-                  <div className="text-4xl font-bold text-emerald-600 mt-1">
-                    {feedback.empathyScore.toFixed(1)}<span className="text-xl font-semibold text-emerald-500">/100</span>
+                <div className="rounded-xl border-2 border-apex-200 bg-apex-50 p-6 text-center">
+                  <div className="text-sm font-medium uppercase tracking-wide text-apex-800">Empathy Score</div>
+                  <div className="mt-1 text-4xl font-bold text-apex-600">
+                    {feedback.empathyScore.toFixed(1)}<span className="text-xl font-semibold text-apex-500">/100</span>
                   </div>
-                  <p className="text-xs text-emerald-700 mt-1">Session empathy recognition</p>
+                  <p className="mt-1 text-xs text-apex-700">Session empathy recognition</p>
                 </div>
                 <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-6 text-center">
                   <div className="text-sm font-medium text-purple-800 uppercase tracking-wide">SPIKES Coverage</div>
@@ -271,7 +271,7 @@ export const Feedback = () => {
                                   {stage.label}
                                 </span>
                                 {covered ? (
-                                  <span className="text-sm font-semibold text-emerald-500">
+                                  <span className="text-sm font-semibold text-apex-500">
                                     ✓ Covered
                                   </span>
                                 ) : (
@@ -310,7 +310,7 @@ export const Feedback = () => {
                                 <span
                                   className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                                     reached
-                                      ? 'bg-emerald-100 text-emerald-700'
+                                      ? 'bg-apex-100 text-apex-700'
                                       : 'bg-gray-100 text-gray-500'
                                   }`}
                                 >
@@ -335,16 +335,16 @@ export const Feedback = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      <div className="bg-emerald-50 p-4 rounded-lg">
+                      <div className="rounded-lg bg-apex-50 p-4">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">Empathy Score</span>
-                          <span className="text-xl font-bold text-emerald-600">
+                          <span className="text-xl font-bold text-apex-600">
                             {feedback.empathyScore.toFixed(1)}/100
                           </span>
                         </div>
                         <div className="w-full h-4 bg-gray-200 rounded-full mt-2 overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-emerald-500 transition-[width]"
+                            className="h-full rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-apex-500 transition-[width]"
                             style={{ width: `${empathyPercent}%` }}
                           />
                         </div>
@@ -352,16 +352,16 @@ export const Feedback = () => {
                       </div>
 
                       {openRatio !== null && (
-                        <div className="bg-emerald-50 p-4 rounded-lg">
+                        <div className="rounded-lg bg-apex-50 p-4">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">Open Question Ratio</span>
-                            <span className="text-lg font-bold text-emerald-600">
+                            <span className="text-lg font-bold text-apex-600">
                               {openRatio}%
                             </span>
                           </div>
-                          <div className="w-full h-2 bg-emerald-200 rounded-full mt-2">
+                          <div className="mt-2 h-2 w-full rounded-full bg-apex-200">
                             <div
-                              className="h-full bg-emerald-500 rounded-full"
+                              className="h-full rounded-full bg-apex-500"
                               style={{ width: `${openRatio}%` }}
                             />
                           </div>
@@ -370,8 +370,8 @@ export const Feedback = () => {
 
                       {feedback.questionBreakdown && (
                         <div className="grid grid-cols-3 gap-3 pt-2">
-                          <div className="text-center p-3 bg-emerald-50 rounded-lg">
-                            <div className="text-lg font-bold text-emerald-800">
+                          <div className="rounded-lg bg-apex-50 p-3 text-center">
+                            <div className="text-lg font-bold text-apex-800">
                               {feedback.questionBreakdown.open}
                             </div>
                             <div className="text-xs text-gray-600">Open</div>
@@ -399,7 +399,7 @@ export const Feedback = () => {
                           </div>
                           <div className="flex justify-between">
                             <span>Addressed</span>
-                            <span className="font-medium text-emerald-600">
+                            <span className="font-medium text-apex-600">
                               {feedback.linkageStats.addressed_count} ({Math.round(feedback.linkageStats.addressed_rate * 100)}%)
                             </span>
                           </div>
@@ -504,7 +504,7 @@ export const Feedback = () => {
                               <div key={dim} className="flex items-center justify-between">
                                 <span className="text-sm font-medium">{dim}</span>
                                 <div className="flex items-center gap-3 text-xs">
-                                  <span className="text-emerald-800">{counts.explicit} explicit</span>
+                                  <span className="text-apex-800">{counts.explicit} explicit</span>
                                   <span className="text-gray-400">|</span>
                                   <span className="text-purple-600">{counts.implicit} implicit</span>
                                   <span className="font-semibold text-gray-700">= {total}</span>
@@ -543,13 +543,13 @@ export const Feedback = () => {
                   {strengthsList.length > 0 && (
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-emerald-700">Strengths</CardTitle>
+                        <CardTitle className="text-apex-700">Strengths</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <ul className="space-y-2">
                           {strengthsList.map((strength, index) => (
                             <li key={index} className="flex items-start gap-2">
-                              <span className="text-emerald-600 mt-0.5">&#10003;</span>
+                              <span className="mt-0.5 text-apex-600">&#10003;</span>
                               <span className="text-sm">{strength}</span>
                             </li>
                           ))}

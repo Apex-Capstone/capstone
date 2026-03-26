@@ -10,19 +10,19 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 158.1 64.4% 51.6%;
+    --primary: 162 45% 53%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 151 64% 96%;
-    --accent-foreground: 164 86% 14%;
+    --accent: 162 48% 96%;
+    --accent-foreground: 163 34% 26%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 158.1 64.4% 51.6%;
+    --ring: 162 45% 53%;
     --radius: 0.5rem;
   }
 }
@@ -42,13 +42,17 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+.brand-font {
+  font-family: "Trebuchet MS", "Avenir Next", "Segoe UI", sans-serif;
+}
+
 a {
   font-weight: 500;
   color: hsl(var(--primary));
   text-decoration: inherit;
 }
 a:hover {
-  color: hsl(158.1 64.4% 40%);
+  color: hsl(162 45% 42%);
 }
 
 body {
@@ -143,12 +147,12 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: transparent;
   cursor: pointer;
   transition: border-color 0.25s;
 }
 button:hover {
-  border-color: hsl(var(--primary) / 0.45);
+  border-color: transparent;
 }
 /* Focus ring removed from global button so UI Button component controls it */
 
@@ -158,7 +162,7 @@ button:hover {
     background-color: #ffffff;
   }
   a:hover {
-    color: hsl(158.1 64.4% 38%);
+    color: hsl(162 45% 40%);
   }
   button {
     background-color: #f9f9f9;

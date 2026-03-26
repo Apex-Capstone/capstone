@@ -76,7 +76,7 @@ export function SessionCard({ session, caseTitle, analytics, to, actions }: Sess
         <div
           className={cn(
             'h-9 w-9 flex shrink-0 items-center justify-center rounded-full',
-            isCompleted ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'
+            isCompleted ? 'bg-apex-100 text-apex-600' : 'bg-amber-100 text-amber-600'
           )}
         >
           {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
@@ -88,7 +88,7 @@ export function SessionCard({ session, caseTitle, analytics, to, actions }: Sess
             <span
               className={cn(
                 'text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap',
-                isCompleted ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                isCompleted ? 'bg-apex-100 text-apex-700' : 'bg-amber-100 text-amber-700'
               )}
             >
               {isCompleted ? 'Completed' : 'Active'}

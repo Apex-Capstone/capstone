@@ -32,8 +32,8 @@ export const ANALYTICS_METRICS: Record<AnalyticsMetricId, AnalyticsMetricConfig>
     label: 'Empathy',
     shortLabel: 'Empathy',
     description: 'How well you recognized and responded to patient emotions.',
-    valueColorClass: 'text-blue-500',
-    chartColor: '#3b82f6',
+    valueColorClass: 'text-apex-600',
+    chartColor: '#50bc9c',
     dataKey: 'empathy',
   },
   communication: {
@@ -50,8 +50,8 @@ export const ANALYTICS_METRICS: Record<AnalyticsMetricId, AnalyticsMetricConfig>
     label: 'Clinical Reasoning',
     shortLabel: 'Clinical reasoning',
     description: 'How well your questions and responses reflected sound clinical thinking.',
-    valueColorClass: 'text-green-500',
-    chartColor: '#22c55e',
+    valueColorClass: 'text-apex-700',
+    chartColor: '#3fa488',
     dataKey: 'clinical',
   },
   spikes: {

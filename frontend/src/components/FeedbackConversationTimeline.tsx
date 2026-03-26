@@ -353,9 +353,9 @@ const renderTextWithSpans = (
     } else if (isEo) {
       className = 'underline decoration-amber-400 decoration-2 underline-offset-2'
     } else if (isResponse) {
-      className = 'underline decoration-emerald-400 decoration-2 underline-offset-2'
+      className = 'underline decoration-apex-400 decoration-2 underline-offset-2'
     } else if (isElicitation) {
-      className = 'underline decoration-emerald-600 decoration-2 underline-offset-2'
+      className = 'underline decoration-apex-600 decoration-2 underline-offset-2'
     }
 
     pieces.push(
@@ -427,7 +427,7 @@ export const FeedbackConversationTimeline = ({
                   )}
                 >
                   {side === 'left' && (
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-apex-100 text-xs font-semibold text-apex-700">
                       {roleLabel[0]}
                     </div>
                   )}
@@ -436,7 +436,7 @@ export const FeedbackConversationTimeline = ({
                     className={cn(
                       'max-w-[80%] rounded-lg px-4 py-3 shadow-sm',
                       side === 'right'
-                        ? 'bg-emerald-600 text-white'
+                        ? 'bg-apex-600 text-white'
                         : 'bg-gray-100 text-gray-900'
                     )}
                   >
@@ -444,7 +444,7 @@ export const FeedbackConversationTimeline = ({
                       <span
                         className={cn(
                           'font-semibold',
-                          side === 'right' ? 'text-emerald-50' : 'text-gray-700'
+                          side === 'right' ? 'text-apex-50' : 'text-gray-700'
                         )}
                       >
                         {roleLabel}
@@ -455,7 +455,7 @@ export const FeedbackConversationTimeline = ({
                       <span
                         className={cn(
                           'ml-auto text-[10px]',
-                          side === 'right' ? 'text-emerald-100' : 'text-gray-500'
+                          side === 'right' ? 'text-apex-100' : 'text-gray-500'
                         )}
                       >
                         {new Date(turn.timestamp).toLocaleTimeString()}
@@ -479,7 +479,7 @@ export const FeedbackConversationTimeline = ({
                           </div>
                         )}
                         {markersForTurn.types.includes('empathy_response') && (
-                          <div className="font-medium text-emerald-400">
+                          <div className="font-medium text-apex-400">
                             ✓ Empathy Response
                           </div>
                         )}
@@ -494,7 +494,7 @@ export const FeedbackConversationTimeline = ({
                             className={cn(
                               'rounded-full px-2 py-0.5 text-[10px] font-medium',
                               side === 'right'
-                                ? 'bg-emerald-500/80 text-emerald-50'
+                                ? 'bg-apex-500/80 text-apex-50'
                                 : 'bg-gray-200 text-gray-700'
                             )}
                           >

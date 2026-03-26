@@ -518,16 +518,16 @@ export const Admin = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Recent sessions</CardTitle>
-                <p className="text-sm text-gray-500 mt-1">
-                  Latest sessions by start time.{' '}
+                <p className="mt-1 text-sm text-gray-500">
+                  Latest sessions by start time. See
                   <button
                     type="button"
-                    className="text-primary underline-offset-4 hover:underline font-medium"
+                    className="mx-1 inline p-0 font-medium text-primary underline-offset-4 hover:underline"
                     onClick={() => setActiveTab('sessions')}
                   >
                     Session Logs
-                  </button>{' '}
-                  has the full list and transcripts.
+                  </button>
+                  for the full list and transcripts.
                 </p>
               </CardHeader>
               <CardContent>
@@ -641,7 +641,7 @@ export const Admin = () => {
                                     'inline-flex px-2 py-1 rounded-full text-xs font-medium',
                                     user.role === 'admin'
                                       ? 'bg-purple-100 text-purple-800'
-                                      : 'bg-emerald-100 text-emerald-800'
+                                      : 'bg-apex-100 text-apex-800'
                                   )}
                                 >
                                   {user.role}
@@ -746,7 +746,7 @@ export const Admin = () => {
                             className={cn(
                               'border-b cursor-pointer transition-colors',
                               selectedDetail?.session.id === s.id
-                                ? 'bg-emerald-50'
+                                ? 'bg-apex-50'
                                 : 'hover:bg-gray-50'
                             )}
                           >
@@ -811,7 +811,7 @@ export const Admin = () => {
                                 <span className="text-sm">{data.month}</span>
                                 <div className="flex items-center gap-2">
                                   <div className="w-20 h-2 bg-gray-200 rounded-full">
-                                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${data.score}%` }} />
+                                    <div className="h-full rounded-full bg-apex-500" style={{ width: `${data.score}%` }} />
                                   </div>
                                   <span className="text-sm font-medium">{data.score}%</span>
                                 </div>
@@ -844,7 +844,7 @@ export const Admin = () => {
                               <span className="text-sm capitalize">{data.difficulty}</span>
                               <div className="flex items-center gap-2">
                                 <div className="w-16 h-2 bg-gray-200 rounded-full">
-                                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${data.rate * 100}%` }} />
+                                  <div className="h-full rounded-full bg-apex-500" style={{ width: `${data.rate * 100}%` }} />
                                 </div>
                                 <span className="text-sm font-medium">{Math.round(data.rate * 100)}%</span>
                               </div>
@@ -1019,7 +1019,7 @@ export const Admin = () => {
             </div>
 
             {/* Tabs */}
-            <div className="border-b border-gray-200 mb-8">
+            <div className="mb-8">
               <nav className="flex gap-8">
                 {tabs.map((tab) => {
                   const Icon = tab.icon
@@ -1030,8 +1030,8 @@ export const Admin = () => {
                       className={cn(
                         'flex items-center gap-2 py-2 px-4 rounded-md font-medium text-sm transition-colors',
                         activeTab === tab.id
-                          ? 'bg-emerald-600 text-white shadow-sm'
-                          : 'bg-gray-100 text-gray-700 hover:bg-emerald-100 hover:text-emerald-700 border border-gray-200'
+                          ? 'bg-apex-600 text-white shadow-sm'
+                          : 'border border-gray-200 bg-gray-100 text-gray-700 hover:bg-apex-100 hover:text-apex-700'
                       )}
                     >
                       <Icon className="h-4 w-4" />
@@ -1040,6 +1040,7 @@ export const Admin = () => {
                   )
                 })}
               </nav>
+              <div className="mt-4 border-b border-gray-200" />
             </div>
 
             {renderTabContent()}

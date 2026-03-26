@@ -44,9 +44,9 @@ export const SpikesProgressBar = ({ currentStage }: SpikesProgressBarProps) => {
               <div
                 className={cn(
                   'flex h-9 w-9 items-center justify-center rounded-full border text-xs font-medium',
-                  isCompleted && 'border-emerald-200 bg-emerald-50 text-emerald-700',
+                  isCompleted && 'border-apex-200 bg-apex-50 text-apex-700',
                   isCurrent &&
-                    'border-emerald-500 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-100',
+                    'border-apex-500 bg-apex-50 text-apex-700 ring-2 ring-apex-100',
                   !isCompleted && !isCurrent && 'border-slate-200 bg-slate-50 text-slate-400'
                 )}
               >
@@ -55,8 +55,8 @@ export const SpikesProgressBar = ({ currentStage }: SpikesProgressBarProps) => {
               <span
                 className={cn(
                   'min-h-[22px] w-full px-0.5 text-center text-[8.5px] leading-tight whitespace-normal sm:text-[9.5px]',
-                  isCompleted && 'text-emerald-700',
-                  isCurrent && 'font-semibold text-emerald-700',
+                  isCompleted && 'text-apex-700',
+                  isCurrent && 'font-semibold text-apex-700',
                   !isCompleted && !isCurrent && 'text-slate-500'
                 )}
               >
@@ -68,7 +68,7 @@ export const SpikesProgressBar = ({ currentStage }: SpikesProgressBarProps) => {
       </div>
       <div className="mt-1 h-1 rounded-full bg-slate-200">
         <div
-          className="h-full rounded-full bg-emerald-500 transition-all duration-300 ease-out"
+          className="h-full rounded-full bg-apex-500 transition-all duration-300 ease-out"
           style={{ width: progressWidth }}
         />
       </div>

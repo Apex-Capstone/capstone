@@ -66,7 +66,7 @@ export function AnalyticsSessionPreview({ session }: AnalyticsSessionPreviewProp
       : null
 
   return (
-    <div className="border-l-2 border-blue-200 pl-4 text-sm text-gray-800">
+    <div className="border-l-2 border-apex-200 pl-4 text-sm text-gray-800">
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Completed</dt>

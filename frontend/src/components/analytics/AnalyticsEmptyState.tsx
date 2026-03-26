@@ -12,7 +12,7 @@ export function AnalyticsEmptyState() {
     <Card className="border border-dashed border-gray-200 bg-slate-50/60 shadow-sm">
       <CardContent className="flex flex-col items-center px-6 py-12 text-center sm:px-10 sm:py-14">
         <div
-          className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 ring-1 ring-blue-100"
+          className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-apex-50 text-apex-600 ring-1 ring-apex-100"
           aria-hidden
         >
           <BarChart3 className="h-7 w-7" strokeWidth={1.75} />
