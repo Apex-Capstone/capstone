@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 type SpikesStageId = 'setting' | 'perception' | 'invitation' | 'knowledge' | 'emotion' | 'strategy'
 
-/** Ordered SPIKES stages for the progress visualization. */
+/** Ordered SPIKES stages for the session overview indicator. */
 const STAGES: { id: SpikesStageId; label: string }[] = [
   { id: 'setting', label: 'Setting' },
   { id: 'perception', label: 'Perception' },
@@ -22,7 +22,7 @@ interface SpikesProgressBarProps {
 }
 
 /**
- * Shows six SPIKES checkpoints with completion/current/empty styling.
+ * Shows six SPIKES checkpoints and underlines only the active stage.
  *
  * @param props - {@link SpikesProgressBarProps}
  * @returns Progress bar JSX
@@ -45,8 +45,7 @@ export const SpikesProgressBar = ({ currentStage }: SpikesProgressBarProps) => {
                 className={cn(
                   'flex h-9 w-9 items-center justify-center rounded-full border text-xs font-medium',
                   isCompleted && 'border-apex-200 bg-apex-50 text-apex-700',
-                  isCurrent &&
-                    'border-apex-500 bg-apex-50 text-apex-700 ring-2 ring-apex-100',
+                  isCurrent && 'border-apex-500 bg-apex-50 text-apex-700 ring-2 ring-apex-100',
                   !isCompleted && !isCurrent && 'border-slate-200 bg-slate-50 text-slate-400'
                 )}
               >
@@ -62,6 +61,12 @@ export const SpikesProgressBar = ({ currentStage }: SpikesProgressBarProps) => {
               >
                 {stage.label}
               </span>
+              <div
+                className={cn(
+                  'h-1 w-full rounded-full transition-colors duration-300 ease-out',
+                  isCurrent || isCompleted ? 'bg-apex-500' : 'bg-slate-200'
+                )}
+              />
             </div>
           )
         })}
