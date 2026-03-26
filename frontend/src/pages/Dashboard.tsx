@@ -463,6 +463,11 @@ export const Dashboard = () => {
                   <div className="mb-6">
                     <h3 className="text-base font-medium text-gray-800 mb-3 flex items-center gap-2">
                       Active
+                      {activeTotal > 0 && (
+                        <span className="text-sm font-normal text-gray-500">
+                          (showing {activeSessions.length} of {activeTotal})
+                        </span>
+                      )}
                     </h3>
                     {activeSessions.length === 0 ? (
                       <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
@@ -479,6 +484,11 @@ export const Dashboard = () => {
                   <div>
                     <h3 className="text-base font-medium text-gray-800 mb-3 flex items-center gap-2">
                       Completed
+                      {completedTotal > 0 && (
+                        <span className="text-sm font-normal text-gray-500">
+                          (showing {completedSessions.length} of {completedTotal})
+                        </span>
+                      )}
                     </h3>
                     {completedSessions.length === 0 ? (
                       <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
