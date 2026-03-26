@@ -5,6 +5,7 @@ Keep both files in sync until the suite is deduplicated.
 """
 
 import pytest
+from datetime import timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -79,6 +80,8 @@ async def test_create_session(test_db, test_user, test_case):
     assert session.user_id == test_user.id
     assert session.case_id == test_case.id
     assert session.state == "active"
+    assert session.started_at.tzinfo == timezone.utc
+    assert session.model_dump(mode="json")["started_at"].endswith("Z")
 
 
 @pytest.mark.asyncio
@@ -93,6 +96,7 @@ async def test_create_session_reuses_active(test_db, test_user, test_case):
     assert second_session.id == first_session.id
     assert second_session.state == "active"
     assert second_session.started_at == first_session.started_at
+    assert second_session.started_at.tzinfo == timezone.utc
 
 
 @pytest.mark.asyncio
@@ -136,4 +140,6 @@ async def test_close_session(test_db, test_user, test_case):
 
     assert closed_session.state == "completed"
     assert closed_session.ended_at is not None
+    assert closed_session.ended_at.tzinfo == timezone.utc
+    assert closed_session.model_dump(mode="json")["ended_at"].endswith("Z")
 

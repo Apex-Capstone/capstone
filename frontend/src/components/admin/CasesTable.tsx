@@ -4,6 +4,7 @@
 import { Button } from '@/components/ui/button'
 import { Pencil, Trash2 } from 'lucide-react'
 import type { Case } from '@/types/case'
+import { formatDateTimeInUserTimeZone } from '@/lib/dateTime'
 
 /** Props for {@link CasesTable}. */
 type Props = {
@@ -37,7 +38,7 @@ export const CasesTable = ({ items, onEdit, onDelete }: Props) => {
               <td className="py-2">{c.title}</td>
               <td className="py-2">{c.difficultyLevel ?? '—'}</td>
               <td className="py-2">{c.category ?? '—'}</td>
-              <td className="py-2">{new Date(c.updatedAt).toLocaleString()}</td>
+              <td className="py-2">{formatDateTimeInUserTimeZone(c.updatedAt)}</td>
               <td className="py-2">
                 <div className="flex justify-end gap-2">
                   <Button size="sm" variant="outline" onClick={() => onEdit(c)}>

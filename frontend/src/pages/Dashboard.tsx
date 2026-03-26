@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { useAuthStore } from '@/store/authStore'
+import { formatDateTimeInUserTimeZone, utcTimestampMs } from '@/lib/dateTime'
 import { toast } from 'sonner'
 import {
   Activity,
@@ -111,9 +112,7 @@ export const Dashboard = () => {
 
         if (analyticsResult.status === 'fulfilled') {
           const analytics = analyticsResult.value
-          const sorted = [...analytics].sort(
-            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          )
+          const sorted = [...analytics].sort((a, b) => utcTimestampMs(b.createdAt) - utcTimestampMs(a.createdAt))
           setAllAnalytics(sorted)
 
           const empathyValues = analytics
@@ -182,7 +181,7 @@ export const Dashboard = () => {
             {session.caseTitle ?? `Case #${session.caseId}`}
           </p>
           <p className="mt-0.5 text-sm text-gray-500">
-            Session {session.id} &bull; Started {new Date(session.startedAt).toLocaleString()}
+            Session {session.id} &bull; Started {formatDateTimeInUserTimeZone(session.startedAt)}
           </p>
         </div>
         <span className="rounded-full border border-apex-200 bg-apex-50 px-3 py-1 text-[10px] font-semibold uppercase text-apex-700">

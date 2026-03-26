@@ -1,7 +1,6 @@
 """Admin controller/router."""
 
 import json
-from datetime import datetime
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,6 +11,7 @@ from sqlalchemy.orm import Session
 from config.settings import get_settings
 from core.deps import get_db, require_admin
 from domain.entities.user import User
+from core.time import UTCDateTime
 from domain.models.admin import (
     AdminUserOverviewResponse,
     AdminUserOverviewRow,
@@ -52,7 +52,7 @@ class AdminSessionListResponse(BaseModel):
 class MetricsTimeline(BaseModel):
     """Metrics timeline for a session."""
     turn_number: int
-    timestamp: datetime
+    timestamp: UTCDateTime
     empathy_score: float
     question_type: str
     spikes_stage: str
@@ -144,8 +144,8 @@ async def list_all_sessions(
     current_user: Annotated[User, Depends(require_admin)],
     user_id: Optional[int] = Query(None),
     case_id: Optional[int] = Query(None),
-    start_date: Optional[datetime] = Query(None),
-    end_date: Optional[datetime] = Query(None),
+    start_date: Optional[UTCDateTime] = Query(None),
+    end_date: Optional[UTCDateTime] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
 ):

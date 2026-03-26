@@ -1,9 +1,10 @@
 """Admin and analytics schemas."""
 
-from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
+
+from core.time import UTCDateTime
 
 
 class UserStats(BaseModel):
@@ -55,7 +56,7 @@ class AnalyticsDashboard(BaseModel):
     session_stats: SessionStats
     performance_stats: PerformanceStats
     case_stats: CaseStats
-    generated_at: datetime
+    generated_at: UTCDateTime
 
 
 class ResearchExportRequest(BaseModel):
@@ -64,8 +65,8 @@ class ResearchExportRequest(BaseModel):
     include_turns: bool = True
     include_feedback: bool = True
     anonymize: bool = True
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
+    start_date: Optional[UTCDateTime] = None
+    end_date: Optional[UTCDateTime] = None
     case_ids: Optional[list[int]] = None
 
 
@@ -74,7 +75,7 @@ class ResearchExportResponse(BaseModel):
     
     export_id: str
     download_url: str
-    generated_at: datetime
+    generated_at: UTCDateTime
     record_count: int
 
 
@@ -93,7 +94,7 @@ class ResearchSessionSummary(BaseModel):
     empathy_score: Optional[float] = None
     communication_score: Optional[float] = None
     clinical_score: Optional[float] = None
-    timestamp: Optional[datetime] = None
+    timestamp: Optional[UTCDateTime] = None
 
 
 class ResearchSessionsEnvelope(BaseModel):
@@ -112,10 +113,10 @@ class AdminUserOverviewRow(BaseModel):
     email: str
     full_name: Optional[str] = None
     role: str
-    created_at: datetime
+    created_at: UTCDateTime
     session_count: int
     completed_session_count: int
-    last_session_at: Optional[datetime] = None
+    last_session_at: Optional[UTCDateTime] = None
     average_overall_score: Optional[float] = None
     average_empathy_score: Optional[float] = None
 

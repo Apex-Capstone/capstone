@@ -2,6 +2,7 @@
  * Single chat message row with optional assistant audio replay.
  */
 import type { Message } from '@/types/session'
+import { formatTimeInUserTimeZone } from '@/lib/dateTime'
 import { cn } from '@/lib/utils'
 import { User, Bot, Volume2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -61,7 +62,7 @@ export const ChatBubble = ({ message, onReplayAudio }: ChatBubbleProps) => {
             isUser ? 'text-apex-100' : 'text-gray-500'
           )}
         >
-          {message.source === 'audio' ? 'Voice' : 'Text'} • {new Date(message.timestamp).toLocaleTimeString()}
+          {message.source === 'audio' ? 'Voice' : 'Text'} • {formatTimeInUserTimeZone(message.timestamp)}
         </p>
         {isUser && message.source === 'audio' && voiceToneLabels.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">

@@ -16,6 +16,7 @@ import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { parseUtcDateTime } from '@/lib/dateTime'
 import { cn } from '@/lib/utils'
 import { AlertTriangle, Download, Shield, BarChart3, TrendingUp } from 'lucide-react'
 import {
@@ -150,8 +151,8 @@ const formatScoreTrendWeeklyTooltipLabel = (label: unknown) => {
  * @returns Day key or null
  */
 const localDayKeyFromTimestamp = (timestamp: string): string | null => {
-  const d = new Date(timestamp)
-  if (Number.isNaN(d.getTime())) return null
+  const d = parseUtcDateTime(timestamp)
+  if (!d) return null
   const y = d.getFullYear()
   const m = d.getMonth() + 1
   const day = d.getDate()
@@ -200,8 +201,8 @@ type TrendPoint = {
  * @returns `YYYY-MM-DD-HH` or null
  */
 const localHourKeyFromTimestamp = (timestamp: string): string | null => {
-  const d = new Date(timestamp)
-  if (Number.isNaN(d.getTime())) return null
+  const d = parseUtcDateTime(timestamp)
+  if (!d) return null
   const y = d.getFullYear()
   const m = d.getMonth() + 1
   const day = d.getDate()
@@ -233,8 +234,8 @@ const localHourStartMsFromHourKey = (hourKey: string): number => {
  * @returns Week start epoch ms or null
  */
 const startOfWeekSundayLocalMs = (timestamp: string): number | null => {
-  const d = new Date(timestamp)
-  if (Number.isNaN(d.getTime())) return null
+  const d = parseUtcDateTime(timestamp)
+  if (!d) return null
   const day = d.getDay()
   const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day)
   start.setHours(0, 0, 0, 0)

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight, Clock, CheckCircle2 } from 'lucide-react'
+import { formatDateInUserTimeZone } from '@/lib/dateTime'
 import type { Session } from '@/types/session'
 import type { TraineeSessionAnalytics } from '@/types/analytics'
 import { cn } from '@/lib/utils'
@@ -8,7 +9,7 @@ import { cn } from '@/lib/utils'
 const SPIKES_TOTAL_STAGES = 6
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, {
+  return formatDateInUserTimeZone(iso, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
