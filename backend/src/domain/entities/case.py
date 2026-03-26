@@ -1,11 +1,11 @@
 """Case entity model."""
 
-from datetime import datetime
-
-from sqlalchemy import Column, DateTime, Integer, String, Text
+from sqlalchemy import Column, Integer, String, Text
 from sqlalchemy.orm import relationship
 
+from core.time import utc_now
 from db.base import Base
+from db.types import UTCDateTimeType
 
 
 class Case(Base):
@@ -25,8 +25,8 @@ class Case(Base):
     evaluator_plugin = Column(String, nullable=True)  # Optional case-level evaluator override (registry key)
     patient_model_plugin = Column(String, nullable=True)  # Optional case-level patient model override (registry key)
     metrics_plugins = Column(Text, nullable=True)  # JSON array of metrics plugin names, e.g. ["plugin.name:Class"]
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(UTCDateTimeType(), default=utc_now)
+    updated_at = Column(UTCDateTimeType(), default=utc_now, onupdate=utc_now)
     
     # Relationships
     sessions = relationship("Session", back_populates="case", cascade="all, delete-orphan")

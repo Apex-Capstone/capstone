@@ -67,7 +67,7 @@ export const PluginDeveloperGuide = () => {
                             el.scrollIntoView({ behavior: 'smooth', block: 'start' })
                           }
                         }}
-                        className="block w-full text-left rounded-md px-2 py-1 text-gray-700 hover:bg-emerald-50 hover:text-emerald-700"
+                        className="block w-full rounded-md px-2 py-1 text-left text-gray-700 hover:bg-apex-50 hover:text-apex-700"
                       >
                         {section.label}
                       </button>

@@ -13,6 +13,7 @@ from adapters.storage.base import StorageAdapter
 from config.logging import get_logger
 from config.settings import get_settings
 from core.errors import NotFoundError
+from core.time import utc_now
 from core.plugin_manager import get_patient_model
 from domain.entities.turn import Turn
 from domain.models.sessions import TurnCreate, TurnResponse
@@ -195,7 +196,7 @@ class DialogueService:
                 object_key,
                 content_type=tts_result.content_type,
             )
-            expires_at = datetime.utcnow() + timedelta(seconds=self.settings.assistant_audio_ttl_seconds)
+            expires_at = utc_now() + timedelta(seconds=self.settings.assistant_audio_ttl_seconds)
             return stored_key, expires_at
         except Exception as exc:
             logger.warning("Skipping assistant TTS for session %s: %s", session_id, exc)

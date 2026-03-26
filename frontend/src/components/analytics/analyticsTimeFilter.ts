@@ -1,4 +1,5 @@
 import type { TraineeSessionAnalytics } from '@/types/analytics'
+import { utcTimestampMs } from '@/lib/dateTime'
 
 export type AnalyticsTimeRange = 'last7_sessions' | 'last30_days' | 'all_time'
 
@@ -20,7 +21,7 @@ export const DEFAULT_ANALYTICS_TIME_RANGE: AnalyticsTimeRange = 'all_time'
  */
 export function sessionCompletionTimeMs(createdAt: string | undefined | null): number | null {
   if (createdAt == null || createdAt === '') return null
-  const ms = Date.parse(createdAt)
+  const ms = utcTimestampMs(createdAt)
   return Number.isFinite(ms) ? ms : null
 }
 

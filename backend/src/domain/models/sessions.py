@@ -1,10 +1,11 @@
 """Session and turn request/response schemas."""
 
 import json
-from datetime import datetime
 from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator
+
+from core.time import UTCDateTime
 
 
 class TimelineEvent(BaseModel):
@@ -82,10 +83,10 @@ class TurnResponse(BaseModel):
     role: str
     text: str
     audio_url: Optional[str]
-    audio_expires_at: Optional[datetime] = None
+    audio_expires_at: Optional[UTCDateTime] = None
     metrics_json: Optional[str]
     spikes_stage: Optional[str]
-    timestamp: datetime
+    timestamp: UTCDateTime
     spans_json: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True, extra="ignore")
@@ -112,8 +113,8 @@ class SessionResponse(BaseModel):
     case_id: int
     state: str
     current_spikes_stage: Optional[str]
-    started_at: datetime
-    ended_at: Optional[datetime]
+    started_at: UTCDateTime
+    ended_at: Optional[UTCDateTime]
     duration_seconds: int
     meta: Optional[str] = Field(default=None, alias="session_metadata")
     evaluator_plugin: Optional[str] = None
@@ -210,7 +211,7 @@ class FeedbackResponse(BaseModel):
     timeline_events: Optional[list[TimelineEvent]] = None
     suggested_responses: Optional[list[SuggestedResponse]] = None
     
-    created_at: datetime
+    created_at: UTCDateTime
     
     model_config = ConfigDict(from_attributes=True, extra="ignore", exclude_none=True)
     
@@ -266,6 +267,7 @@ class FeedbackResponse(BaseModel):
     def model_dump_json(self, **kwargs) -> str:
         """Override model_dump_json to remove empty values before JSON serialization."""
         import json
+        kwargs.setdefault("mode", "json")
         data = self.model_dump(**kwargs)
         return json.dumps(data)
 

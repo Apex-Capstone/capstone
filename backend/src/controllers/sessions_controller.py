@@ -1,7 +1,6 @@
 """Sessions controller/router."""
 
 import json
-from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -19,6 +18,7 @@ from config.logging import get_logger
 from config.settings import get_settings
 from core.deps import get_current_user, get_db, verify_session_access
 from core.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
+from core.time import utc_now
 from domain.entities.user import User
 from repositories.feedback_repo import FeedbackRepository
 from repositories.session_repo import SessionRepository
@@ -47,7 +47,7 @@ def _build_turn_audio_url(turn_id: int, audio_url: str | None, audio_expires_at=
     """Build the backend assistant audio endpoint URL when audio is available."""
     if not audio_url:
         return None
-    if audio_expires_at is not None and audio_expires_at <= datetime.utcnow():
+    if audio_expires_at is not None and audio_expires_at <= utc_now():
         return None
     base_url = get_settings().public_base_url.rstrip("/")
     return f"{base_url}/v1/turns/{turn_id}/audio"

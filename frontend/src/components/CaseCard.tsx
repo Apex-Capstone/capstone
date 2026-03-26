@@ -1,10 +1,11 @@
 import type { KeyboardEvent } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card'
 import type { Case } from '@/types/case'
+import { formatDateInUserTimeZone } from '@/lib/dateTime'
 import { cn } from '@/lib/utils'
 
 const difficultyConfig: Record<string, { label: string; color: string }> = {
-  beginner: { label: 'Beginner', color: 'text-emerald-700 bg-emerald-100' },
+  beginner: { label: 'Beginner', color: 'text-apex-700 bg-apex-100' },
   intermediate: { label: 'Intermediate', color: 'text-amber-700 bg-amber-100' },
   advanced: { label: 'Advanced', color: 'text-rose-700 bg-rose-100' },
 }
@@ -35,15 +36,17 @@ export const CaseCard = ({ caseData, onClick, selected }: CaseCardProps) => {
       tabIndex={0}
       className={cn(
         'cursor-pointer rounded-lg outline-none transition-shadow',
-        'focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2'
+        'focus-visible:ring-2 focus-visible:ring-apex-500 focus-visible:ring-offset-2'
       )}
       onClick={activate}
       onKeyDown={onKeyDown}
     >
       <Card
         className={cn(
-          'h-full transition-shadow hover:shadow-md hover:border-emerald-300',
-          selected ? 'border-2 border-emerald-500' : 'border'
+          'h-full transition-shadow hover:shadow-md',
+          selected
+            ? 'border-2 border-apex-500 hover:border-apex-500'
+            : 'border border-gray-200 hover:border-apex-300'
         )}
       >
         <CardHeader className="pb-3">
@@ -70,9 +73,9 @@ export const CaseCard = ({ caseData, onClick, selected }: CaseCardProps) => {
 
         <CardContent className="pt-0">
           <div className="flex items-center justify-between text-xs text-gray-400">
-            <span>Created: {new Date(caseData.createdAt).toLocaleDateString()}</span>
+            <span>Created: {formatDateInUserTimeZone(caseData.createdAt)}</span>
             {caseData.updatedAt !== caseData.createdAt && (
-              <span>Updated: {new Date(caseData.updatedAt).toLocaleDateString()}</span>
+              <span>Updated: {formatDateInUserTimeZone(caseData.updatedAt)}</span>
             )}
           </div>
         </CardContent>
