@@ -132,6 +132,19 @@ function scoreToPercent(score: number): number {
   return Math.min(100, Math.max(0, Math.round(score)))
 }
 
+const getEvaluatorLabel = (phase?: string) => {
+  switch (phase) {
+    case 'baseline_rule_v1':
+      return 'APEX Baseline Evaluator'
+    case 'hybrid_llm_v1':
+      return 'APEX Hybrid Evaluator'
+    case 'hybrid_llm_v2':
+      return 'APEX Hybrid v2 Evaluator'
+    default:
+      return 'APEX Hybrid Evaluator'
+  }
+}
+
 /**
  * Loads feedback + session detail for `sessionId` and renders charts and timeline.
  *
@@ -228,7 +241,7 @@ export const Feedback = () => {
   }
 
   const overallPercent = scoreToPercent(feedback.overallScore)
-  const empathyPercent = scoreToPercent(feedback.empathyScore)
+  const communicationPercent = scoreToPercent(feedback.communicationScore)
   const coveredStages = normaliseSpikesCovered(feedback.spikesCoverage?.covered ?? [])
   const coveragePercent = feedback.spikesCoverage
     ? Math.round(feedback.spikesCoverage.percent * 100)
@@ -276,8 +289,8 @@ export const Feedback = () => {
                 </div>
               </div>
 
-              {/* Hero: SPIKES Coverage, Empathy Score, Communication Score */}
-              <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+              {/* Hero: SPIKES Coverage, Empathy Score */}
+              <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-6 text-center">
                   <div className="text-sm font-medium text-purple-800 uppercase tracking-wide">SPIKES Coverage</div>
                   <div className="text-4xl font-bold text-purple-600 mt-1">
@@ -293,13 +306,6 @@ export const Feedback = () => {
                     {feedback.empathyScore.toFixed(1)}<span className="text-xl font-semibold text-apex-500">/100</span>
                   </div>
                   <p className="mt-1 text-xs text-apex-700">Session empathy recognition</p>
-                </div>
-                <div className="rounded-xl border-2 border-orange-200 bg-orange-50 p-6 text-center">
-                  <div className="text-sm font-medium uppercase tracking-wide text-orange-800">Communication Score</div>
-                  <div className="mt-1 text-4xl font-bold text-orange-600">
-                    {feedback.communicationScore.toFixed(1)}<span className="text-xl font-semibold text-orange-500">/100</span>
-                  </div>
-                  <p className="mt-1 text-xs text-orange-700">Session communication clarity</p>
                 </div>
               </div>
             </div>
@@ -359,15 +365,15 @@ export const Feedback = () => {
                       <div className="space-y-4">
                         <div className="rounded-lg bg-apex-50 p-4">
                           <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Empathy Score</span>
+                            <span className="text-sm font-medium">Communication Score</span>
                             <span className="text-xl font-bold text-apex-600">
-                              {feedback.empathyScore.toFixed(1)}/100
+                              {feedback.communicationScore.toFixed(1)}/100
                             </span>
                           </div>
                           <div className="w-full h-4 bg-gray-200 rounded-full mt-2 overflow-hidden">
                             <div
                               className="h-full rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-apex-500 transition-[width]"
-                              style={{ width: `${empathyPercent}%` }}
+                              style={{ width: `${communicationPercent}%` }}
                             />
                           </div>
                           <p className="text-xs text-gray-500 mt-1">Band: red (low) → yellow → green (high)</p>
@@ -596,6 +602,37 @@ export const Feedback = () => {
               </div>
 
  
+              {/* Row 2: Evaluation Framework (full width) */}
+              <Card className="overflow-hidden border-gray-200">
+                <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white px-5 py-4">
+                  <CardTitle className="text-lg">Evaluation Framework</CardTitle>
+                </CardHeader>
+                <CardContent className="px-5 pb-5 pt-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
+                      <div className="text-xs font-medium uppercase tracking-wide text-indigo-600">Evaluator</div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        {getEvaluatorLabel(feedback.evaluatorMeta?.phase as string | undefined)}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
+                      <div className="text-xs font-medium uppercase tracking-wide text-indigo-600">Framework</div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        {feedback.evaluatorMeta?.framework
+                          ? String(feedback.evaluatorMeta.framework)
+                          : 'SPIKES + Clinical Empathy Analysis'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3 sm:col-span-2 lg:col-span-1">
+                      <div className="text-xs font-medium uppercase tracking-wide text-indigo-600">About</div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        Scores and feedback were generated by the evaluation plugin configured for this session.
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {feedback.evaluatorMeta != null &&
                 Object.keys(feedback.evaluatorMeta).length > 0 && (
                   <Card className="overflow-hidden border-gray-200">

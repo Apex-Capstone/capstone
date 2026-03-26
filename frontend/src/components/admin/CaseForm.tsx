@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { fetchAdminPluginRegistry } from '@/api/admin.api'
+import { fetchAdminPluginRegistry, fetchAdminPlugins } from '@/api/admin.api'
 import type { Case } from '@/types/case'
 import type { PluginsResponse, PluginInfo } from '@/types/plugins'
 
@@ -36,6 +36,22 @@ function pluginLabel(p: PluginInfo) {
   return p.version ? `${shortName} (v${p.version})` : shortName
 }
 
+/** Active system-level plugin paths from the admin /plugins endpoint. */
+type ActivePluginConfig = { patient_model: string; evaluator: string; metrics: string[] }
+
+/**
+ * Matches an active plugin module path (e.g. "plugins.evaluators.apex_hybrid_evaluator:ApexHybridEvaluator")
+ * against the registry to produce a human-readable label with version.
+ */
+function resolveActivePluginLabel(path: string | undefined, registry: PluginInfo[]): string | null {
+  if (!path) return null
+  for (const p of registry) {
+    if (path.includes(p.name) || p.name.includes(path)) return pluginLabel(p)
+  }
+  if (path.includes(':')) return path.split(':').pop() ?? path
+  return path
+}
+
 /**
  * Large dialog with sections for metadata, patient, script, and AI plugin overrides.
  *
@@ -61,6 +77,7 @@ export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }:
   })
   const [plugins, setPlugins] = useState<PluginsResponse | null>(null)
   const [pluginsLoading, setPluginsLoading] = useState(false)
+  const [activeConfig, setActiveConfig] = useState<ActivePluginConfig | null>(null)
 
   useEffect(() => {
     if (initial) setValues((v) => ({ ...v, ...initial }))
@@ -69,8 +86,14 @@ export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }:
   useEffect(() => {
     if (!open) return
     setPluginsLoading(true)
-    fetchAdminPluginRegistry()
-      .then(setPlugins)
+    Promise.all([
+      fetchAdminPluginRegistry(),
+      fetchAdminPlugins().catch(() => null),
+    ])
+      .then(([registry, active]) => {
+        setPlugins(registry)
+        if (active) setActiveConfig(active as unknown as ActivePluginConfig)
+      })
       .catch(() => setPlugins(null))
       .finally(() => setPluginsLoading(false))
   }, [open])
@@ -237,6 +260,15 @@ export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }:
                       </option>
                     ))}
                   </select>
+                  {(!values.patientModelPlugin || values.patientModelPlugin === PATIENT_MODEL_DEFAULT) && (
+                    <p className="text-xs text-muted-foreground">
+                      Currently resolves to{' '}
+                      <span className="font-medium text-gray-700">
+                        {resolveActivePluginLabel(activeConfig?.patient_model, plugins?.patient_models ?? [])
+                          ?? 'DefaultLLMPatientModel (v1.0)'}
+                      </span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -254,9 +286,19 @@ export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }:
                       </option>
                     ))}
                   </select>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Override the evaluator for this case. Default uses the system-configured evaluator.
-                  </p>
+                  {(!values.evaluatorPlugin || values.evaluatorPlugin === EVALUATOR_DEFAULT) ? (
+                    <p className="text-xs text-muted-foreground">
+                      Currently resolves to{' '}
+                      <span className="font-medium text-gray-700">
+                        {resolveActivePluginLabel(activeConfig?.evaluator, plugins?.evaluators ?? [])
+                          ?? 'ApexHybridEvaluator (v1.0)'}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Overrides the system default evaluator for this case.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2 mt-4">

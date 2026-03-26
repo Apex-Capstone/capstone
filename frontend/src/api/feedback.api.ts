@@ -129,6 +129,7 @@ export const fetchFeedback = async (sessionId: string): Promise<Feedback> => {
     const emotion =
       normalizedCovered.includes('emotion') ||
       normalizedCovered.includes('emotions') ||
+      normalizedCovered.includes('empathy') ||
       normalizedCovered.includes('e')
     const strategy =
       normalizedCovered.includes('strategy') || normalizedCovered.includes('s2')
