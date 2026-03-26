@@ -4,7 +4,7 @@
 import { Link, Navigate } from 'react-router-dom'
 import { useAuthGate } from '@/hooks/useAuthGate'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MessageSquare, BarChart3, Puzzle, ArrowRight, Microscope } from 'lucide-react'
 
 /** Static hero visual: conversation + structured evaluation output. No live data. */
