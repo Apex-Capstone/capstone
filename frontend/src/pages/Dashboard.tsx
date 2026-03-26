@@ -1,11 +1,8 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
-import { listCases } from '@/api/cases.api'
-import { createSession, closeSession, listActiveSessions, listCompletedSessions } from '@/api/sessions.api'
-import type { Case } from '@/types/case'
+import { useEffect, useState } from 'react'
+import { closeSession, listActiveSessions, listCompletedSessions } from '@/api/sessions.api'
 import type { Session } from '@/types/session'
 import { Button } from '@/components/ui/button'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { CaseCard } from '@/components/CaseCard'
+import { useNavigate } from 'react-router-dom'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { useAuthStore } from '@/store/authStore'
@@ -19,44 +16,23 @@ import {
 } from '@/components/ui/dialog'
 
 export const Dashboard = () => {
-  const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
   const [activeSessions, setActiveSessions] = useState<Session[]>([])
   const [activeTotal, setActiveTotal] = useState(0)
   const [completedSessions, setCompletedSessions] = useState<Session[]>([])
   const [completedTotal, setCompletedTotal] = useState(0)
-  const [creatingSessionForCase, setCreatingSessionForCase] = useState<number | null>(null)
   const [closingSessionId, setClosingSessionId] = useState<number | null>(null)
   const [confirmCloseSession, setConfirmCloseSession] = useState<Session | null>(null)
   const { user } = useAuthStore()
   const navigate = useNavigate()
-  const location = useLocation()
-  const mainRef = useRef<HTMLElement>(null)
-
-  useEffect(() => {
-    if (loading) return
-    requestAnimationFrame(() => {
-      if (location.hash === '#cases') {
-        document.getElementById('cases')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      } else {
-        mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
-      }
-    })
-  }, [location.hash, loading])
 
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
-        const [casesResult, activeResult, completedResult] = await Promise.allSettled([
-          listCases(),
+        const [activeResult, completedResult] = await Promise.allSettled([
           listActiveSessions({ limit: 3 }),
           listCompletedSessions({ limit: 3 }),
         ])
-        if (casesResult.status === 'fulfilled') {
-          setCases(casesResult.value.items ?? [])
-        } else {
-          console.error('Failed to fetch cases:', casesResult.reason)
-        }
         if (activeResult.status === 'fulfilled') {
           setActiveSessions(activeResult.value.sessions ?? [])
           setActiveTotal(activeResult.value.total ?? 0)
@@ -85,18 +61,8 @@ export const Dashboard = () => {
     return `${secs}s`
   }
 
-  const handleStartNewSession = async (caseId: number) => {
-    if (creatingSessionForCase) return
-    setCreatingSessionForCase(caseId)
-    try {
-      const session = await createSession(caseId, { forceNew: true })
-      navigate(`/case/${caseId}?sessionId=${session.id}`)
-    } catch (error) {
-      console.error('Failed to start a new session:', error)
-      toast.error('Failed to start session. Please try again.')
-    } finally {
-      setCreatingSessionForCase(null)
-    }
+  const handleStartNewSession = async () => {
+    navigate('/cases')
   }
 
   const handleCloseSession = async () => {
@@ -118,8 +84,6 @@ export const Dashboard = () => {
       setClosingSessionId(null)
     }
   }
-
-  const inProgressCount = activeTotal
 
   const activeSessionCard = (session: Session) => (
     <div key={session.id} className="rounded-lg border border-gray-200 border-l-4 border-l-emerald-500 bg-white p-4 transition-shadow hover:shadow-md hover:border-emerald-300">
@@ -189,7 +153,7 @@ export const Dashboard = () => {
       <Navbar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main ref={mainRef} className="flex-1 overflow-y-auto md:ml-64">
+        <main className="flex-1 overflow-y-auto md:ml-64">
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             <nav className="mb-4 text-sm text-gray-500">Dashboard</nav>
 
@@ -238,6 +202,21 @@ export const Dashboard = () => {
               </div>
             ) : (
               <div>
+                {/* Quick actions */}
+                <div className="mb-8">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button variant="success" onClick={handleStartNewSession}>
+                      Start Session
+                    </Button>
+                    <Button variant="outline" onClick={() => navigate('/cases')}>
+                      Browse Cases
+                    </Button>
+                    <Button variant="outline" onClick={() => navigate('/analytics')}>
+                      View Analytics
+                    </Button>
+                  </div>
+                </div>
+
                 {/* Sessions */}
                 <div className="mb-8">
                   <div className="flex items-center justify-between mb-6">
@@ -288,55 +267,6 @@ export const Dashboard = () => {
                       </div>
                     )}
                   </div>
-                </div>
-
-                <div id="cases">
-                  {cases.length === 0 ? (
-                    <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
-                      <p className="text-gray-500">No virtual patient cases available. Contact your administrator.</p>
-                    </div>
-                  ) : (
-                    <Fragment>
-                      <div className="mb-6">
-                        <h2 className="text-xl font-semibold text-gray-900 mb-2">Virtual Patient Cases</h2>
-                        <p className="text-gray-600">
-                          Select a case to practice your communication skills using the SPIKES framework
-                        </p>
-                      </div>
-
-                      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                        {cases.map((caseItem) => (
-                          <CaseCard
-                            key={caseItem.id}
-                            caseData={caseItem as any}
-                            onClick={handleStartNewSession}
-                            selected={creatingSessionForCase === caseItem.id}
-                          />
-                        ))}
-                      </div>
-
-                      <div className="mt-12 grid gap-4 sm:grid-cols-3">
-                        <div className="bg-white rounded-lg border p-4 text-center">
-                          <div className="text-2xl font-bold text-emerald-600">
-                            {completedTotal}
-                          </div>
-                          <div className="text-sm text-gray-600">Completed Sessions</div>
-                        </div>
-                        <div className="bg-white rounded-lg border p-4 text-center">
-                          <div className="text-2xl font-bold text-orange-600">
-                            {inProgressCount}
-                          </div>
-                          <div className="text-sm text-gray-600">In Progress</div>
-                        </div>
-                        <div className="bg-white rounded-lg border p-4 text-center">
-                          <div className="text-2xl font-bold text-gray-600">
-                            {cases.length}
-                          </div>
-                          <div className="text-sm text-gray-600">Available Cases</div>
-                        </div>
-                      </div>
-                    </Fragment>
-                  )}
                 </div>
               </div>
             )}

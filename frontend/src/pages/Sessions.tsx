@@ -206,7 +206,7 @@ export const Sessions = () => {
                   </p>
                   <Button
                     className="mt-6"
-                    onClick={() => navigate('/dashboard')}
+                    onClick={() => navigate('/cases')}
                   >
                     Browse Cases
                   </Button>
