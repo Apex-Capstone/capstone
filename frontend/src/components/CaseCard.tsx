@@ -35,17 +35,17 @@ export const CaseCard = ({ caseData, onClick, selected }: CaseCardProps) => {
       tabIndex={0}
       className={cn(
         'cursor-pointer rounded-lg outline-none transition-shadow',
-        'focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2'
+        'focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2'
       )}
       onClick={activate}
       onKeyDown={onKeyDown}
     >
       <Card
         className={cn(
-          'h-full transition-shadow hover:shadow-md',
+          'h-full transition hover:shadow-md',
           selected
-            ? 'border-2 border-emerald-500 hover:border-emerald-500'
-            : 'border border-gray-200 hover:border-gray-300'
+            ? 'border-2 border-green-500 hover:border-green-500'
+            : 'border border-gray-200 hover:border-green-400'
         )}
       >
         <CardHeader className="pb-3">

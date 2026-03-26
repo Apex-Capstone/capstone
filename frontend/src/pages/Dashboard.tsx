@@ -2,14 +2,24 @@ import { useEffect, useState } from 'react'
 import { closeSession, listActiveSessions, listCompletedSessions } from '@/api/sessions.api'
 import { fetchMySessionAnalytics } from '@/api/analytics.api'
 import type { Session } from '@/types/session'
+import type { TraineeSessionAnalytics } from '@/types/analytics'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { StatsCard } from '@/components/StatsCard'
 import { useNavigate } from 'react-router-dom'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { useAuthStore } from '@/store/authStore'
 import { toast } from 'sonner'
-import { Activity, BarChart3, CheckCircle2, ClipboardList, HeartHandshake } from 'lucide-react'
+import {
+  Activity,
+  BarChart3,
+  CheckCircle2,
+  ClipboardList,
+  HeartHandshake,
+  Lightbulb,
+  TrendingUp,
+} from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -17,6 +27,51 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
+
+const SPIKES_TOTAL_STAGES = 6
+
+function clampStageCount(stageCount: number) {
+  if (!Number.isFinite(stageCount)) return 0
+  return Math.max(0, Math.min(SPIKES_TOTAL_STAGES, Math.round(stageCount)))
+}
+
+function spikesStageCountFromAnalytics(a: {
+  spikesStagesCovered?: string[]
+  spikesCoveragePercent: number
+}): number | null {
+  if (a.spikesStagesCovered?.length) return clampStageCount(a.spikesStagesCovered.length)
+  const pct = a.spikesCoveragePercent
+  if (typeof pct === 'number' && Number.isFinite(pct)) return clampStageCount((pct / 100) * SPIKES_TOTAL_STAGES)
+  return null
+}
+
+function formatDurationLabel(seconds: number) {
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.round(seconds % 60)
+  if (mins === 0) return `${secs}s`
+  if (secs === 0) return `${mins}m`
+  return `${mins}m ${secs}s`
+}
+
+function computeInsight(analytics: TraineeSessionAnalytics[]): string | null {
+  if (analytics.length === 0) return null
+  const avgEmpathy = analytics.reduce((s, a) => s + a.empathyScore, 0) / analytics.length
+  const avgSpikes = analytics.reduce((s, a) => s + a.spikesCoveragePercent, 0) / analytics.length
+
+  if (avgEmpathy >= 80 && avgSpikes >= 80) {
+    return 'Excellent performance across both empathy and SPIKES coverage. Keep up the great work!'
+  }
+  if (avgEmpathy >= 80) {
+    return 'Your empathy scores are consistently strong. Focus on covering more SPIKES stages to round out your communication skills.'
+  }
+  if (avgSpikes >= 80) {
+    return 'Great SPIKES coverage! Consider focusing on empathetic responses to further improve patient interactions.'
+  }
+  if (avgEmpathy < 60) {
+    return 'You consistently acknowledge patient emotions, but could improve empathy follow-up responses.'
+  }
+  return 'Practice consistently to improve your empathy scores and SPIKES coverage across sessions.'
+}
 
 export const Dashboard = () => {
   const [loading, setLoading] = useState(true)
@@ -31,6 +86,7 @@ export const Dashboard = () => {
   const totalSessions = activeTotal + completedTotal
   const [avgEmpathy, setAvgEmpathy] = useState<number | null>(null)
   const [avgSpikesCoverageStageCount, setAvgSpikesCoverageStageCount] = useState<number | null>(null)
+  const [allAnalytics, setAllAnalytics] = useState<TraineeSessionAnalytics[]>([])
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -55,22 +111,26 @@ export const Dashboard = () => {
 
         if (analyticsResult.status === 'fulfilled') {
           const analytics = analyticsResult.value
+          const sorted = [...analytics].sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
+          setAllAnalytics(sorted)
+
           const empathyValues = analytics
             .map((a) => (typeof a.empathyScore === 'number' && Number.isFinite(a.empathyScore) ? a.empathyScore : null))
             .filter((v): v is number => v != null)
-
           const stagesValues = analytics
             .map((a) => spikesStageCountFromAnalytics(a))
             .filter((v): v is number => v != null)
 
           const empathyAvg = empathyValues.length ? empathyValues.reduce((s, v) => s + v, 0) / empathyValues.length : null
           const spikesAvg = stagesValues.length ? stagesValues.reduce((s, v) => s + v, 0) / stagesValues.length : null
-
           setAvgEmpathy(empathyAvg)
           setAvgSpikesCoverageStageCount(spikesAvg)
         } else {
           setAvgEmpathy(null)
           setAvgSpikesCoverageStageCount(null)
+          setAllAnalytics([])
         }
       } finally {
         setLoading(false)
@@ -79,37 +139,15 @@ export const Dashboard = () => {
     loadDashboardData()
   }, [])
 
-  const formatDurationLabel = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    if (mins > 0) {
-      return `${mins}m ${secs}s`
-    }
-    return `${secs}s`
-  }
+  const lastSession = allAnalytics[0] ?? null
+  const sparklineScores = allAnalytics.slice(0, 5).reverse().map((a) => a.empathyScore)
+  const sparklineTrend =
+    sparklineScores.length >= 2
+      ? Math.round(sparklineScores[sparklineScores.length - 1] - sparklineScores[sparklineScores.length - 2])
+      : null
+  const insightMessage = computeInsight(allAnalytics)
 
-  const SPIKES_TOTAL_STAGES = 6
-
-  const clampStageCount = (stageCount: number) => {
-    if (!Number.isFinite(stageCount)) return 0
-    return Math.max(0, Math.min(SPIKES_TOTAL_STAGES, Math.round(stageCount)))
-  }
-
-  const spikesStageCountFromAnalytics = (analytics: {
-    spikesStagesCovered?: string[]
-    spikesCoveragePercent: number
-  }): number | null => {
-    if (analytics.spikesStagesCovered?.length) {
-      return clampStageCount(analytics.spikesStagesCovered.length)
-    }
-    const pct = analytics.spikesCoveragePercent
-    if (typeof pct === 'number' && Number.isFinite(pct)) {
-      return clampStageCount((pct / 100) * SPIKES_TOTAL_STAGES)
-    }
-    return null
-  }
-
-  const handleStartNewSession = async () => {
+  const handleStartNewSession = () => {
     navigate('/cases')
   }
 
@@ -134,14 +172,17 @@ export const Dashboard = () => {
   }
 
   const activeSessionCard = (session: Session) => (
-    <div key={session.id} className="rounded-lg border border-gray-200 border-l-4 border-l-emerald-500 bg-white p-4 transition-shadow hover:shadow-md hover:border-emerald-300">
+    <div
+      key={session.id}
+      className="rounded-lg border border-gray-200 border-l-4 border-l-green-500 bg-white p-4 transition hover:shadow-md hover:border-green-400"
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-base font-semibold text-gray-900">
             {session.caseTitle ?? `Case #${session.caseId}`}
           </p>
-          <p className="mt-0.5 text-xs text-gray-400">
-            Session {session.id} · Started {new Date(session.startedAt).toLocaleString()}
+          <p className="mt-0.5 text-sm text-gray-500">
+            Session {session.id} &bull; Started {new Date(session.startedAt).toLocaleString()}
           </p>
         </div>
         <span className="px-3 py-1 text-[10px] font-semibold uppercase rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">
@@ -159,7 +200,7 @@ export const Dashboard = () => {
         <Button
           size="sm"
           variant="outline"
-          className="text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+          className="text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700"
           onClick={() => setConfirmCloseSession(session)}
           disabled={closingSessionId === session.id}
         >
@@ -170,14 +211,21 @@ export const Dashboard = () => {
   )
 
   const completedSessionCard = (session: Session) => (
-    <div key={session.id} className="rounded-lg border border-gray-200 border-l-4 border-l-gray-300 bg-white p-4 transition-shadow hover:shadow-md hover:border-gray-300">
+    <div
+      key={session.id}
+      className="rounded-lg border border-gray-200 border-l-4 border-l-gray-300 bg-white p-4 transition cursor-pointer hover:shadow-md hover:border-green-400"
+      onClick={() => navigate(`/feedback/${session.id}`)}
+      role="link"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/feedback/${session.id}`) }}
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-base font-semibold text-gray-900">
             {session.caseTitle ?? `Case #${session.caseId}`}
           </p>
-          <p className="mt-0.5 text-xs text-gray-400">
-            Session {session.id} · {formatDurationLabel(session.durationSeconds ?? 0)}
+          <p className="mt-0.5 text-sm text-gray-500">
+            Session {session.id} &bull; {formatDurationLabel(session.durationSeconds ?? 0)}
           </p>
         </div>
         <span className="px-3 py-1 text-[10px] font-semibold uppercase rounded-full bg-gray-100 border border-gray-200 text-gray-600">
@@ -188,7 +236,7 @@ export const Dashboard = () => {
         <Button
           size="sm"
           variant="success"
-          onClick={() => navigate(`/feedback/${session.id}`)}
+          onClick={(e) => { e.stopPropagation(); navigate(`/feedback/${session.id}`) }}
         >
           View Feedback
         </Button>
@@ -218,7 +266,7 @@ export const Dashboard = () => {
                   {user?.role && user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                 </span>
                 {user?.role === 'admin' && (
-                  <span className="text-gray-500">• You have access to admin features</span>
+                  <span className="text-gray-500">&bull; You have access to admin features</span>
                 )}
               </div>
             </div>
@@ -228,66 +276,160 @@ export const Dashboard = () => {
                 <div className="mb-8">
                   <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
                     {[1, 2, 3, 4, 5].map((n) => (
-                      <div key={n} className="h-20 rounded-lg bg-gray-200 animate-pulse" />
+                      <div key={n} className="h-24 rounded-lg bg-gray-100 animate-pulse" />
                     ))}
                   </div>
                 </div>
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  {[1, 2, 3, 4, 5, 6].map((n) => (
-                    <div key={n} className="rounded-lg bg-gray-200 p-6 animate-pulse">
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="h-5 w-32 bg-gray-200 rounded" />
-                        <div className="h-5 w-14 bg-gray-200 rounded-full" />
-                      </div>
-                      <div className="space-y-2 mb-4">
-                        <div className="h-4 w-full bg-gray-200 rounded" />
-                        <div className="h-4 w-3/4 bg-gray-200 rounded" />
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <div className="h-3 w-24 bg-gray-200 rounded" />
-                        <div className="h-3 w-20 bg-gray-200 rounded" />
-                      </div>
-                    </div>
+                <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[1, 2, 3].map((n) => (
+                    <div key={n} className="h-40 rounded-lg bg-gray-100 animate-pulse" />
                   ))}
                 </div>
               </div>
             ) : (
               <div>
+                {/* Clickable stat cards */}
                 <div className="mb-8">
                   <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
                     <StatsCard
                       icon={ClipboardList}
                       title="Total Sessions"
                       value={totalSessions}
+                      href="/sessions"
+                      hintText="View Sessions"
                     />
                     <StatsCard
                       icon={Activity}
                       title="Active Sessions"
                       value={activeTotal}
-                      valueClassName="text-emerald-700"
+                      valueClassName="text-2xl font-bold text-green-700"
+                      href="/sessions?filter=active"
+                      hintText="View Active"
                     />
                     <StatsCard
                       icon={CheckCircle2}
                       title="Completed Sessions"
                       value={completedTotal}
-                      valueClassName="text-gray-700"
+                      valueClassName="text-2xl font-bold text-gray-700"
+                      href="/sessions?filter=completed"
+                      hintText="View Completed"
                     />
                     <StatsCard
                       icon={HeartHandshake}
-                      title="Average Empathy Score"
-                      value={avgEmpathy == null ? '—' : Math.round(avgEmpathy)}
+                      title="Avg Empathy"
+                      value={avgEmpathy == null ? '—' : `${Math.round(avgEmpathy)}%`}
+                      href="/analytics"
+                      hintText="View Analytics"
                     />
                     <StatsCard
                       icon={BarChart3}
-                      title="Average SPIKES Coverage"
+                      title="Avg SPIKES"
                       value={
                         avgSpikesCoverageStageCount == null
                           ? '—'
                           : `${avgSpikesCoverageStageCount.toFixed(1)} / 6`
                       }
+                      href="/analytics"
+                      hintText="View Analytics"
                     />
                   </div>
                 </div>
+
+                {/* Last Session + Insight + Trend row */}
+                {allAnalytics.length > 0 && (
+                  <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Last Session Performance */}
+                    {lastSession && (
+                      <Card className="h-full transition hover:shadow-md hover:border-green-400">
+                        <CardContent className="p-4 h-full flex flex-col justify-between">
+                          <div>
+                            <div className="text-sm font-semibold text-gray-500 mb-2">
+                              Last Session
+                            </div>
+                            <div className="text-xl font-semibold text-gray-900 mb-3 truncate">
+                              {lastSession.caseTitle}
+                            </div>
+                            <div className="grid grid-cols-2 gap-y-2 text-base mt-4">
+                              <span className="text-gray-500">Empathy</span>
+                              <span className="font-semibold text-gray-900 text-right">
+                                {Math.round(lastSession.empathyScore)}%
+                              </span>
+                              <span className="text-gray-500">Communication</span>
+                              <span className="font-semibold text-gray-900 text-right">
+                                {Math.round(lastSession.communicationScore)}%
+                              </span>
+                              <span className="text-gray-500">SPIKES</span>
+                              <span className="font-semibold text-gray-900 text-right">
+                                {spikesStageCountFromAnalytics(lastSession) ?? '—'} / 6
+                              </span>
+                            </div>
+                          </div>
+                          <Button
+                            variant="success"
+                            className="mt-4 w-full py-2.5"
+                            onClick={() => navigate(`/feedback/${lastSession.sessionId}`)}
+                          >
+                            View Feedback
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Training Insight */}
+                    {insightMessage && (
+                      <Card className="h-full transition hover:shadow-md hover:border-green-400">
+                        <CardContent className="p-4 h-full flex flex-col">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Lightbulb className="h-5 w-5 text-amber-500" />
+                            <span className="text-sm font-semibold text-gray-500">
+                              Training Insight
+                            </span>
+                          </div>
+                          <p className="text-base leading-relaxed text-gray-700 mt-2">
+                            {insightMessage}
+                          </p>
+                          <p className="text-sm text-gray-400 mt-auto pt-3">
+                            Based on your recent sessions
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Performance Trend */}
+                    {sparklineScores.length >= 2 && (
+                      <Card className="h-full transition hover:shadow-md hover:border-green-400">
+                        <CardContent className="p-4 h-full flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <TrendingUp className="h-5 w-5 text-green-600" />
+                              <span className="text-sm font-semibold text-gray-500">
+                                Empathy Trend
+                              </span>
+                            </div>
+                            <div className="flex items-end gap-2 w-full h-24 mt-4">
+                              {sparklineScores.map((score, i) => (
+                                <div
+                                  key={i}
+                                  className="flex-1 bg-green-500 rounded-sm transition-all"
+                                  style={{ height: `${Math.max(score, 5)}%` }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <p className="text-sm text-gray-400">Last {sparklineScores.length} sessions</p>
+                            {sparklineTrend != null && (
+                              <p className="text-base font-medium text-gray-600 mt-1">
+                                {sparklineTrend >= 0 ? '+' : ''}
+                                {sparklineTrend}% last session
+                              </p>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
 
                 {/* Quick actions */}
                 <div className="mb-8">

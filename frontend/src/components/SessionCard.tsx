@@ -7,19 +7,12 @@ import { cn } from '@/lib/utils'
 
 const SPIKES_TOTAL_STAGES = 6
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
-
 function formatDuration(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds <= 0) return '0s'
   const m = Math.floor(seconds / 60)
   const s = Math.round(seconds % 60)
   if (m === 0) return `${s}s`
+  if (s === 0) return `${m}m`
   return `${m}m ${s}s`
 }
 
@@ -58,9 +51,9 @@ function performanceBadge(analytics: TraineeSessionAnalytics | undefined) {
   const empathyMaster = empathy >= 85
   const strongSpikes = spikesCount >= 5
 
-  if (empathyMaster && strongSpikes) return '🏅 Excellent Communication'
-  if (empathyMaster) return '🏅 Empathy Master'
-  if (strongSpikes) return '🏅 Strong SPIKES'
+  if (empathyMaster && strongSpikes) return 'Excellent Communication'
+  if (empathyMaster) return 'Empathy Master'
+  if (strongSpikes) return 'Strong SPIKES'
   return null
 }
 
@@ -68,10 +61,11 @@ type SessionCardProps = {
   session: Session
   caseTitle: string
   analytics?: TraineeSessionAnalytics
-  to: string
+  to?: string
+  actions?: ReactNode
 }
 
-export function SessionCard({ session, caseTitle, analytics, to }: SessionCardProps) {
+export function SessionCard({ session, caseTitle, analytics, to, actions }: SessionCardProps) {
   const isCompleted = session.state === 'completed'
 
   const empathyRounded =
@@ -95,55 +89,65 @@ export function SessionCard({ session, caseTitle, analytics, to }: SessionCardPr
 
   const durationLabel = isCompleted ? formatDuration(session.durationSeconds ?? 0) : 'In progress'
 
-  return (
-    <Link
-      to={to}
-      className="group block no-underline"
-      aria-label={`Open ${isCompleted ? 'feedback' : 'session'} for session ${session.id}`}
+  const cardElement = (
+    <Card
+      className={cn(
+        'h-full rounded-lg border border-gray-200 transition',
+        'py-4 hover:shadow-md hover:border-green-400 cursor-pointer'
+      )}
     >
-      <Card
-        className={cn(
-          'h-full transition-colors',
-          'py-4 hover:bg-gray-50 cursor-pointer',
-          'border border-gray-200'
-        )}
-      >
-        <CardContent className="p-0">
-          <div className="flex flex-col gap-3 px-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-base font-semibold text-gray-900 truncate">{caseTitle}</div>
-              </div>
-              {statusBadge}
+      <CardContent className="p-0">
+        <div className="flex flex-col gap-3 px-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-base font-semibold text-gray-900 truncate">{caseTitle}</div>
             </div>
-
-            <div className="flex items-center gap-3 text-sm text-gray-500">
-              <span>{formatDate(session.startedAt)}</span>
-              <span className="text-gray-300">•</span>
-              <span>{durationLabel}</span>
-              <span className="text-gray-300">•</span>
-              <span>Session #{session.id}</span>
-            </div>
-
-            {isCompleted && (
-              <div className="flex items-center justify-start gap-3">
-                <div className={cn('text-sm font-semibold', empathyToneClass(analytics?.empathyScore ?? 0))}>
-                  Empathy {empathyRounded ?? '—'}
-                </div>
-                <span className="text-gray-300">•</span>
-                <div className="text-sm font-medium text-purple-700">
-                  SPIKES {spikesLabel}
-                </div>
-              </div>
-            )}
-
-            {isCompleted && badgeText && (
-              <div className="pt-1 text-sm font-semibold text-gray-700">{badgeText}</div>
-            )}
+            {statusBadge}
           </div>
-        </CardContent>
-      </Card>
-    </Link>
-  )
-}
 
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>Session {session.id}</span>
+            <span className="text-gray-300">&bull;</span>
+            <span>{durationLabel}</span>
+          </div>
+
+          {isCompleted && (
+            <div className="flex items-center justify-start gap-3">
+              <div className={cn('text-sm font-semibold', empathyToneClass(analytics?.empathyScore ?? 0))}>
+                Empathy {empathyRounded != null ? `${empathyRounded}%` : '—'}
+              </div>
+              <span className="text-gray-300">&bull;</span>
+              <div className="text-sm font-medium text-purple-700">
+                SPIKES {spikesLabel}
+              </div>
+            </div>
+          )}
+
+          {isCompleted && badgeText && (
+            <div className="pt-1 text-sm font-semibold text-gray-700">{badgeText}</div>
+          )}
+
+          {actions && (
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {actions}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+
+  if (to) {
+    return (
+      <Link
+        to={to}
+        className="group block no-underline"
+        aria-label={`Open ${isCompleted ? 'feedback' : 'session'} for session ${session.id}`}
+      >
+        {cardElement}
+      </Link>
+    )
+  }
+
+  return <div className="group block">{cardElement}</div>
+}
