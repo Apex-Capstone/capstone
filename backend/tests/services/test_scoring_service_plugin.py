@@ -11,7 +11,7 @@ from domain.entities.case import Case
 from domain.entities.user import User
 from domain.models.sessions import FeedbackResponse
 from services.scoring_service import ScoringService
-from tests.test_conversation_fixture import TEST_CONVERSATION_GOOD
+from tests.fixtures.conversation_fixture import TEST_CONVERSATION_GOOD
 from tests.utils.transcript_runner import (
     create_all_for_test_engine,
     run_fixture_seeded_transcript_through_scoring,
@@ -38,7 +38,6 @@ async def test_scoring_service_generate_feedback_uses_plugin(test_db, monkeypatc
     # Configure a minimal user and case, and seed a GOOD transcript
     user = User(
         email="scoring_plugin_tester@example.com",
-        hashed_password="not_used_in_tests",
         role="trainee",
         full_name="Scoring Plugin Tester",
     )

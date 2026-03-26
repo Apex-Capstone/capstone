@@ -1,37 +1,25 @@
 /**
  * Marketing landing for logged-out users; quick dashboard link when authenticated.
  */
-import { Link } from 'react-router-dom'
-import { useAuthStore } from '@/store/authStore'
+import { Link, Navigate } from 'react-router-dom'
+import { useAuthGate } from '@/hooks/useAuthGate'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Stethoscope, FileText, BarChart3, Shield, ArrowRight } from 'lucide-react'
 
-/**
- * Public home: hero, feature cards, and CTAs to login or dashboard.
- *
- * @returns Landing or welcome-back screen
- */
 export const Home = () => {
-  const { isAuthenticated, user } = useAuthStore()
+  const gate = useAuthGate()
 
-  if (isAuthenticated) {
-    // If authenticated, redirect to dashboard
+  if (gate === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            Welcome back, {user?.name || user?.email}!
-          </h1>
-          <Link to="/dashboard">
-            <Button size="lg">
-              Go to Dashboard
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Link>
-        </div>
+      <div className="flex min-h-screen items-center justify-center text-gray-500">
+        Loading...
       </div>
     )
+  }
+
+  if (gate === 'authed') {
+    return <Navigate to="/dashboard" replace />
   }
 
   return (
@@ -76,8 +64,8 @@ export const Home = () => {
 
           <Card>
             <CardHeader>
-              <div className="rounded-lg bg-green-100 w-12 h-12 flex items-center justify-center mb-4">
-                <BarChart3 className="h-6 w-6 text-green-600" />
+              <div className="rounded-lg bg-emerald-100 w-12 h-12 flex items-center justify-center mb-4">
+                <BarChart3 className="h-6 w-6 text-emerald-600" />
               </div>
               <CardTitle>AI-Powered Feedback</CardTitle>
               <CardDescription>

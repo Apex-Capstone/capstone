@@ -23,9 +23,13 @@ class SuggestedResponse(BaseModel):
 
 class SessionCreate(BaseModel):
     """Session creation schema."""
-    
+
     case_id: int
     force_new: bool = Field(default=False)
+    evaluator_plugin: str | None = Field(
+        default=None,
+        description="Optional evaluator plugin id (registry key). Overrides case and settings when creating a new session.",
+    )
 
 
 class SessionUpdate(BaseModel):
@@ -41,7 +45,32 @@ class TurnCreate(BaseModel):
     
     text: str
     audio_url: Optional[str] = None
+    voice_tone: Optional[dict] = None
     enable_tts: bool = False
+
+
+class AudioToneDimensions(BaseModel):
+    """Structured acoustic tone feature set."""
+
+    valence: float | None = None
+    arousal: float | None = None
+    pace_wpm: float | None = None
+    volume_db: float | None = None
+    pitch_hz: float | None = None
+    jitter: float | None = None
+    shimmer: float | None = None
+    pauses_per_min: float | None = None
+
+
+class AudioToneAnalysis(BaseModel):
+    """Acoustic tone summary returned from audio analysis."""
+
+    primary: str
+    secondary: str | None = None
+    confidence: float
+    dimensions: AudioToneDimensions
+    labels: list[str] = []
+    provider: str
 
 
 class TurnResponse(BaseModel):
@@ -68,6 +97,7 @@ class TurnResponseWithAudio(BaseModel):
     turn: TurnResponse
     patient_reply: str
     transcript: str | None = None
+    audio_tone: AudioToneAnalysis | None = None
     audio_url: str | None = None
     assistant_audio_url: str | None = None
     spikes_stage: str | None = None
@@ -137,8 +167,6 @@ class FeedbackResponse(BaseModel):
     session_id: int
     empathy_score: float
     communication_score: float | None = None
-    clinical_reasoning_score: float | None = None
-    professionalism_score: float | None = None
     spikes_completion_score: float
     overall_score: float
     

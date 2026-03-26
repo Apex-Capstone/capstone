@@ -17,6 +17,29 @@ export interface Message {
   /** Delivery state for optimistic UI. */
   status?: 'pending' | 'sent' | 'error'
   assistantAudioUrl?: string
+  voiceTone?: AudioToneAnalysis
+}
+
+/** Acoustic features derived from uploaded speech. */
+export interface AudioToneDimensions {
+  valence?: number
+  arousal?: number
+  paceWpm?: number
+  volumeDb?: number
+  pitchHz?: number
+  jitter?: number
+  shimmer?: number
+  pausesPerMin?: number
+}
+
+/** Structured tone metadata returned by the backend audio pipeline. */
+export interface AudioToneAnalysis {
+  primary: string
+  secondary?: string
+  confidence: number
+  dimensions: AudioToneDimensions
+  labels: string[]
+  provider: string
 }
 
 /** Wire shape for a session row as returned by the API (`snake_case`). */
@@ -57,6 +80,23 @@ export interface TurnResponseWithAudioDTO {
   turn: TurnDTO
   patient_reply: string
   transcript?: string | null
+  audio_tone?: {
+    primary: string
+    secondary?: string | null
+    confidence: number
+    dimensions: {
+      valence?: number | null
+      arousal?: number | null
+      pace_wpm?: number | null
+      volume_db?: number | null
+      pitch_hz?: number | null
+      jitter?: number | null
+      shimmer?: number | null
+      pauses_per_min?: number | null
+    }
+    labels: string[]
+    provider: string
+  } | null
   audio_url?: string | null
   assistant_audio_url?: string | null
   spikes_stage?: string | null
@@ -104,6 +144,7 @@ export interface TurnResponseWithAudio {
   turn: Turn
   patientReply: string
   transcript?: string
+  audioTone?: AudioToneAnalysis
   audioUrl?: string
   assistantAudioUrl?: string
   spikesStage?: string

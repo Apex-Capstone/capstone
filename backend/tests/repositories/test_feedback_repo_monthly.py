@@ -30,8 +30,7 @@ def _seed_session_with_feedback(
     overall_score: float,
 ) -> None:
     user = User(
-        email=f"u{uuid.uuid4().hex}@example.com",
-        hashed_password="x",
+        email=f"u{uuid.uuid4().hex}@example.com",        
         role="trainee",
         full_name="T",
     )

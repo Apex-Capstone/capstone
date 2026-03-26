@@ -70,22 +70,16 @@ The tables are created automatically when `Base.metadata.create_all(engine)` run
 
 You have two options:
 
-### **Option A – Reset and Seed**
+### **Option A – Alembic migrations (recommended)**
 
-This fully wipes and rebuilds your schema:
+Apply schema changes without wiping data:
 
 ```
-poetry run python -m src.scripts.reset_and_seed
+cd backend
+PYTHONPATH=src poetry run alembic upgrade head
 ```
 
-This will:
-
-- Drop existing tables  
-- Recreate schema  
-- Insert Admin and Trainee users  
-- Insert all default patient cases  
-
-Perfect for development or teammates pulling the project for the first time.
+Users are created via **Supabase Auth** (not SQL seed scripts). Cases and other app data are maintained in your database as you add them (admin tools, SQL, or migrations).
 
 ---
 
@@ -140,17 +134,19 @@ If not, check the following:
 
 ### ❌ “no such table”
 - Tables were never created  
-Fix:
+Fix: run migrations from the `backend` directory:
 
 ```
-poetry run python -m src.scripts.reset_and_seed
+PYTHONPATH=src poetry run alembic upgrade head
 ```
+
+Or start the app once so `init_db()` can create tables (development only; prefer Alembic for real environments).
 
 ### ❌ “ModuleNotFoundError”
-Always run scripts with the correct path:
+Always run backend commands with `PYTHONPATH` including `src` (see project README), e.g. from `backend/`:
 
 ```
-PYTHONPATH="$PWD/src" poetry run python -m src.scripts.seed
+PYTHONPATH=src poetry run alembic upgrade head
 ```
 
 ---
@@ -159,9 +155,8 @@ PYTHONPATH="$PWD/src" poetry run python -m src.scripts.seed
 
 | Action | Command |
 |--------|---------|
-| Start backend | `poetry run uvicorn app:app --reload` |
-| Reset DB + Seed | `poetry run python -m src.scripts.reset_and_seed` |
-| Seed only | `poetry run python -m src.scripts.seed` |
+| Start backend | `PYTHONPATH=src poetry run uvicorn src.app:app --reload` |
+| Run migrations | `PYTHONPATH=src poetry run alembic upgrade head` |
 | Test connection | See section above |
 | View tables | Supabase Table Editor |
 

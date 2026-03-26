@@ -82,21 +82,30 @@ class SessionService:
             if existing_session:
                 return self._session_to_response(existing_session, case_title=case.title)
 
-        # Resolve evaluator plugin at creation time: case override else settings.
+        # Resolve evaluator plugin at creation time: request override, else case, else settings.
         # Sessions are frozen to the evaluator in use when they were started.
         settings = get_settings()
+        raw_request_eval = session_data.evaluator_plugin
+        request_override: str | None = None
+        if raw_request_eval is not None and str(raw_request_eval).strip():
+            request_override = str(raw_request_eval).strip()
         case_override = getattr(case, "evaluator_plugin", None)
-        plugin_name: str | None = case_override if case_override else getattr(settings, "evaluator_plugin", None)
+        if request_override:
+            plugin_name: str | None = request_override
+        elif case_override:
+            plugin_name = case_override
+        else:
+            plugin_name = getattr(settings, "evaluator_plugin", None)
 
         evaluator_version: str | None = None
         if plugin_name:
             try:
                 evaluator_cls = PluginRegistry.get_evaluator(plugin_name)
             except ValueError:
-                # Case override must exist in registry; do not auto-load.
-                if case_override:
+                # Explicit request or case override must exist in registry; do not auto-load.
+                if request_override or case_override:
                     raise HTTPException(status_code=400, detail="Invalid evaluator plugin")
-                # Backward compatibility: no case override, load from settings path.
+                # Backward compatibility: settings fallback only, load from settings path.
                 evaluator_cls = _load_class_from_path(plugin_name)
                 PluginRegistry.register_evaluator(plugin_name, evaluator_cls)
 
@@ -217,10 +226,11 @@ class SessionService:
         user_id: int,
         skip: int = 0,
         limit: int = 100,
+        state: str | None = None,
     ) -> SessionListResponse:
-        """List sessions for a user."""
-        sessions = self.session_repo.get_by_user(user_id, skip, limit)
-        total = len(sessions)
+        """List sessions for a user, optionally filtered by state."""
+        sessions = self.session_repo.get_by_user(user_id, skip, limit, state=state)
+        total = self.session_repo.count_by_user_and_state(user_id, state) if state else len(sessions)
         
         return SessionListResponse(
             sessions=[self._session_to_response(s) for s in sessions],

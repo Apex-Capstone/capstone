@@ -1,8 +1,7 @@
-"""Mirrored tests for session service behaviour (non-src tree).
+"""Mirrored tests for session service behaviour.
 
-These tests intentionally duplicate backend/src/tests/test_sessions.py so that
-they are picked up when pytest is pointed at the top-level backend/tests/
-directory. Keep them in sync with the source-tree tests.
+These tests intentionally overlap with `tests/services/test_sessions.py`.
+Keep both files in sync until the suite is deduplicated.
 """
 
 import pytest
@@ -11,16 +10,27 @@ from sqlalchemy.orm import sessionmaker
 
 from db.base import Base
 from domain.entities.case import Case
-from domain.entities.session import Session
 from domain.entities.user import User
 from domain.models.sessions import SessionCreate
 from services.session_service import SessionService
+
+
+@pytest.fixture(autouse=True)
+def _ensure_plugin_registry_for_session_service(test_db):
+    """After SQLite schema is prepared, load plugins so create_session validation matches production."""
+    import plugins.evaluators.apex_baseline_evaluator  # noqa: F401
+    import plugins.evaluators.apex_hybrid_evaluator  # noqa: F401
+    import plugins.metrics.apex_metrics  # noqa: F401
+    import plugins.patient_models.default_llm_patient  # noqa: F401
 
 
 @pytest.fixture
 def test_db():
     """Create a test database session."""
     engine = create_engine("sqlite:///:memory:")
+    if engine.dialect.name == "sqlite":
+        for table in Base.metadata.tables.values():
+            table.schema = None
     Base.metadata.create_all(engine)
     TestingSessionLocal = sessionmaker(bind=engine)
     db = TestingSessionLocal()
@@ -34,8 +44,7 @@ def test_db():
 def test_user(test_db):
     """Create a test user."""
     user = User(
-        email="test@example.com",
-        hashed_password="hashed_password",
+        email="test@example.com",        
         role="trainee",
         full_name="Test User",
     )

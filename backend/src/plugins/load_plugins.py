@@ -11,7 +11,9 @@ logger = logging.getLogger(__name__)
 
 PLUGIN_MODULES = [
     "plugins.patient_models.default_llm_patient",
+    "plugins.evaluators.apex_baseline_evaluator",
     "plugins.evaluators.apex_hybrid_evaluator",
+    "plugins.evaluators.apex_hybrid_v2_evaluator",
     "plugins.metrics.apex_metrics",
 ]
 

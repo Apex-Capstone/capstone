@@ -193,9 +193,9 @@ poetry run mypy src/
 
 ### Render (recommended flow)
 
-**Pre-deploy command — use migrations, not `reset_and_seed`**
+**Pre-deploy command — use migrations only**
 
-Running `python -m src.scripts.reset_and_seed` in pre-deploy **drops the entire `core` schema** (`DROP SCHEMA IF EXISTS core CASCADE`) and re-seeds dev data. That wipes all production data on every deploy. For a **persistent** database, use Alembic instead:
+Never run a script that **drops** the `core` schema in pre-deploy; that wipes production data. Use Alembic instead:
 
 ```bash
 # From the backend directory (set Render “Root Directory” to `backend` if the repo root is the capstone project)
@@ -207,8 +207,6 @@ Equivalent one-liner:
 ```bash
 PYTHONPATH=src poetry run alembic upgrade head
 ```
-
-Reserve `reset_and_seed` for **local development** or a **one-time** bootstrap only.
 
 **Start command**
 
@@ -232,7 +230,7 @@ Set `VITE_API_URL` to your **backend** public URL at **build** time so the SPA c
 
 **Storage vs database**
 
-PostgreSQL data (sessions, users, etc.) lives in the database configured by `DATABASE_URL` and **persists** across deploys **unless** you run `reset_and_seed` or otherwise drop schema.
+PostgreSQL data (sessions, users, etc.) lives in the database configured by `DATABASE_URL` and **persists** across deploys unless you manually drop schema or truncate data.
 
 Files under `local_storage_path` (default `./storage`) on Render’s **ephemeral filesystem** are **not** preserved across deploys. Assistant audio is also stored in **Supabase** per your settings; prefer relying on Supabase (or similar) for durable media, and treat local cache as disposable.
 
@@ -242,7 +240,7 @@ Files under `local_storage_path` (default `./storage`) on Render’s **ephemeral
 |--------|--------|
 | Same DB as local | Compare `DATABASE_URL` in Render with local `database_url` character-for-character. |
 | JWT parity | Compare `SECRET_KEY` with local if you expect shared token behavior. |
-| Pre-deploy | Confirm logs show `alembic upgrade head`, not `reset_and_seed`. |
+| Pre-deploy | Confirm logs show `alembic upgrade head`. |
 | Missing media only | If DB rows exist but files 404, check Supabase vs wiped `./storage`. |
 
 ### Generic production

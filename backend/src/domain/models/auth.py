@@ -14,51 +14,24 @@ class UserBase(BaseModel):
     role: str = "trainee"
 
 
-class UserCreate(UserBase):
-    """User creation schema."""
-    
-    password: str
-
-
 class UserUpdate(BaseModel):
     """User update schema."""
     
-    email: Optional[EmailStr] = None
     full_name: Optional[str] = None
     role: Optional[str] = None
-    password: Optional[str] = None
+    gender: Optional[str] = None
+    race: Optional[str] = None
+    year_of_study: Optional[str] = None
 
 
 class UserResponse(UserBase):
-    """User response schema."""
+    """User response schema returned by /auth/me and admin endpoints."""
     
     id: int
-    created_at: datetime
-    updated_at: datetime
+    gender: Optional[str] = None
+    race: Optional[str] = None
+    year_of_study: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True, extra="ignore")
-
-
-
-class LoginRequest(BaseModel):
-    """Login request schema."""
-    
-    email: EmailStr
-    password: str
-
-
-class LoginResponse(BaseModel):
-    """Login response schema."""
-    
-    access_token: str
-    token_type: str = "bearer"
-    user: UserResponse
-
-
-class TokenPayload(BaseModel):
-    """JWT token payload schema."""
-    
-    sub: int  # user_id
-    exp: datetime
-    role: str
-

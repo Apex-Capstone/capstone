@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from domain.entities.case import Case
 from domain.entities.user import User
 from plugins.metrics.apex_metrics import ApexMetrics
-from tests.test_conversation_fixture import TEST_CONVERSATION_GOOD
+from tests.fixtures.conversation_fixture import TEST_CONVERSATION_GOOD
 from tests.utils.transcript_runner import (
     create_all_for_test_engine,
     run_fixture_seeded_transcript_through_scoring,
@@ -37,8 +37,7 @@ def scored_session_id(test_db):
     no patch needed since PluginRegistry resolves the default evaluator.
     """
     user = User(
-        email="metrics_plugin_tester@example.com",
-        hashed_password="not_used_in_tests",
+        email="metrics_plugin_tester@example.com",        
         role="trainee",
         full_name="Metrics Plugin Tester",
     )

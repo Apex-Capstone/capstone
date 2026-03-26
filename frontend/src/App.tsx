@@ -1,19 +1,26 @@
 /**
  * Root router: public routes, role-protected trainee/admin pages, and login redirect.
  */
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import { useAuthStore } from './store/authStore'
 import { Home } from './pages/Home'
 import { Login } from './pages/Login'
+import { Signup } from './pages/Signup'
 import { Dashboard } from './pages/Dashboard'
 import { CaseDetail } from './pages/CaseDetail'
 import { Feedback } from './pages/Feedback'
 import { Sessions } from './pages/Sessions'
 import { SessionDetailPage } from './pages/SessionDetailPage'
+import { Analytics } from './pages/Analytics'
 import { Admin } from './pages/Admin'
 import { Research } from './pages/Research'
+import { ResearchSessions } from './pages/ResearchSessions'
+import { AdminResearchSessionPage } from './pages/AdminResearchSessionPage'
 import { PluginDeveloperGuide } from './pages/PluginDeveloperGuide'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { useAuthGate } from './hooks/useAuthGate'
 
 /**
  * Renders the login page or redirects authenticated users to the dashboard.
@@ -24,9 +31,17 @@ import { ProtectedRoute } from './components/ProtectedRoute'
  * @returns Login screen or a client-side redirect
  */
 const LoginRoute = () => {
-  const { isAuthenticated } = useAuthStore()
+  const gate = useAuthGate()
 
-  if (isAuthenticated) {
+  if (gate === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-gray-500">
+        Loading...
+      </div>
+    )
+  }
+
+  if (gate === 'authed') {
     return <Navigate to="/dashboard" replace />
   }
   return <Login />
@@ -38,12 +53,20 @@ const LoginRoute = () => {
  * @returns Browser router wrapping all page routes
  */
 function App() {
+  const initialize = useAuthStore((s) => s.initialize)
+
+  useEffect(() => {
+    initialize()
+  }, [initialize])
+
   return (
     <BrowserRouter>
+      <Toaster position="top-center" richColors />
       <Routes>
         {/* Public */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<LoginRoute />} />
+        <Route path="/signup" element={<Signup />} />
 
         {/* Shared: admin + trainee */}
         <Route
@@ -86,6 +109,14 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'trainee']}>
+              <Analytics />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Admin routes */}
         <Route
@@ -101,6 +132,22 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['admin']}>
               <Research />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/research/sessions"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <ResearchSessions />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/sessions/:sessionId"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminResearchSessionPage />
             </ProtectedRoute>
           }
         />

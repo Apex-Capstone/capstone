@@ -1,35 +1,32 @@
-/**
- * Route wrapper that requires authentication and optional role membership.
- */
+import { useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import type { ReactNode } from 'react'
 
-/**
- * Props for {@link ProtectedRoute}.
- *
- * @property children - Nested route element to render when allowed
- * @property allowedRoles - If set, user role must be one of these or redirect occurs
- */
 interface ProtectedRouteProps {
   children: ReactNode
   allowedRoles?: ('admin' | 'trainee')[]
 }
 
-/**
- * Guards content behind login and optional role checks.
- *
- * @remarks
- * Unauthenticated users go to `/login`. Authenticated users with a disallowed role go to `/dashboard`.
- *
- * @param props - {@link ProtectedRouteProps}
- * @returns Children, a login redirect, or a dashboard redirect
- */
 export const ProtectedRoute = ({
   children,
   allowedRoles,
 }: ProtectedRouteProps) => {
-  const { isAuthenticated, user } = useAuthStore()
+  const { isAuthenticated, user, loading } = useAuthStore()
+  const refreshProfile = useAuthStore((s) => s.refreshProfile)
+
+  useEffect(() => {
+    if (loading || !isAuthenticated || user) return
+    void refreshProfile()
+  }, [loading, isAuthenticated, user, refreshProfile])
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    )
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />

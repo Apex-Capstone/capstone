@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run database migrations before starting the web service on Render (or similar hosts).
-# Do NOT use src.scripts.reset_and_seed here — that drops the entire `core` schema.
+# Pre-deploy: apply migrations only — do not drop schema or run destructive DB scripts here.
 #
 # Render: set Root Directory to `backend` (or cd into backend first), then:
 #   bash render_predeploy.sh

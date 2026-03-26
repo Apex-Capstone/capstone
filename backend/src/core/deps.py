@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from config.logging import get_logger
 from core.errors import AuthenticationError, AuthorizationError
-from core.security import RoleScopes, decode_access_token
+from core.security import RoleScopes, decode_supabase_token
 from db.base import SessionLocal
 from domain.entities.user import User
 from repositories.user_repo import UserRepository
@@ -32,19 +32,19 @@ async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
     db: Annotated[Session, Depends(get_db)],
 ) -> User:
-    """Get current authenticated user."""
+    """Get current authenticated user from a Supabase-issued JWT."""
     token = credentials.credentials
-    payload = decode_access_token(token)
+    payload = decode_supabase_token(token)
     
     if not payload:
         raise AuthenticationError("Invalid or expired token")
     
-    user_id: int = payload.get("sub")
-    if not user_id:
+    supabase_user_id: str = payload.get("sub")
+    if not supabase_user_id:
         raise AuthenticationError("Invalid token payload")
     
     user_repo = UserRepository(db)
-    user = user_repo.get_by_id(user_id)
+    user = user_repo.get_by_supabase_id(supabase_user_id)
     
     if not user:
         raise AuthenticationError("User not found")

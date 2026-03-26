@@ -1,32 +1,51 @@
-/**
- * Dashboard card linking to a case detail route with difficulty badge.
- */
-import { Link } from 'react-router-dom'
+import type { KeyboardEvent } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card'
 import type { Case } from '@/types/case'
 import { cn } from '@/lib/utils'
 
-/** Visual labels/colors keyed by normalized difficulty string. */
 const difficultyConfig: Record<string, { label: string; color: string }> = {
   beginner: { label: 'Beginner', color: 'text-emerald-700 bg-emerald-100' },
   intermediate: { label: 'Intermediate', color: 'text-amber-700 bg-amber-100' },
   advanced: { label: 'Advanced', color: 'text-rose-700 bg-rose-100' },
 }
 
-/**
- * Clickable summary of a {@link Case} for the case list grid.
- *
- * @param props - Props
- * @param props.caseData - Case to display
- * @returns Linked card UI
- */
-export const CaseCard = ({ caseData }: { caseData: Case }) => {
+interface CaseCardProps {
+  caseData: Case
+  onClick?: (caseId: number) => void
+  /** Highlights the card (e.g. while starting a session). */
+  selected?: boolean
+}
+
+export const CaseCard = ({ caseData, onClick, selected }: CaseCardProps) => {
   const difficultyKey = caseData.difficultyLevel?.toLowerCase()
   const difficulty = difficultyKey ? difficultyConfig[difficultyKey] : null
 
+  const activate = () => onClick?.(caseData.id)
+
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      activate()
+    }
+  }
+
   return (
-    <Link to={`/case/${caseData.id}`}>
-      <Card className="h-full transition-shadow hover:shadow-md hover:border-emerald-300">
+    <div
+      role="button"
+      tabIndex={0}
+      className={cn(
+        'cursor-pointer rounded-lg outline-none transition-shadow',
+        'focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2'
+      )}
+      onClick={activate}
+      onKeyDown={onKeyDown}
+    >
+      <Card
+        className={cn(
+          'h-full transition-shadow hover:shadow-md hover:border-emerald-300',
+          selected ? 'border-2 border-emerald-500' : 'border'
+        )}
+      >
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between mb-2">
             <CardTitle className="text-lg leading-tight">{caseData.title}</CardTitle>
@@ -58,6 +77,6 @@ export const CaseCard = ({ caseData }: { caseData: Case }) => {
           </div>
         </CardContent>
       </Card>
-    </Link>
+    </div>
   )
 }
