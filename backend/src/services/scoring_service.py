@@ -131,6 +131,130 @@ def _compact_llm_output_for_evaluator_meta(llm_out: Any) -> dict[str, Any]:
     return d
 
 
+_SPIKES_CANONICAL_ORDER = [
+    "setting",
+    "perception",
+    "invitation",
+    "knowledge",
+    "emotion",
+    "strategy",
+]
+_SPIKES_LLM_CONFIDENCE_THRESHOLD = 0.6
+
+
+def _normalize_spikes_stage_key(raw: Any) -> str | None:
+    if not isinstance(raw, str):
+        return None
+    value = raw.strip().lower()
+    if not value:
+        return None
+    stage_map = {
+        "s": "setting",
+        "setting": "setting",
+        "p": "perception",
+        "perception": "perception",
+        "i": "invitation",
+        "invitation": "invitation",
+        "k": "knowledge",
+        "knowledge": "knowledge",
+        "e": "emotion",
+        "emotion": "emotion",
+        "emotions": "emotion",
+        "empathy": "emotion",
+        "s2": "strategy",
+        "strategy": "strategy",
+        "summary": "strategy",
+    }
+    return stage_map.get(value)
+
+
+def _build_spikes_coverage_payload(stage_set: set[str]) -> dict[str, Any]:
+    covered = [stage for stage in _SPIKES_CANONICAL_ORDER if stage in stage_set]
+    return {
+        "covered": covered,
+        "percent": (len(covered) / len(_SPIKES_CANONICAL_ORDER)) if _SPIKES_CANONICAL_ORDER else 0.0,
+    }
+
+
+def _calculate_spikes_completion_from_coverage(spikes_coverage: dict[str, Any] | None) -> float:
+    """Compute SPIKES completion from the final canonical coverage payload."""
+    covered_count = 0
+    if isinstance(spikes_coverage, dict):
+        covered = spikes_coverage.get("covered")
+        if isinstance(covered, list):
+            covered_count = len(
+                {stage for stage in covered if isinstance(stage, str) and stage in _SPIKES_CANONICAL_ORDER}
+            )
+    if not _SPIKES_CANONICAL_ORDER:
+        return 0.0
+    return round((covered_count / len(_SPIKES_CANONICAL_ORDER)) * 100.0, 2)
+
+
+def _extract_rule_spikes_stage_set(spikes_coverage: dict[str, Any] | None) -> set[str]:
+    covered_raw = []
+    if isinstance(spikes_coverage, dict):
+        maybe_covered = spikes_coverage.get("covered")
+        if isinstance(maybe_covered, list):
+            covered_raw = maybe_covered
+    out: set[str] = set()
+    for stage in covered_raw:
+        normalized = _normalize_spikes_stage_key(stage)
+        if normalized:
+            out.add(normalized)
+    return out
+
+
+def _should_apply_llm_spikes_merge(evaluator_meta: dict[str, Any] | None) -> bool:
+    if not isinstance(evaluator_meta, dict):
+        return False
+    if evaluator_meta.get("status") != "completed":
+        return False
+    llm_output = evaluator_meta.get("llm_output")
+    if not isinstance(llm_output, dict):
+        return False
+    spikes_annotations = llm_output.get("spikes_annotations")
+    return isinstance(spikes_annotations, list) and len(spikes_annotations) > 0
+
+
+def _extract_llm_spikes_stage_set(evaluator_meta: dict[str, Any] | None) -> set[str]:
+    if not _should_apply_llm_spikes_merge(evaluator_meta):
+        return set()
+    llm_output = evaluator_meta.get("llm_output") if isinstance(evaluator_meta, dict) else None
+    annotations = llm_output.get("spikes_annotations") if isinstance(llm_output, dict) else None
+    if not isinstance(annotations, list):
+        return set()
+    stages: set[str] = set()
+    for item in annotations:
+        if not isinstance(item, dict):
+            continue
+        normalized = _normalize_spikes_stage_key(item.get("stage"))
+        if not normalized:
+            continue
+        conf = item.get("confidence")
+        if conf is not None:
+            try:
+                if float(conf) < _SPIKES_LLM_CONFIDENCE_THRESHOLD:
+                    continue
+            except (TypeError, ValueError):
+                continue
+        stages.add(normalized)
+    return stages
+
+
+def _compute_spikes_coverage_merge(
+    rule_spikes_coverage: dict[str, Any] | None,
+    evaluator_meta: dict[str, Any] | None,
+) -> dict[str, Any]:
+    rule_stages = _extract_rule_spikes_stage_set(rule_spikes_coverage)
+    rule_payload = _build_spikes_coverage_payload(rule_stages)
+    if not _should_apply_llm_spikes_merge(evaluator_meta):
+        return rule_payload
+
+    llm_stages = _extract_llm_spikes_stage_set(evaluator_meta)
+    merged_stages = rule_stages | llm_stages
+    return _build_spikes_coverage_payload(merged_stages)
+
+
 @dataclass
 class _RuleFeedbackState:
     """Rule-only computation snapshot before persistence (no LLM)."""
@@ -741,8 +865,6 @@ class ScoringService:
         feedback.communication_score = communication_score
         feedback.clinical_reasoning_score = None
         feedback.professionalism_score = None
-        feedback.spikes_completion_score = spikes_score
-        feedback.overall_score = overall_score
 
         # Keep structured fields as native Python objects in the service layer.
         # FeedbackRepository is the single serialization boundary before commit.
@@ -754,7 +876,18 @@ class ScoringService:
         feedback.eo_to_elicitation_links = state.eo_to_elicitation_links
         feedback.eo_to_response_links = state.eo_to_response_links
         feedback.missed_opportunities = state.missed_opportunities
-        feedback.spikes_coverage = state.spikes_coverage
+        # Single source of truth: persisted SPIKES coverage and persisted SPIKES score are
+        # both derived from this same final canonical merged payload.
+        feedback.spikes_coverage = _compute_spikes_coverage_merge(state.spikes_coverage, evaluator_meta)
+        feedback.spikes_completion_score = _calculate_spikes_completion_from_coverage(feedback.spikes_coverage)
+        feedback.overall_score = self._clamp_score(
+            round(
+                0.5 * float(feedback.empathy_score or 0.0)
+                + 0.2 * float(feedback.communication_score or 0.0)
+                + 0.3 * float(feedback.spikes_completion_score or 0.0),
+                2,
+            )
+        )
         feedback.spikes_timestamps = state.spikes_timestamps
         feedback.spikes_strategies = state.spikes_strategies
         feedback.question_breakdown = state.question_breakdown
@@ -766,7 +899,9 @@ class ScoringService:
         feedback.areas_for_improvement = (
             state.improvements if state.improvements and state.improvements.strip() else None
         )
-        feedback.detailed_feedback = f"Overall Score: {overall_score:.1f}/100" if overall_score >= 0 else None
+        feedback.detailed_feedback = (
+            f"Overall Score: {float(feedback.overall_score):.1f}/100" if float(feedback.overall_score) >= 0 else None
+        )
 
         if existing_feedback:
             saved_feedback = self.feedback_repo.update(feedback)
@@ -1300,9 +1435,9 @@ class ScoringService:
             "invitation": "invitation",
             "k": "knowledge",
             "knowledge": "knowledge",
-            "e": "empathy",
-            "emotion": "empathy",
-            "empathy": "empathy",
+            "e": "emotion",
+            "emotion": "emotion",
+            "empathy": "emotion",
             "s2": "strategy",
             "strategy": "strategy",
             "summary": "strategy",
@@ -1318,7 +1453,7 @@ class ScoringService:
                 covered.add(canonical)
 
         # Canonical six stages
-        canonical_stages = ["setting", "perception", "invitation", "knowledge", "empathy", "strategy"]
+        canonical_stages = ["setting", "perception", "invitation", "knowledge", "emotion", "strategy"]
         total_stages = len(canonical_stages)
 
         covered_count = len(covered & set(canonical_stages))

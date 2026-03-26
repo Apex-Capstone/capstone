@@ -82,7 +82,10 @@ def _spikes_json(score: float = 52.0) -> str:
         {
             "reviewer_version": "v2",
             "spikes_completion_score": score,
-            "spikes_annotations": [],
+            "spikes_annotations": [
+                {"turn_number": 2, "stage": "perception", "evidence_snippet": "q", "confidence": 0.9},
+                {"turn_number": 3, "stage": "invitation", "evidence_snippet": "q2", "confidence": 0.9},
+            ],
             "stage_turn_mapping": [],
             "spikes_sequencing_notes": None,
             "spikes_confidence": None,
@@ -214,6 +217,13 @@ async def test_hybrid_v2_success_three_calls_and_meta(
         "communication": "llm",
         "spikes": "llm",
     }
+    merged_covered = fb.spikes_coverage.get("covered") or []
+    assert "perception" in merged_covered
+    assert "invitation" in merged_covered
+    assert fb.spikes_completion_score == pytest.approx(round((len(merged_covered) / 6.0) * 100.0, 2))
+    assert fb.overall_score == pytest.approx(
+        round(0.5 * fb.empathy_score + 0.2 * fb.communication_score + 0.3 * fb.spikes_completion_score, 2)
+    )
 
     merged = meta.get("merged_scores") or {}
     rs = meta["rule_scores"]
@@ -321,6 +331,14 @@ async def test_hybrid_v2_total_failure(
     assert meta.get("status") == "failed"
     assert meta.get("llm_scores") is None
     assert meta.get("merged_scores") is None
+    # LLM merge gate fails when status is failed, so coverage should remain rule-only.
+    assert "perception" not in (fb.spikes_coverage.get("covered") or [])
+    assert "invitation" not in (fb.spikes_coverage.get("covered") or [])
+    covered = fb.spikes_coverage.get("covered") or []
+    assert fb.spikes_completion_score == pytest.approx(round((len(covered) / 6.0) * 100.0, 2))
+    assert fb.overall_score == pytest.approx(
+        round(0.5 * fb.empathy_score + 0.2 * fb.communication_score + 0.3 * fb.spikes_completion_score, 2)
+    )
 
 
 @pytest.mark.asyncio
