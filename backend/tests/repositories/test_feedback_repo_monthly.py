@@ -1,7 +1,7 @@
 """Tests for FeedbackRepository monthly aggregates."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -63,8 +63,8 @@ def _seed_session_with_feedback(
 def test_get_average_overall_by_month_averages_and_sorts_chronologically():
     db = _setup_db()
     try:
-        jan = datetime(2025, 1, 15, 12, 0, 0)
-        feb = datetime(2025, 2, 10, 12, 0, 0)
+        jan = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        feb = datetime(2025, 2, 10, 12, 0, 0, tzinfo=timezone.utc)
         _seed_session_with_feedback(db, created_at=jan, overall_score=80.0)
         _seed_session_with_feedback(db, created_at=jan, overall_score=90.0)
         _seed_session_with_feedback(db, created_at=feb, overall_score=70.0)

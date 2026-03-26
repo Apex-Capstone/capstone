@@ -13,6 +13,7 @@ from adapters.storage.base import StorageAdapter
 from config.logging import get_logger
 from config.settings import get_settings
 from core.errors import NotFoundError
+from core.time import utc_now
 from core.plugin_manager import get_patient_model
 from domain.entities.turn import Turn
 from domain.models.sessions import TurnCreate, TurnResponse
@@ -23,6 +24,7 @@ from services.stage_tracker import StageTracker
 from services.nlu_pipeline import NLUPipeline
 from services.dialogue_state import DialogueState
 from services.patient_prompt_builder import PatientPromptBuilder
+from services.patient_voice_profile import infer_patient_voice_profile
 from services.turn_analysis import analyze_user_input, analyze_assistant_response
 
 logger = get_logger(__name__)
@@ -151,6 +153,7 @@ class DialogueService:
             assistant_audio_url, assistant_audio_expires_at = await self._create_assistant_audio(
                 session_id=session_id,
                 response_text=patient_response,
+                case=case,
             )
         
         # Create assistant turn
@@ -181,10 +184,19 @@ class DialogueService:
         self,
         session_id: int,
         response_text: str,
+        case,
     ) -> tuple[str | None, datetime | None]:
         """Synthesize assistant speech and persist it, without blocking text replies on failure."""
         try:
-            tts_result = await self.tts_adapter.synthesize_speech(response_text)
+            voice_profile = infer_patient_voice_profile(
+                case,
+                base_instructions=self.settings.openai_tts_instructions,
+            )
+            tts_result = await self.tts_adapter.synthesize_speech(
+                response_text,
+                voice_id=voice_profile.voice_id,
+                instructions=voice_profile.instructions,
+            )
             if not tts_result.audio_data:
                 logger.warning("TTS returned empty audio payload for session %s", session_id)
                 return None, None
@@ -195,7 +207,7 @@ class DialogueService:
                 object_key,
                 content_type=tts_result.content_type,
             )
-            expires_at = datetime.utcnow() + timedelta(seconds=self.settings.assistant_audio_ttl_seconds)
+            expires_at = utc_now() + timedelta(seconds=self.settings.assistant_audio_ttl_seconds)
             return stored_key, expires_at
         except Exception as exc:
             logger.warning("Skipping assistant TTS for session %s: %s", session_id, exc)

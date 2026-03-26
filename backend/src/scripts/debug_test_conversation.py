@@ -215,11 +215,12 @@ async def run_test_conversation():
     # Convert datetime objects to strings for JSON serialization
     import json as json_lib
     from datetime import datetime
+    from core.time import serialize_utc_datetime
     
     def json_serial(obj):
         """JSON serializer for objects not serializable by default json code"""
         if isinstance(obj, datetime):
-            return obj.isoformat()
+            return serialize_utc_datetime(obj)
         raise TypeError(f"Type {type(obj)} not serializable")
     
     feedback_dict = feedback.model_dump(exclude_none=True)

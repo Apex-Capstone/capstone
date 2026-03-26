@@ -12,17 +12,17 @@ export function AnalyticsEmptyState() {
     <Card className="border border-dashed border-gray-200 bg-slate-50/60 shadow-sm">
       <CardContent className="flex flex-col items-center px-6 py-12 text-center sm:px-10 sm:py-14">
         <div
-          className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 ring-1 ring-blue-100"
+          className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-apex-50 text-apex-600 ring-1 ring-apex-100"
           aria-hidden
         >
           <BarChart3 className="h-7 w-7" strokeWidth={1.75} />
         </div>
         <h2 className="text-lg font-semibold text-gray-900 sm:text-xl">
-          Your analytics will appear here
+          Complete a session to see your performance analytics.
         </h2>
         <p className="mt-3 max-w-md text-sm leading-relaxed text-gray-600">
-          Complete a training session and come back to see your scores, trends, and how your
-          communication skills grow over time. Every session helps build your picture.
+          End a practice session to generate feedback and unlock your empathy score, SPIKES
+          coverage, and score trends.
         </p>
         <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:justify-center">
           <Link

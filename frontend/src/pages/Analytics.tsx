@@ -27,6 +27,7 @@ import {
 } from '@/components/analytics/analyticsMetricConfig'
 import { getAnalyticsCoachingInsight } from '@/components/analytics/analyticsCoachingInsight'
 import { MetricInfoTooltip } from '@/components/analytics/MetricInfoTooltip'
+import { formatDateInUserTimeZone } from '@/lib/dateTime'
 import {
   DEFAULT_ANALYTICS_TIME_RANGE,
   filterAnalyticsSessionsByTimeRange,
@@ -154,7 +155,7 @@ export const Analytics = () => {
     () =>
       filteredSessions.map((s, index) => ({
         label: `S${index + 1}`,
-        date: new Date(s.createdAt).toLocaleDateString(),
+        date: formatDateInUserTimeZone(s.createdAt),
         empathy: s.empathyScore,
         communication: s.communicationScore,
         clinical: s.clinicalScore,
@@ -170,7 +171,7 @@ export const Analytics = () => {
 
   if (loading) {
     return (
-      <div className="h-screen flex flex-col">
+      <div className="fixed inset-0 overflow-hidden flex flex-col bg-white">
         <Navbar />
         <div className="flex flex-1 min-h-0">
           <Sidebar />
@@ -186,7 +187,7 @@ export const Analytics = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="fixed inset-0 overflow-hidden flex flex-col bg-white">
       <Navbar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />

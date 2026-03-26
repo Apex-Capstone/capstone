@@ -5,6 +5,7 @@ import type { TraineeSessionAnalytics } from '@/types/analytics'
 import { formatPercentWhole } from '@/utils/format'
 import { ANALYTICS_METRICS } from '@/components/analytics/analyticsMetricConfig'
 import { AnalyticsSessionPreview } from '@/components/analytics/AnalyticsSessionPreview'
+import { formatDateTimeInUserTimeZone, utcTimestampMs } from '@/lib/dateTime'
 import { cn } from '@/lib/utils'
 
 type SortKey =
@@ -112,8 +113,8 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
           right = b.spikesCoveragePercent
           break
         case 'createdAt':
-          left = new Date(a.createdAt).getTime()
-          right = new Date(b.createdAt).getTime()
+          left = utcTimestampMs(a.createdAt)
+          right = utcTimestampMs(b.createdAt)
           break
       }
 
@@ -224,8 +225,7 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
       </div>
 
       <div className="overflow-x-auto rounded-lg border">
-        <div className="max-h-[460px] overflow-y-auto">
-          <table className="min-w-[1180px] w-full text-sm">
+        <table className="min-w-[1180px] w-full text-sm">
             <thead className="sticky top-0 z-10 bg-gray-50">
               <tr className="border-b text-gray-600">
                 <th className="w-10 px-2 py-3 text-left align-middle" scope="col">
@@ -292,7 +292,7 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
                         <td className="w-10 px-2 py-3 align-middle">
                           <button
                             type="button"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-apex-500/40"
                             aria-expanded={expanded}
                             aria-controls={previewId}
                             onClick={(e) => {
@@ -313,12 +313,12 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
                         <td className="min-w-[240px] max-w-[min(320px,40vw)] px-4 py-3 align-middle text-gray-900">
                           {s.caseTitle}
                         </td>
-                        <td className="px-3 py-3 align-middle">{metricBar(s.empathyScore, 'bg-blue-500')}</td>
+                        <td className="px-3 py-3 align-middle">{metricBar(s.empathyScore, 'bg-apex-500')}</td>
                         <td className="px-3 py-3 align-middle">{metricBar(s.communicationScore, 'bg-purple-500')}</td>
-                        <td className="px-3 py-3 align-middle">{metricBar(s.clinicalScore, 'bg-green-500')}</td>
+                        <td className="px-3 py-3 align-middle">{metricBar(s.clinicalScore, 'bg-apex-700')}</td>
                         <td className="px-3 py-3 align-middle">{metricBar(s.spikesCoveragePercent, 'bg-orange-500')}</td>
                         <td className="whitespace-nowrap px-4 py-3 align-middle text-gray-600">
-                          {new Date(s.createdAt).toLocaleString()}
+                          {formatDateTimeInUserTimeZone(s.createdAt)}
                         </td>
                         <td className="px-4 py-3 align-middle">
                           <button
@@ -327,7 +327,7 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
                               e.stopPropagation()
                               navigate(`/feedback/${s.sessionId}`)
                             }}
-                            className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                            className="rounded-md border border-apex-200 px-3 py-1.5 text-xs font-semibold text-apex-700 hover:bg-apex-50"
                           >
                             View Feedback
                           </button>
@@ -355,8 +355,7 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
                 })
               )}
             </tbody>
-          </table>
-        </div>
+        </table>
       </div>
 
       <div className="flex items-center justify-end gap-3">

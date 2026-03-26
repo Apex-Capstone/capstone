@@ -11,6 +11,7 @@ import type { Case } from '@/types/case'
 import type { Feedback } from '@/api/feedback.api'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
+import { formatDateInUserTimeZone, formatTimeInUserTimeZone } from '@/lib/dateTime'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -58,7 +59,7 @@ function formatDuration(seconds: number): string {
  * @returns Localized date/time
  */
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
+  return formatDateInUserTimeZone(iso, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -240,7 +241,7 @@ export const SessionDetailPage = () => {
                         className={cn(
                           'rounded-full px-2.5 py-0.5 text-xs font-medium',
                           isCompleted
-                            ? 'bg-emerald-100 text-emerald-700'
+                            ? 'bg-apex-100 text-apex-700'
                             : 'bg-amber-100 text-amber-700'
                         )}
                       >
@@ -260,7 +261,7 @@ export const SessionDetailPage = () => {
                       </span>
                       {session.endedAt && (
                         <span className="flex items-center gap-1.5">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                          <CheckCircle2 className="h-4 w-4 text-apex-500" />
                           {formatDate(session.endedAt)}
                         </span>
                       )}
@@ -341,8 +342,8 @@ export const SessionDetailPage = () => {
                                 )}
                               >
                                 {!isUser && (
-                                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100">
-                                    <Bot className="h-4 w-4 text-emerald-600" />
+                                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-apex-100">
+                                    <Bot className="h-4 w-4 text-apex-600" />
                                   </div>
                                 )}
 
@@ -361,7 +362,7 @@ export const SessionDetailPage = () => {
                                     className={cn(
                                       'rounded-lg px-4 py-2.5',
                                       isUser
-                                        ? 'bg-emerald-600 text-white'
+                                        ? 'bg-apex-600 text-white'
                                         : 'bg-gray-100 text-gray-900'
                                     )}
                                   >
@@ -369,10 +370,10 @@ export const SessionDetailPage = () => {
                                     <p
                                       className={cn(
                                         'mt-1 text-xs',
-                                        isUser ? 'text-emerald-100' : 'text-gray-500'
+                                        isUser ? 'text-apex-100' : 'text-gray-500'
                                       )}
                                     >
-                                      {new Date(turn.timestamp).toLocaleTimeString()}
+                                      {formatTimeInUserTimeZone(turn.timestamp)}
                                     </p>
                                   </div>
                                 </div>
@@ -404,11 +405,11 @@ export const SessionDetailPage = () => {
                           <div className="mb-1 flex justify-between text-sm">
                             <span className="text-gray-600">Overall</span>
                           </div>
-                          {scoreBar(feedback.overallScore, 'bg-gradient-to-r from-red-400 via-yellow-400 to-emerald-500')}
+                          {scoreBar(feedback.overallScore, 'bg-gradient-to-r from-red-400 via-yellow-400 to-apex-500')}
                         </div>
                         <div>
                           <div className="mb-1 text-sm text-gray-600">Empathy</div>
-                          {scoreBar(feedback.empathyScore, 'bg-emerald-500')}
+                          {scoreBar(feedback.empathyScore, 'bg-apex-500')}
                         </div>
                         <div>
                           <div className="mb-1 text-sm text-gray-600">SPIKES Completion</div>
@@ -429,13 +430,13 @@ export const SessionDetailPage = () => {
                     {strengthsList.length > 0 && (
                       <Card>
                         <CardHeader className="pb-3">
-                          <CardTitle className="text-base text-emerald-700">Strengths</CardTitle>
+                          <CardTitle className="text-base text-apex-700">Strengths</CardTitle>
                         </CardHeader>
                         <CardContent>
                           <ul className="space-y-2">
                             {strengthsList.map((s, i) => (
                               <li key={i} className="flex items-start gap-2 text-sm">
-                                <span className="mt-0.5 text-emerald-500">&#10003;</span>
+                                <span className="mt-0.5 text-apex-500">&#10003;</span>
                                 <span>{s}</span>
                               </li>
                             ))}

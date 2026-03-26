@@ -16,6 +16,7 @@ import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { parseUtcDateTime } from '@/lib/dateTime'
 import { cn } from '@/lib/utils'
 import { AlertTriangle, Download, Shield, BarChart3, TrendingUp } from 'lucide-react'
 import {
@@ -150,8 +151,8 @@ const formatScoreTrendWeeklyTooltipLabel = (label: unknown) => {
  * @returns Day key or null
  */
 const localDayKeyFromTimestamp = (timestamp: string): string | null => {
-  const d = new Date(timestamp)
-  if (Number.isNaN(d.getTime())) return null
+  const d = parseUtcDateTime(timestamp)
+  if (!d) return null
   const y = d.getFullYear()
   const m = d.getMonth() + 1
   const day = d.getDate()
@@ -200,8 +201,8 @@ type TrendPoint = {
  * @returns `YYYY-MM-DD-HH` or null
  */
 const localHourKeyFromTimestamp = (timestamp: string): string | null => {
-  const d = new Date(timestamp)
-  if (Number.isNaN(d.getTime())) return null
+  const d = parseUtcDateTime(timestamp)
+  if (!d) return null
   const y = d.getFullYear()
   const m = d.getMonth() + 1
   const day = d.getDate()
@@ -233,8 +234,8 @@ const localHourStartMsFromHourKey = (hourKey: string): number => {
  * @returns Week start epoch ms or null
  */
 const startOfWeekSundayLocalMs = (timestamp: string): number | null => {
-  const d = new Date(timestamp)
-  if (Number.isNaN(d.getTime())) return null
+  const d = parseUtcDateTime(timestamp)
+  if (!d) return null
   const day = d.getDay()
   const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day)
   start.setHours(0, 0, 0, 0)
@@ -755,11 +756,11 @@ export const Research = () => {
               </p>
               
               {/* Privacy Notice */}
-              <div className="mt-4 flex items-start gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
-                <Shield className="h-5 w-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+              <div className="mt-4 flex items-start gap-3 rounded-lg border border-apex-200 bg-apex-50 p-4">
+                <Shield className="mt-0.5 h-5 w-5 shrink-0 text-apex-600" />
                 <div className="text-sm">
-                  <p className="font-medium text-emerald-900 mb-1">Privacy & Ethics Notice</p>
-                  <p className="text-emerald-700">
+                  <p className="mb-1 font-medium text-apex-900">Privacy & Ethics Notice</p>
+                  <p className="text-apex-700">
                     All data displayed has been anonymized and aggregated to protect user privacy. 
                     This endpoint is designed for research purposes and fairness auditing only.
                   </p>
@@ -774,7 +775,7 @@ export const Research = () => {
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
                       <CardTitle className="flex items-center gap-2">
-                        <TrendingUp className="h-5 w-5 text-emerald-600 shrink-0" />
+                        <TrendingUp className="h-5 w-5 shrink-0 text-apex-600" />
                         Score Trends
                       </CardTitle>
                       <p className="text-sm text-gray-500 font-normal mt-1">
@@ -797,7 +798,7 @@ export const Research = () => {
                         variant={scoreTrendGranularity === 'hourly' ? 'default' : 'outline'}
                         className={
                           scoreTrendGranularity !== 'hourly'
-                            ? 'border-emerald-200 hover:bg-emerald-50 hover:text-emerald-900'
+                            ? 'border-apex-200 hover:bg-apex-50 hover:text-apex-900'
                             : undefined
                         }
                         onClick={() => setScoreTrendGranularity('hourly')}
@@ -810,7 +811,7 @@ export const Research = () => {
                         variant={scoreTrendGranularity === 'daily' ? 'default' : 'outline'}
                         className={
                           scoreTrendGranularity !== 'daily'
-                            ? 'border-emerald-200 hover:bg-emerald-50 hover:text-emerald-900'
+                            ? 'border-apex-200 hover:bg-apex-50 hover:text-apex-900'
                             : undefined
                         }
                         onClick={() => setScoreTrendGranularity('daily')}
@@ -823,7 +824,7 @@ export const Research = () => {
                         variant={scoreTrendGranularity === 'weekly' ? 'default' : 'outline'}
                         className={
                           scoreTrendGranularity !== 'weekly'
-                            ? 'border-emerald-200 hover:bg-emerald-50 hover:text-emerald-900'
+                            ? 'border-apex-200 hover:bg-apex-50 hover:text-apex-900'
                             : undefined
                         }
                         onClick={() => setScoreTrendGranularity('weekly')}
@@ -918,7 +919,7 @@ export const Research = () => {
                           <span className="text-sm font-medium text-purple-900">Bias Probe Consistency</span>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                             data.fairnessMetrics.biasProbeConsistency >= 0.8 
-                              ? "bg-emerald-100 text-emerald-800" 
+                              ? "bg-apex-100 text-apex-800"
                               : "bg-red-100 text-red-800"
                           }`}>
                             {data.fairnessMetrics.biasProbeConsistency >= 0.8 ? "Good" : "Needs Attention"}
@@ -938,52 +939,52 @@ export const Research = () => {
                         </p>
                       </div>
 
-                      <div className="bg-emerald-50 p-4 rounded-lg">
+                      <div className="rounded-lg bg-apex-50 p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-emerald-900">Demographic Parity</span>
+                          <span className="text-sm font-medium text-apex-900">Demographic Parity</span>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                             data.fairnessMetrics.demographicParity >= 0.85 
-                              ? "bg-emerald-100 text-emerald-800" 
+                              ? "bg-apex-100 text-apex-800"
                               : "bg-red-100 text-red-800"
                           }`}>
                             {data.fairnessMetrics.demographicParity >= 0.85 ? "Good" : "Needs Attention"}
                           </span>
                         </div>
-                        <div className="text-2xl font-bold text-emerald-700 mb-1">
+                        <div className="mb-1 text-2xl font-bold text-apex-700">
                           {(data.fairnessMetrics.demographicParity * 100).toFixed(1)}%
                         </div>
                         <div className="w-full h-2 bg-gray-200 rounded-full">
                           <div 
-                            className="h-full bg-emerald-600 rounded-full"
+                            className="h-full rounded-full bg-apex-600"
                             style={{ width: `${data.fairnessMetrics.demographicParity * 100}%` }}
                           />
                         </div>
-                        <p className="text-xs text-emerald-700 mt-2">
+                        <p className="mt-2 text-xs text-apex-700">
                           Equal positive prediction rates across protected groups
                         </p>
                       </div>
 
-                      <div className="bg-emerald-50 p-4 rounded-lg">
+                      <div className="rounded-lg bg-apex-50 p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-emerald-900">Equalized Odds</span>
+                          <span className="text-sm font-medium text-apex-900">Equalized Odds</span>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                             data.fairnessMetrics.equalizedOdds >= 0.8 
-                              ? "bg-emerald-100 text-emerald-800" 
+                              ? "bg-apex-100 text-apex-800"
                               : "bg-red-100 text-red-800"
                           }`}>
                             {data.fairnessMetrics.equalizedOdds >= 0.8 ? "Good" : "Needs Attention"}
                           </span>
                         </div>
-                        <div className="text-2xl font-bold text-emerald-700 mb-1">
+                        <div className="mb-1 text-2xl font-bold text-apex-700">
                           {(data.fairnessMetrics.equalizedOdds * 100).toFixed(1)}%
                         </div>
                         <div className="w-full h-2 bg-gray-200 rounded-full">
                           <div 
-                            className="h-full bg-emerald-600 rounded-full"
+                            className="h-full rounded-full bg-apex-600"
                             style={{ width: `${data.fairnessMetrics.equalizedOdds * 100}%` }}
                           />
                         </div>
-                        <p className="text-xs text-emerald-700 mt-2">
+                        <p className="mt-2 text-xs text-apex-700">
                           Equal true positive and false positive rates across groups
                         </p>
                       </div>
@@ -1025,7 +1026,7 @@ export const Research = () => {
                   <div className="mt-3 flex justify-end">
                     <Link
                       to="/research/sessions"
-                      className="text-sm text-blue-600 hover:underline"
+                      className="text-sm text-apex-600 hover:underline"
                     >
                       View All Sessions →
                     </Link>

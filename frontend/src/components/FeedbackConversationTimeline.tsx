@@ -1,10 +1,12 @@
 /**
  * Conversation transcript with per-turn SPIKES labels, metric badges, and empathy span highlights.
  */
+import { useEffect, useRef, useState } from 'react'
 import type React from 'react'
 import type { Turn } from '@/types/session'
 import type { Feedback } from '@/api/feedback.api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatTimeInUserTimeZone } from '@/lib/dateTime'
 import { cn } from '@/lib/utils'
 
 /** Props for {@link FeedbackConversationTimeline}. */
@@ -146,6 +148,45 @@ type EmpathyMarkersByTurn = Record<
   }
 >
 
+const MIN_TIMELINE_HEIGHT_PX = 320
+const VIEWPORT_BOTTOM_GUTTER_PX = 24
+
+/**
+ * Returns whether a role belongs to the clinician/user side.
+ *
+ * @param role - Raw role from the turn
+ * @returns True when the turn should appear on the clinician side
+ */
+const isClinicianRole = (role: string): boolean => {
+  return ['user', 'trainee', 'doctor', 'physician', 'clinician'].includes(role.toLowerCase())
+}
+
+/**
+ * Finds the nearest clinician turn for a missed opportunity.
+ *
+ * @param turns - Full ordered transcript
+ * @param afterTurnNumber - EO turn number
+ * @returns Next clinician turn when available, otherwise previous clinician turn
+ */
+const getNearestClinicianTurnNumber = (
+  turns: Array<Turn & { spansJson?: string }>,
+  afterTurnNumber: number,
+): number | undefined => {
+  const nextClinicianTurn = turns
+    .filter((turn) => turn.turnNumber > afterTurnNumber)
+    .sort((a, b) => a.turnNumber - b.turnNumber)
+    .find((turn) => isClinicianRole(turn.role))?.turnNumber
+
+  if (nextClinicianTurn) {
+    return nextClinicianTurn
+  }
+
+  return turns
+    .filter((turn) => turn.turnNumber < afterTurnNumber)
+    .sort((a, b) => b.turnNumber - a.turnNumber)
+    .find((turn) => isClinicianRole(turn.role))?.turnNumber
+}
+
 /**
  * Parses `spans_json` into validated start/end spans for highlighting.
  *
@@ -258,19 +299,26 @@ const buildEmpathyTimelineMarkers = (
   // 2) Overlay missed opportunities using backend summary (has turn_number)
   if (Array.isArray(feedback.missed_opportunities)) {
     feedback.missed_opportunities.forEach((entry) => {
-      const tn = typeof (entry as any)?.turn_number === 'number'
+      const eoTurnNumber = typeof (entry as any)?.turn_number === 'number'
         ? (entry as any).turn_number
         : undefined
-      if (!tn) return
+      if (!eoTurnNumber) return
 
-      if (!markers[tn]) {
-        markers[tn] = { types: [] }
+      const clinicianTurnNumber = getNearestClinicianTurnNumber(turns, eoTurnNumber)
+
+      if (!markers[eoTurnNumber]) {
+        markers[eoTurnNumber] = { types: [] }
       }
-      if (!markers[tn].types.includes('empathy_opportunity')) {
-        markers[tn].types.push('empathy_opportunity')
+      if (!markers[eoTurnNumber].types.includes('empathy_opportunity')) {
+        markers[eoTurnNumber].types.push('empathy_opportunity')
       }
-      if (!markers[tn].types.includes('missed_opportunity')) {
-        markers[tn].types.push('missed_opportunity')
+
+      const missedMarkerTurn = clinicianTurnNumber ?? eoTurnNumber
+      if (!markers[missedMarkerTurn]) {
+        markers[missedMarkerTurn] = { types: [] }
+      }
+      if (!markers[missedMarkerTurn].types.includes('missed_opportunity')) {
+        markers[missedMarkerTurn].types.push('missed_opportunity')
       }
     })
   }
@@ -353,9 +401,9 @@ const renderTextWithSpans = (
     } else if (isEo) {
       className = 'underline decoration-amber-400 decoration-2 underline-offset-2'
     } else if (isResponse) {
-      className = 'underline decoration-emerald-400 decoration-2 underline-offset-2'
+      className = 'underline decoration-apex-400 decoration-2 underline-offset-2'
     } else if (isElicitation) {
-      className = 'underline decoration-emerald-600 decoration-2 underline-offset-2'
+      className = 'underline decoration-apex-600 decoration-2 underline-offset-2'
     }
 
     pieces.push(
@@ -398,19 +446,57 @@ export const FeedbackConversationTimeline = ({
   turns,
   feedback,
 }: FeedbackConversationTimelineProps) => {
+  const cardRef = useRef<HTMLDivElement | null>(null)
+  const headerRef = useRef<HTMLDivElement | null>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  const [timelineMaxHeight, setTimelineMaxHeight] = useState<number>(MIN_TIMELINE_HEIGHT_PX)
   const sortedTurns = [...turns].sort((a, b) => a.turnNumber - b.turnNumber)
   const empathyMarkers = buildEmpathyTimelineMarkers(feedback, sortedTurns)
 
+  useEffect(() => {
+    const updateTimelineHeight = () => {
+      if (!cardRef.current) {
+        return
+      }
+
+      const cardTop = cardRef.current.getBoundingClientRect().top
+      const contentStyles = contentRef.current
+        ? window.getComputedStyle(contentRef.current)
+        : null
+      const contentVerticalPadding =
+        (contentStyles ? Number.parseFloat(contentStyles.paddingTop) : 0) +
+        (contentStyles ? Number.parseFloat(contentStyles.paddingBottom) : 0)
+      const availableHeight =
+        window.innerHeight -
+        cardTop -
+        (headerRef.current?.offsetHeight ?? 0) -
+        contentVerticalPadding -
+        VIEWPORT_BOTTOM_GUTTER_PX
+
+      setTimelineMaxHeight(Math.max(MIN_TIMELINE_HEIGHT_PX, Math.floor(availableHeight)))
+    }
+
+    updateTimelineHeight()
+    window.addEventListener('resize', updateTimelineHeight)
+
+    return () => {
+      window.removeEventListener('resize', updateTimelineHeight)
+    }
+  }, [])
+
   return (
-    <Card>
-      <CardHeader>
+    <Card ref={cardRef} className="flex flex-col overflow-hidden">
+      <CardHeader ref={headerRef}>
         <CardTitle>Conversation Analysis</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent ref={contentRef} className="min-h-0 flex-1">
         {sortedTurns.length === 0 ? (
           <p className="text-sm text-gray-500">No conversation turns recorded for this session.</p>
         ) : (
-          <div className="space-y-4">
+          <div
+            className="space-y-4 overflow-y-auto pr-2"
+            style={{ maxHeight: `${timelineMaxHeight}px` }}
+          >
             {sortedTurns.map((turn) => {
               const roleLabel = formatRoleLabel(turn.role)
               const side = mapRoleToSide(turn.role)
@@ -427,7 +513,7 @@ export const FeedbackConversationTimeline = ({
                   )}
                 >
                   {side === 'left' && (
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-apex-100 text-xs font-semibold text-apex-700">
                       {roleLabel[0]}
                     </div>
                   )}
@@ -436,7 +522,7 @@ export const FeedbackConversationTimeline = ({
                     className={cn(
                       'max-w-[80%] rounded-lg px-4 py-3 shadow-sm',
                       side === 'right'
-                        ? 'bg-emerald-600 text-white'
+                        ? 'bg-apex-600 text-white'
                         : 'bg-gray-100 text-gray-900'
                     )}
                   >
@@ -444,21 +530,23 @@ export const FeedbackConversationTimeline = ({
                       <span
                         className={cn(
                           'font-semibold',
-                          side === 'right' ? 'text-emerald-50' : 'text-gray-700'
+                          side === 'right' ? 'text-apex-50' : 'text-gray-700'
                         )}
                       >
                         {roleLabel}
                       </span>
-                      <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-700">
-                        {spikesStage}
-                      </span>
+                      {side === 'right' && (
+                        <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-700">
+                          {spikesStage}
+                        </span>
+                      )}
                       <span
                         className={cn(
                           'ml-auto text-[10px]',
-                          side === 'right' ? 'text-emerald-100' : 'text-gray-500'
+                          side === 'right' ? 'text-apex-100' : 'text-gray-500'
                         )}
                       >
-                        {new Date(turn.timestamp).toLocaleTimeString()}
+                        {formatTimeInUserTimeZone(turn.timestamp)}
                       </span>
                     </div>
 
@@ -474,12 +562,19 @@ export const FeedbackConversationTimeline = ({
                           </div>
                         )}
                         {markersForTurn.types.includes('missed_opportunity') && (
-                          <div className="font-medium text-amber-600">
+                          <div
+                            className={cn(
+                              'inline-flex rounded-full px-2 py-1 font-medium',
+                              side === 'right'
+                                ? 'bg-amber-50 text-amber-700'
+                                : 'bg-amber-100 text-amber-700'
+                            )}
+                          >
                             ⚠ Missed Empathy Opportunity
                           </div>
                         )}
                         {markersForTurn.types.includes('empathy_response') && (
-                          <div className="font-medium text-emerald-400">
+                          <div className="font-medium text-apex-400">
                             ✓ Empathy Response
                           </div>
                         )}
@@ -494,7 +589,7 @@ export const FeedbackConversationTimeline = ({
                             className={cn(
                               'rounded-full px-2 py-0.5 text-[10px] font-medium',
                               side === 'right'
-                                ? 'bg-emerald-500/80 text-emerald-50'
+                                ? 'bg-apex-500/80 text-apex-50'
                                 : 'bg-gray-200 text-gray-700'
                             )}
                           >

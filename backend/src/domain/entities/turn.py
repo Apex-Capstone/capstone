@@ -1,11 +1,11 @@
 """Turn entity model."""
 
-from datetime import datetime
-
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Column, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from db.base import Base
+from db.types import UTCDateTimeType
+from core.time import utc_now
 
 
 class Turn(Base):
@@ -20,12 +20,12 @@ class Turn(Base):
     role = Column(String, nullable=False)  # user, assistant (patient)
     text = Column(Text, nullable=False)
     audio_url = Column(String, nullable=True)  # URL to stored audio file
-    audio_expires_at = Column(DateTime, nullable=True)  # Expiration timestamp for assistant audio
+    audio_expires_at = Column(UTCDateTimeType(), nullable=True)  # Expiration timestamp for assistant audio
     metrics_json = Column(Text)  # JSON with turn-level metrics (empathy score, question type, etc.) - kept for backward compatibility
     spans_json = Column(Text, nullable=True)  # JSON with detected spans (EO, elicitation, response, SPIKES) with character offsets
     relations_json = Column(Text, nullable=True)  # JSON with span-relation links (will be populated in Part 2)
     spikes_stage = Column(String)  # SPIKES stage during this turn (single primary stage; multi-stage stored in spans_json)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(UTCDateTimeType(), default=utc_now)
     
     # Relationships
     session = relationship("Session", back_populates="turns")

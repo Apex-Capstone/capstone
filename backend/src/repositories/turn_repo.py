@@ -5,6 +5,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from core.time import ensure_utc_datetime
 from domain.entities.turn import Turn
 
 
@@ -81,6 +82,7 @@ class TurnRepository:
         limit: int | None = None,
     ) -> list[Turn]:
         """Get assistant turns with expired persisted audio."""
+        cutoff = ensure_utc_datetime(cutoff)
         query = (
             self.db.query(Turn)
             .filter(

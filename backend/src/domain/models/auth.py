@@ -1,9 +1,10 @@
 """Authentication request/response schemas."""
 
-from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, EmailStr, ConfigDict
+
+from core.time import UTCDateTime
 
 
 class UserBase(BaseModel):
@@ -31,7 +32,7 @@ class UserResponse(UserBase):
     gender: Optional[str] = None
     race: Optional[str] = None
     year_of_study: Optional[str] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: Optional[UTCDateTime] = None
+    updated_at: Optional[UTCDateTime] = None
     
     model_config = ConfigDict(from_attributes=True, extra="ignore")

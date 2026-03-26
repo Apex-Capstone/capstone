@@ -1,7 +1,6 @@
 """Turn media controller/router."""
 
 import mimetypes
-from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -12,6 +11,7 @@ from sqlalchemy.orm import Session
 from adapters.storage import get_storage_adapter
 from core.deps import get_current_user, get_db, verify_session_access
 from core.errors import NotFoundError
+from core.time import utc_now
 from domain.entities.user import User
 from repositories.session_repo import SessionRepository
 from repositories.turn_repo import TurnRepository
@@ -32,7 +32,7 @@ async def get_turn_audio(
     if not turn or not turn.audio_url or turn.role != "assistant":
         raise NotFoundError(f"Audio not found for turn {turn_id}")
 
-    if turn.audio_expires_at and turn.audio_expires_at <= datetime.utcnow():
+    if turn.audio_expires_at and turn.audio_expires_at <= utc_now():
         raise NotFoundError(f"Audio expired for turn {turn_id}")
 
     session = SessionRepository(db).get_by_id(turn.session_id)

@@ -1,13 +1,26 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import timezone
+import sys
+import types
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+google_module = sys.modules.setdefault("google", types.ModuleType("google"))
+genai_module = types.ModuleType("google.genai")
+genai_module.Client = object
+genai_types_module = types.ModuleType("google.genai.types")
+genai_types_module.GenerateContentConfig = object
+genai_module.types = genai_types_module
+google_module.genai = genai_module
+sys.modules["google.genai"] = genai_module
+sys.modules["google.genai.types"] = genai_types_module
+
 from adapters.llm.base import LLMAdapter
 from adapters.nlu.simple_rule_nlu import SimpleRuleNLU
 from adapters.tts.base import TTSAudioResult
+from core.time import utc_now
 from db.base import Base
 from domain.entities.case import Case
 from domain.entities.session import Session as SessionEntity
@@ -187,6 +200,10 @@ async def test_dialogue_service_generates_assistant_audio_when_enabled(
         storage_adapter=storage,
     )
 
+    seeded_session.case.patient_background = "A 78-year-old man who is retired and anxious about his prognosis."
+    seeded_session.case.script = "He speaks carefully and is worried about what happens next."
+    test_db.commit()
+
     response = await service.process_user_turn(
         seeded_session.id,
         TurnCreate(text="Can you tell me what the results mean?", enable_tts=True),
@@ -195,9 +212,12 @@ async def test_dialogue_service_generates_assistant_audio_when_enabled(
     assert response.audio_url is not None
     assert response.audio_url.startswith("sessions/")
     assert response.audio_expires_at is not None
-    assert response.audio_expires_at > datetime.utcnow()
+    assert response.audio_expires_at.tzinfo == timezone.utc
+    assert response.audio_expires_at > utc_now()
     assert tts.calls
     assert storage.calls
+    assert tts.calls[0]["voice_id"] == "sage"
+    assert "older man" in (tts.calls[0]["instructions"] or "")
 
 
 @pytest.mark.asyncio

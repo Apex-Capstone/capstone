@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from adapters.storage.base import StorageAdapter
 from config.logging import get_logger
+from core.time import ensure_utc_datetime, utc_now
 from repositories.turn_repo import TurnRepository
 from services.audio_cache_service import AudioCacheService
 
@@ -32,7 +33,7 @@ class AudioCleanupService:
         limit: int | None = None,
     ) -> int:
         """Clean expired assistant audio and return the number of cleared turns."""
-        cutoff = now or datetime.utcnow()
+        cutoff = utc_now() if now is None else ensure_utc_datetime(now)
         expired_turns = self.turn_repo.get_expired_assistant_audio(cutoff, limit=limit)
         cleaned_count = 0
 

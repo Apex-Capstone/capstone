@@ -1,9 +1,8 @@
 """Analytics service for admin dashboard."""
 
-from datetime import datetime
-
 from sqlalchemy.orm import Session
 
+from core.time import utc_now
 from domain.models.admin import (
     AnalyticsDashboard,
     CaseStats,
@@ -40,7 +39,7 @@ class AnalyticsService:
             session_stats=session_stats,
             performance_stats=performance_stats,
             case_stats=case_stats,
-            generated_at=datetime.utcnow(),
+            generated_at=utc_now(),
         )
     
     async def _get_user_stats(self) -> UserStats:
