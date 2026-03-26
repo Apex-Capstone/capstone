@@ -159,7 +159,7 @@ export const Home = () => {
                 <Link to="/login">
                   <Button
                     size="lg"
-                    className="h-11 rounded-lg bg-gray-950 px-7 text-sm font-semibold text-white shadow-sm hover:bg-gray-800"
+                    className="h-11 rounded-lg bg-emerald-700 px-7 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800"
                   >
                     Start a simulated session
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -300,12 +300,12 @@ export const Home = () => {
                 <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">03</p>
                 <h3 className="text-sm font-semibold text-gray-950">Exportable dataset</h3>
               </div>
-              <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-                <table className="w-full text-[11px] tabular-nums">
+              <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+                <table className="w-full min-w-[320px] text-[11px] tabular-nums">
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-50">
-                      {['session_id', 'score_spikes', 'empathy', 'transcript_id'].map((col) => (
-                        <th key={col} className="px-3 py-2 text-left font-semibold text-gray-500">{col}</th>
+                      {['session_id', 'spikes', 'empathy', 'transcript_id'].map((col) => (
+                        <th key={col} className="whitespace-nowrap px-3 py-2 text-left font-semibold text-gray-500">{col}</th>
                       ))}
                     </tr>
                   </thead>
@@ -339,18 +339,18 @@ export const Home = () => {
 
         {/* ── Bottom CTA ────────────────────────────────────────────── */}
         <section>
-          <div className="rounded-2xl border border-gray-200 bg-gray-950 px-8 py-12 text-center shadow-sm">
+          <div className="rounded-2xl border border-emerald-800 bg-emerald-700 px-8 py-12 text-center shadow-sm">
             <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
               Run structured clinical communication studies
             </h2>
-            <p className="mx-auto mt-4 max-w-xl text-base text-gray-400">
+              <p className="mx-auto mt-4 max-w-xl text-base text-emerald-100">
               Simulate interactions, evaluate communication, and generate analysis-ready outputs.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Link to="/login">
                 <Button
                   size="lg"
-                  className="h-11 rounded-lg bg-white px-8 text-sm font-semibold text-gray-950 shadow-sm hover:bg-gray-100"
+                  className="h-11 rounded-lg bg-white px-8 text-sm font-semibold text-emerald-800 shadow-sm hover:bg-emerald-50"
                 >
                   Start a session
                   <ArrowRight className="ml-2 h-4 w-4" />
