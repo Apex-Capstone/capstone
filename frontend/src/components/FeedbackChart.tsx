@@ -46,7 +46,7 @@ export const FeedbackChart = ({ feedback }: FeedbackChartProps) => {
                 </div>
                 <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-emerald-600 transition-all rounded-full"
+                    className="h-full bg-apex-600 transition-all rounded-full"
                     style={{ width: `${percent}%` }}
                   />
                 </div>
@@ -57,7 +57,7 @@ export const FeedbackChart = ({ feedback }: FeedbackChartProps) => {
         <div className="mt-6 pt-6 border-t">
           <div className="flex items-center justify-between">
             <span className="text-lg font-semibold">Overall Score</span>
-            <span className="text-2xl font-bold text-emerald-600">
+            <span className="text-2xl font-bold text-apex-600">
               {feedback.overallScore.toFixed(1)}/100
             </span>
           </div>

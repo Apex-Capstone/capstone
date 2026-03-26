@@ -80,7 +80,7 @@ export const Sidebar = () => {
           <span className="text-sm font-semibold">Navigation</span>
           <button
             onClick={() => setCollapsed(true)}
-            className="p-2 rounded-md hover:bg-emerald-50"
+            className="p-2 rounded-md hover:bg-apex-50"
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -98,16 +98,16 @@ export const Sidebar = () => {
                 className={cn(
                   'group flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                   isActive
-                    ? 'bg-emerald-100 text-emerald-900'
-                    : 'text-gray-700 hover:bg-emerald-50 hover:text-emerald-900'
+                    ? 'bg-apex-100 text-apex-900'
+                    : 'text-gray-700 hover:bg-apex-50 hover:text-apex-900'
                 )}
               >
                 <item.icon
                   className={cn(
                     'h-5 w-5 shrink-0',
                     isActive
-                      ? 'text-emerald-900'
-                      : 'text-gray-600 group-hover:text-emerald-900'
+                      ? 'text-apex-900'
+                      : 'text-gray-600 group-hover:text-apex-900'
                   )}
                 />
                 <span>{item.name}</span>

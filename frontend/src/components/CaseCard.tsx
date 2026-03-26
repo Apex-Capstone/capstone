@@ -4,9 +4,9 @@ import type { Case } from '@/types/case'
 import { cn } from '@/lib/utils'
 
 const difficultyConfig: Record<string, { label: string; color: string }> = {
-  beginner: { label: 'Beginner', color: 'text-emerald-700 bg-emerald-100' },
-  intermediate: { label: 'Intermediate', color: 'text-yellow-700 bg-yellow-100' },
-  advanced: { label: 'Advanced', color: 'text-red-700 bg-red-100' },
+  beginner: { label: 'Beginner', color: 'text-apex-700 bg-apex-100' },
+  intermediate: { label: 'Intermediate', color: 'text-amber-700 bg-amber-100' },
+  advanced: { label: 'Advanced', color: 'text-rose-700 bg-rose-100' },
 }
 
 interface CaseCardProps {
@@ -35,17 +35,17 @@ export const CaseCard = ({ caseData, onClick, selected }: CaseCardProps) => {
       tabIndex={0}
       className={cn(
         'cursor-pointer rounded-lg outline-none transition-shadow',
-        'focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2'
+        'focus-visible:ring-2 focus-visible:ring-apex-500 focus-visible:ring-offset-2'
       )}
       onClick={activate}
       onKeyDown={onKeyDown}
     >
       <Card
         className={cn(
-          'h-full transition hover:shadow-md',
+          'h-full transition-shadow hover:shadow-md',
           selected
-            ? 'border-2 border-green-500 hover:border-green-500'
-            : 'border border-gray-200 hover:border-green-400'
+            ? 'border-2 border-apex-500 hover:border-apex-500'
+            : 'border border-gray-200 hover:border-apex-300'
         )}
       >
         <CardHeader className="pb-3">

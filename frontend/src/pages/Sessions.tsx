@@ -42,7 +42,6 @@ export const Sessions = () => {
   >({})
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterState>(initialFilter)
-  const [closingSessionId, setClosingSessionId] = useState<number | null>(null)
   const [confirmCloseSession, setConfirmCloseSession] = useState<Session | null>(null)
 
   useEffect(() => {
@@ -90,7 +89,6 @@ export const Sessions = () => {
     if (!confirmCloseSession) return
     const session = confirmCloseSession
     setConfirmCloseSession(null)
-    setClosingSessionId(session.id)
     try {
       await closeSession(session.id)
       setSessions((prev) =>
@@ -102,8 +100,6 @@ export const Sessions = () => {
     } catch (error) {
       console.error('Failed to close session:', error)
       toast.error('Failed to close session. Please try again.')
-    } finally {
-      setClosingSessionId(null)
     }
   }
 
@@ -174,7 +170,7 @@ export const Sessions = () => {
                   className={cn(
                     'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
                     filter === value
-                      ? 'bg-green-600 text-white'
+                      ? 'bg-apex-600 text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   )}
                 >
@@ -182,7 +178,7 @@ export const Sessions = () => {
                   <span
                     className={cn(
                       'ml-1.5 rounded-full px-1.5 py-0.5 text-xs',
-                      filter === value ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
+                      filter === value ? 'bg-apex-500 text-white' : 'bg-gray-200 text-gray-500'
                     )}
                   >
                     {count}

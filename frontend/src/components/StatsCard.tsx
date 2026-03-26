@@ -18,7 +18,7 @@ export function StatsCard({ icon: Icon, title, value, valueClassName, href, hint
     <Card
       className={cn(
         'transition',
-        href && 'hover:shadow-md hover:border-green-400 cursor-pointer group'
+        href && 'cursor-pointer group hover:border-apex-300 hover:shadow-md'
       )}
     >
       <CardContent className="flex items-center gap-3 p-4">

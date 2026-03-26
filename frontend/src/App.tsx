@@ -2,7 +2,7 @@
  * Root router: public routes, role-protected trainee/admin pages, and login redirect.
  */
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, matchPath, useLocation } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { useAuthStore } from './store/authStore'
 import { Home } from './pages/Home'
@@ -22,6 +22,44 @@ import { AdminResearchSessionPage } from './pages/AdminResearchSessionPage'
 import { PluginDeveloperGuide } from './pages/PluginDeveloperGuide'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { useAuthGate } from './hooks/useAuthGate'
+import apexLogo from './assets/apex-capstone-logo.png'
+
+const ROUTE_TITLES: Array<{ path: string; screenName: string }> = [
+  { path: '/', screenName: 'Home' },
+  { path: '/login', screenName: 'Login' },
+  { path: '/signup', screenName: 'Sign Up' },
+  { path: '/dashboard', screenName: 'Dashboard' },
+  { path: '/case/:caseId', screenName: 'Case Details' },
+  { path: '/feedback/:sessionId', screenName: 'Feedback' },
+  { path: '/sessions', screenName: 'My Sessions' },
+  { path: '/sessions/:sessionId', screenName: 'Session Details' },
+  { path: '/admin', screenName: 'Admin Dashboard' },
+  { path: '/research', screenName: 'Research' },
+  { path: '/docs/plugin-developer-guide', screenName: 'Plugin Developer Guide' },
+]
+
+const getScreenName = (pathname: string) =>
+  ROUTE_TITLES.find(({ path }) => matchPath({ path, end: true }, pathname))?.screenName ?? 'App'
+
+const BrandingManager = () => {
+  const location = useLocation()
+
+  useEffect(() => {
+    document.title = `APEX | ${getScreenName(location.pathname)}`
+
+    let favicon = document.querySelector("link[rel='icon']") as HTMLLinkElement | null
+    if (!favicon) {
+      favicon = document.createElement('link')
+      favicon.rel = 'icon'
+      document.head.appendChild(favicon)
+    }
+
+    favicon.type = 'image/png'
+    favicon.href = apexLogo
+  }, [location.pathname])
+
+  return null
+}
 
 /**
  * Renders the login page or redirects authenticated users to the dashboard.
@@ -62,6 +100,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <BrandingManager />
       <Toaster position="top-center" richColors />
       <Routes>
         {/* Public */}

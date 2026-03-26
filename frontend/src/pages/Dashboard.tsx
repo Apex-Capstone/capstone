@@ -174,9 +174,9 @@ export const Dashboard = () => {
   const activeSessionCard = (session: Session) => (
     <div
       key={session.id}
-      className="rounded-lg border border-gray-200 border-l-4 border-l-green-500 bg-white p-4 transition hover:shadow-md hover:border-green-400"
+      className="flex h-full flex-col rounded-lg border border-gray-200 border-l-4 border-l-apex-500 bg-white p-4 transition-shadow hover:border-apex-300 hover:shadow-md"
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-1 items-start justify-between gap-4">
         <div>
           <p className="text-base font-semibold text-gray-900">
             {session.caseTitle ?? `Case #${session.caseId}`}
@@ -185,7 +185,7 @@ export const Dashboard = () => {
             Session {session.id} &bull; Started {new Date(session.startedAt).toLocaleString()}
           </p>
         </div>
-        <span className="px-3 py-1 text-[10px] font-semibold uppercase rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">
+        <span className="rounded-full border border-apex-200 bg-apex-50 px-3 py-1 text-[10px] font-semibold uppercase text-apex-700">
           Active
         </span>
       </div>
@@ -213,13 +213,13 @@ export const Dashboard = () => {
   const completedSessionCard = (session: Session) => (
     <div
       key={session.id}
-      className="rounded-lg border border-gray-200 border-l-4 border-l-gray-300 bg-white p-4 transition cursor-pointer hover:shadow-md hover:border-green-400"
+      className="flex h-full cursor-pointer flex-col rounded-lg border border-gray-200 border-l-4 border-l-gray-300 bg-white p-4 transition-shadow hover:border-apex-300 hover:shadow-md"
       onClick={() => navigate(`/feedback/${session.id}`)}
       role="link"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/feedback/${session.id}`) }}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-1 items-start justify-between gap-4">
         <div>
           <p className="text-base font-semibold text-gray-900">
             {session.caseTitle ?? `Case #${session.caseId}`}
@@ -262,7 +262,7 @@ export const Dashboard = () => {
               </p>
               <div className="mt-4 flex items-center gap-4 text-sm">
                 <span className="font-medium text-gray-700">Role:</span>
-                <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800 font-medium">
+                <span className="rounded-full bg-apex-100 px-3 py-1 font-medium text-apex-800">
                   {user?.role && user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                 </span>
                 {user?.role === 'admin' && (
@@ -302,7 +302,7 @@ export const Dashboard = () => {
                       icon={Activity}
                       title="Active Sessions"
                       value={activeTotal}
-                      valueClassName="text-2xl font-bold text-green-700"
+                      valueClassName="text-2xl font-bold text-apex-700"
                       href="/sessions?filter=active"
                       hintText="View Active"
                     />
@@ -340,7 +340,7 @@ export const Dashboard = () => {
                   <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Last Session Performance */}
                     {lastSession && (
-                      <Card className="h-full transition hover:shadow-md hover:border-green-400">
+                      <Card className="h-full transition hover:shadow-md hover:border-apex-300">
                         <CardContent className="p-4 h-full flex flex-col justify-between">
                           <div>
                             <div className="text-sm font-semibold text-gray-500 mb-2">
@@ -377,7 +377,7 @@ export const Dashboard = () => {
 
                     {/* Training Insight */}
                     {insightMessage && (
-                      <Card className="h-full transition hover:shadow-md hover:border-green-400">
+                      <Card className="h-full transition hover:shadow-md hover:border-apex-300">
                         <CardContent className="p-4 h-full flex flex-col">
                           <div className="flex items-center gap-2 mb-2">
                             <Lightbulb className="h-5 w-5 text-amber-500" />
@@ -397,11 +397,11 @@ export const Dashboard = () => {
 
                     {/* Performance Trend */}
                     {sparklineScores.length >= 2 && (
-                      <Card className="h-full transition hover:shadow-md hover:border-green-400">
+                      <Card className="h-full transition hover:shadow-md hover:border-apex-300">
                         <CardContent className="p-4 h-full flex flex-col justify-between">
                           <div>
                             <div className="flex items-center gap-2 mb-2">
-                              <TrendingUp className="h-5 w-5 text-green-600" />
+                              <TrendingUp className="h-5 w-5 text-apex-600" />
                               <span className="text-sm font-semibold text-gray-500">
                                 Empathy Trend
                               </span>
@@ -410,7 +410,7 @@ export const Dashboard = () => {
                               {sparklineScores.map((score, i) => (
                                 <div
                                   key={i}
-                                  className="flex-1 bg-green-500 rounded-sm transition-all"
+                                  className="flex-1 rounded-sm bg-apex-500 transition-all"
                                   style={{ height: `${Math.max(score, 5)}%` }}
                                 />
                               ))}

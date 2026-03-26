@@ -23,13 +23,13 @@ export const Home = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-emerald-50">
+    <div className="min-h-screen bg-gradient-to-br from-apex-50 via-white to-apex-50">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         {/* Hero Section */}
         <div className="text-center mb-16">
           <div className="flex justify-center mb-6">
-            <div className="rounded-full bg-emerald-100 p-4">
-              <Stethoscope className="h-12 w-12 text-emerald-600" />
+            <div className="rounded-full bg-apex-100 p-4">
+              <Stethoscope className="h-12 w-12 text-apex-600" />
             </div>
           </div>
           <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl mb-4">
@@ -51,8 +51,8 @@ export const Home = () => {
         <div className="grid gap-8 md:grid-cols-3 mb-16">
           <Card>
             <CardHeader>
-              <div className="rounded-lg bg-emerald-100 w-12 h-12 flex items-center justify-center mb-4">
-                <FileText className="h-6 w-6 text-emerald-600" />
+              <div className="rounded-lg bg-apex-100 w-12 h-12 flex items-center justify-center mb-4">
+                <FileText className="h-6 w-6 text-apex-600" />
               </div>
               <CardTitle>Case-Based Learning</CardTitle>
               <CardDescription>
@@ -64,8 +64,8 @@ export const Home = () => {
 
           <Card>
             <CardHeader>
-              <div className="rounded-lg bg-emerald-100 w-12 h-12 flex items-center justify-center mb-4">
-                <BarChart3 className="h-6 w-6 text-emerald-600" />
+              <div className="rounded-lg bg-apex-100 w-12 h-12 flex items-center justify-center mb-4">
+                <BarChart3 className="h-6 w-6 text-apex-600" />
               </div>
               <CardTitle>AI-Powered Feedback</CardTitle>
               <CardDescription>
@@ -91,10 +91,10 @@ export const Home = () => {
 
         {/* CTA Section */}
         <div className="text-center">
-          <Card className="bg-emerald-600 text-white border-0">
+          <Card className="border-0 bg-apex-600 text-white">
             <CardHeader>
               <CardTitle className="text-2xl mb-2">Ready to Start Learning?</CardTitle>
-              <CardDescription className="text-emerald-100">
+              <CardDescription className="text-apex-100">
                 Sign in to access your dashboard and begin your medical training journey.
               </CardDescription>
             </CardHeader>
