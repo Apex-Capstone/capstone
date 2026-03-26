@@ -123,7 +123,13 @@ export const Analytics = () => {
     const communication = average(filteredSessions.map((s) => s.communicationScore))
     const clinical = average(filteredSessions.map((s) => s.clinicalScore))
     const spikes = average(filteredSessions.map((s) => s.spikesCompletionScore))
-    const overall = (empathy + communication + clinical + spikes) / 4
+    const backendOveralls = filteredSessions
+      .map((s) => s.overallScore)
+      .filter((v): v is number => typeof v === 'number')
+    const overall =
+      backendOveralls.length === filteredSessions.length
+        ? average(backendOveralls)
+        : (empathy + communication + clinical + spikes) / 4
     return {
       empty: false,
       empathy,
