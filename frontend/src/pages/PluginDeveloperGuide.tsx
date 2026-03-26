@@ -9,6 +9,8 @@ import { useEffect } from 'react'
 /** In-page table of contents anchors. */
 const sections = [
   { id: 'overview', label: 'Overview' },
+  { id: 'architecture', label: 'Plugin Architecture' },
+  { id: 'plugin-types', label: 'Plugin Types' },
   { id: 'patient-model', label: 'PatientModel Plugins' },
   { id: 'evaluator', label: 'Evaluator Plugins' },
   { id: 'metrics', label: 'Metrics Plugins' },
@@ -101,7 +103,74 @@ export const PluginDeveloperGuide = () => {
                   </p>
                 </section>
 
-                {/* 2. PatientModel Plugins */}
+                {/* 2. Plugin Architecture */}
+                <section className="mb-6" id="architecture">
+                  <h2 className="text-xl font-semibold mt-8 mb-3">Plugin Architecture</h2>
+                  <p className="text-gray-700 mb-4">
+                    APEX uses a pipeline architecture where each stage can be swapped via plugins.
+                    The evaluation pipeline flows as follows:
+                  </p>
+                  <div className="rounded-lg border border-gray-200 bg-gray-900 p-5 text-sm font-mono text-gray-100 overflow-x-auto mb-4">
+                    <div className="space-y-1">
+                      <div className="text-indigo-300">Clinician Message</div>
+                      <div className="text-gray-500">{'  →'} <span className="text-amber-300">Patient Model Plugin</span> <span className="text-gray-500">(generates patient response)</span></div>
+                      <div className="text-gray-500">{'  →'} <span className="text-gray-300">Conversation</span> <span className="text-gray-500">(multi-turn dialogue)</span></div>
+                      <div className="text-gray-500">{'  →'} <span className="text-emerald-300">Evaluator Plugin</span> <span className="text-gray-500">(scores communication, produces feedback)</span></div>
+                      <div className="text-gray-500">{'  →'} <span className="text-gray-300">Feedback + Scores</span> <span className="text-gray-500">(FeedbackResponse)</span></div>
+                      <div className="text-gray-500">{'  →'} <span className="text-purple-300">Metrics Plugins</span> <span className="text-gray-500">(compute research analytics)</span></div>
+                      <div className="text-gray-500">{'  →'} <span className="text-gray-300">Analytics Dashboard</span></div>
+                    </div>
+                  </div>
+                  <p className="text-gray-700">
+                    Each plugin type implements a specific protocol (interface) and is configured via
+                    environment variables using{' '}
+                    <span className="font-mono text-sm">module.path:ClassName</span> format. Plugins are
+                    resolved at session creation time and frozen on the session record, ensuring
+                    reproducible results for research.
+                  </p>
+                </section>
+
+                {/* 3. Plugin Types Overview */}
+                <section className="mb-6" id="plugin-types">
+                  <h2 className="text-xl font-semibold mt-8 mb-3">Plugin Types</h2>
+                  <div className="space-y-4">
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                      <h3 className="font-semibold text-amber-900">Patient Model Plugin</h3>
+                      <p className="text-sm text-amber-800 mt-1">
+                        Generates simulated patient responses during training conversations. The plugin
+                        receives the full conversation state (case context, session metadata, conversation
+                        history) and returns the next patient utterance as a string.
+                      </p>
+                      <p className="text-xs text-amber-700 mt-2 font-mono">
+                        Protocol: PatientModel.generate_response(state, clinician_input) → str
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                      <h3 className="font-semibold text-emerald-900">Evaluator Plugin</h3>
+                      <p className="text-sm text-emerald-800 mt-1">
+                        Scores clinician communication after a session ends and produces structured
+                        feedback including numeric scores, text feedback, strengths, areas for
+                        improvement, and optional framework-specific data (e.g. SPIKES coverage).
+                      </p>
+                      <p className="text-xs text-emerald-700 mt-2 font-mono">
+                        Protocol: Evaluator.evaluate(db, session_id) → FeedbackResponse
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
+                      <h3 className="font-semibold text-purple-900">Metrics Plugin</h3>
+                      <p className="text-sm text-purple-800 mt-1">
+                        Computes additional analytics metrics for research dashboards and data exports.
+                        Multiple metrics plugins can run in parallel, each producing a dictionary of
+                        computed values from the session data.
+                      </p>
+                      <p className="text-xs text-purple-700 mt-2 font-mono">
+                        Protocol: MetricsPlugin.compute(db, session_id) → dict[str, Any]
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
+                {/* 4. PatientModel Plugins */}
                 <section className="mb-6" id="patient-model">
                   <h2 className="text-xl font-semibold mt-8 mb-3">PatientModel Plugins</h2>
                   <p className="text-gray-700 mb-3">
@@ -166,10 +235,60 @@ class MyEvaluator:
                   </pre>
 
                   <h3 className="text-lg font-medium mt-6 mb-2">Expected return type</h3>
-                  <p className="text-gray-700">
+                  <p className="text-gray-700 mb-3">
                     <span className="font-mono">FeedbackResponse</span> (or a compatible type) with at
                     least empathy score, overall score, and optional strengths / areas for improvement,
                     suggested responses, and timeline events as defined in the domain model.
+                  </p>
+
+                  <h3 className="text-lg font-medium mt-6 mb-2">Complete evaluator example</h3>
+                  <pre className="bg-gray-900 text-gray-100 p-4 rounded-md text-sm overflow-x-auto mb-3">
+                    <code>{`from sqlalchemy.orm import Session
+from domain.models.sessions import FeedbackResponse
+from repositories.session_repo import SessionRepository
+
+
+class MyCustomEvaluator:
+    """Custom evaluator with SPIKES + empathy scoring."""
+
+    name = "my_custom_evaluator"
+    version = "1.0.0"
+
+    async def evaluate(self, db: Session, session_id: int) -> FeedbackResponse:
+        repo = SessionRepository(db)
+        session = repo.get(session_id)
+        turns = repo.get_turns(session_id)
+
+        # Implement your scoring logic here
+        empathy_score = self._score_empathy(turns)
+        spikes_score = self._score_spikes(turns)
+
+        return FeedbackResponse(
+            session_id=session_id,
+            empathy_score=empathy_score,
+            overall_score=(empathy_score + spikes_score) / 2,
+            spikes_completion_score=spikes_score,
+            strengths="Good use of open questions.",
+            areas_for_improvement="Consider more reflective listening.",
+            evaluator_meta={
+                "name": self.name,
+                "version": self.version,
+                "framework": "SPIKES + Empathy",
+            },
+        )
+
+    def _score_empathy(self, turns):
+        # Your empathy scoring implementation
+        return 75.0
+
+    def _score_spikes(self, turns):
+        # Your SPIKES scoring implementation
+        return 80.0`}</code>
+                  </pre>
+                  <p className="text-gray-700 text-sm">
+                    Include <span className="font-mono">evaluator_meta</span> in your response to provide
+                    the UI with display context — the Feedback page will show the evaluator name and
+                    framework to trainees.
                   </p>
                 </section>
 

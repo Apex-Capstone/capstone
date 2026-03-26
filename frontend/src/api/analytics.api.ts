@@ -16,6 +16,8 @@ function fromDTO(dto: TraineeSessionAnalyticsDTO): TraineeSessionAnalytics {
     clinicalScore: dto.clinical_score,
     spikesCompletionScore: dto.spikes_completion_score,
     spikesCoveragePercent: dto.spikes_coverage_percent,
+    overallScore:
+      typeof dto.overall_score === 'number' ? dto.overall_score : undefined,
     durationSeconds: dto.duration_seconds,
     createdAt: dto.created_at,
     eoAddressedRate:

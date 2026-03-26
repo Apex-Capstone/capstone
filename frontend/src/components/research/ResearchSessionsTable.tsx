@@ -162,7 +162,7 @@ export function ResearchSessionsTable({
       k: 67,
       knowledge: 67,
       e: 83,
-      empathy: 83,
+      emotion: 83,
       s2: 100,
       summary: 100,
     }

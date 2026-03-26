@@ -9,12 +9,12 @@ export interface SpikesCoverage {
   perception: boolean
   invitation: boolean
   knowledge: boolean
-  emotions: boolean
+  emotion: boolean
   strategy: boolean
   coveredCount: number
   total: number
-   covered: string[]
-   percent: number
+  covered: string[]
+  percent: number
 }
 
 /** Link between empathy-opportunity spans in feedback graphs. */
@@ -33,6 +33,7 @@ export interface Feedback {
   sessionId: number
 
   empathyScore: number
+  communicationScore: number
   spikesCompletionScore: number
   overallScore: number
 
@@ -105,12 +106,12 @@ export interface Feedback {
 export const fetchFeedback = async (sessionId: string): Promise<Feedback> => {
   const { data } = await api.get(`/v1/sessions/${sessionId}/feedback`)
 
-  // Map snake_case API response into the richer Feedback model used by the UI
-  let spikesCoverage: SpikesCoverage | undefined
-
-  if (data.spikes_coverage && typeof data.spikes_coverage === 'object') {
-    const coveredRaw = Array.isArray(data.spikes_coverage.covered)
-      ? data.spikes_coverage.covered
+  const normalizeCoverage = (rawCoverage: unknown): SpikesCoverage | undefined => {
+    if (!rawCoverage || typeof rawCoverage !== 'object') {
+      return undefined
+    }
+    const coveredRaw = Array.isArray((rawCoverage as { covered?: unknown[] }).covered)
+      ? (rawCoverage as { covered: unknown[] }).covered
       : []
 
     const normalizedCovered = coveredRaw
@@ -125,25 +126,26 @@ export const fetchFeedback = async (sessionId: string): Promise<Feedback> => {
       normalizedCovered.includes('invitation') || normalizedCovered.includes('i')
     const knowledge =
       normalizedCovered.includes('knowledge') || normalizedCovered.includes('k')
-    const emotions =
+    const emotion =
       normalizedCovered.includes('emotion') ||
       normalizedCovered.includes('emotions') ||
+      normalizedCovered.includes('empathy') ||
       normalizedCovered.includes('e')
     const strategy =
       normalizedCovered.includes('strategy') || normalizedCovered.includes('s2')
 
-    const stages = { setting, perception, invitation, knowledge, emotions, strategy }
+    const stages = { setting, perception, invitation, knowledge, emotion, strategy }
     const coveredCount = Object.values(stages).filter(Boolean).length
     const total = 6
 
     const percent =
-      typeof data.spikes_coverage.percent === 'number'
-        ? data.spikes_coverage.percent
+      typeof (rawCoverage as { percent?: unknown }).percent === 'number'
+        ? ((rawCoverage as { percent: number }).percent ?? 0)
         : total > 0
           ? coveredCount / total
           : 0
 
-    spikesCoverage = {
+    return {
       ...stages,
       coveredCount,
       total,
@@ -152,10 +154,12 @@ export const fetchFeedback = async (sessionId: string): Promise<Feedback> => {
     }
   }
 
+  const spikesCoverage = normalizeCoverage(data.spikes_coverage)
   return {
     id: data.id,
     sessionId: data.session_id,
     empathyScore: data.empathy_score ?? 0,
+    communicationScore: data.communication_score ?? 0,
     spikesCompletionScore: data.spikes_completion_score ?? 0,
     overallScore: data.overall_score ?? 0,
     eoCountsByDimension: data.eo_counts_by_dimension ?? undefined,

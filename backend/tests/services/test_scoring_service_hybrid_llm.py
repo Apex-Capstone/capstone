@@ -11,7 +11,12 @@ from schemas.llm_reviewer import (
     LLMMissedOpportunityItem,
     LLMReviewerOutput,
 )
-from services.scoring_service import ScoringService, _compact_llm_output_for_evaluator_meta
+from services.scoring_service import (
+    ScoringService,
+    _calculate_spikes_completion_from_coverage,
+    _compact_llm_output_for_evaluator_meta,
+    _compute_spikes_coverage_merge,
+)
 from tests.utils.transcript_runner import create_all_for_test_engine
 
 
@@ -81,3 +86,33 @@ def test_compact_hybrid_v2_compiled_includes_v2_fields() -> None:
     assert d["reviewer_version"] == "v2"
     assert d["empathic_opportunities"] == ["a"]
     assert d["stage_turn_mapping"] == [{"turn_number": 1, "stage": "setting"}]
+
+
+def test_spikes_coverage_merge_union_and_confidence_gate() -> None:
+    rule_cov = {"covered": ["setting", "strategy"], "percent": 2 / 6}
+    evaluator_meta = {
+        "status": "completed",
+        "llm_output": {
+            "spikes_annotations": [
+                {"stage": "perception", "confidence": 0.95},
+                {"stage": "invitation", "confidence": 0.3},
+                {"stage": "knowledge"},  # missing confidence should be allowed
+            ]
+        },
+    }
+    merged = _compute_spikes_coverage_merge(rule_cov, evaluator_meta)
+    assert merged["covered"] == ["setting", "perception", "knowledge", "strategy"]
+    assert _calculate_spikes_completion_from_coverage(merged) == pytest.approx(round((4 / 6) * 100.0, 2))
+
+
+def test_spikes_coverage_merge_gating_fallbacks_to_rule_only() -> None:
+    rule_cov = {"covered": ["setting"], "percent": 1 / 6}
+    for meta in (
+        None,
+        {"status": "failed", "llm_output": {"spikes_annotations": [{"stage": "knowledge"}]}},
+        {"status": "completed"},
+        {"status": "completed", "llm_output": {}},
+        {"status": "completed", "llm_output": {"spikes_annotations": []}},
+    ):
+        merged = _compute_spikes_coverage_merge(rule_cov, meta)
+        assert merged["covered"] == ["setting"]
