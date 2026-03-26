@@ -229,7 +229,7 @@ export const Sessions = () => {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3 max-h-[420px] overflow-y-auto scroll-smooth pr-1 pb-2">
+              <div className="space-y-2 max-h-[420px] overflow-y-auto scroll-smooth pr-1 pb-2">
                 {displaySessions.map((session) => {
                   const caseTitle =
                     caseMap[session.caseId]?.title ?? session.caseTitle ?? `Case #${session.caseId}`
@@ -244,11 +244,6 @@ export const Sessions = () => {
                         caseTitle={caseTitle}
                         analytics={analytics}
                         to={`/feedback/${session.id}`}
-                        actions={
-                          <Button size="sm" variant="success">
-                            View Feedback
-                          </Button>
-                        }
                       />
                     )
                   }
@@ -258,32 +253,7 @@ export const Sessions = () => {
                       key={session.id}
                       session={session}
                       caseTitle={caseTitle}
-                      actions={
-                        <>
-                          <Button
-                            size="sm"
-                            variant="success"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              navigate(`/case/${session.caseId}?sessionId=${session.id}`)
-                            }}
-                          >
-                            Continue
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700"
-                            disabled={closingSessionId === session.id}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setConfirmCloseSession(session)
-                            }}
-                          >
-                            {closingSessionId === session.id ? 'Closing...' : 'Close Session'}
-                          </Button>
-                        </>
-                      }
+                      to={`/case/${session.caseId}?sessionId=${session.id}`}
                     />
                   )
                 })}

@@ -1,11 +1,21 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, CardContent } from '@/components/ui/card'
+import { ChevronRight, Clock, CheckCircle2 } from 'lucide-react'
 import type { Session } from '@/types/session'
 import type { TraineeSessionAnalytics } from '@/types/analytics'
 import { cn } from '@/lib/utils'
 
 const SPIKES_TOTAL_STAGES = 6
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
 
 function formatDuration(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds <= 0) return '0s'
@@ -19,12 +29,6 @@ function formatDuration(seconds: number): string {
 function clampStageCount(stageCount: number): number {
   if (!Number.isFinite(stageCount)) return 0
   return Math.max(0, Math.min(SPIKES_TOTAL_STAGES, Math.round(stageCount)))
-}
-
-function empathyToneClass(score: number) {
-  if (score >= 80) return 'text-emerald-700'
-  if (score >= 60) return 'text-yellow-700'
-  return 'text-red-700'
 }
 
 function spikesStageCount(analytics: TraineeSessionAnalytics | undefined): number | null {
@@ -43,20 +47,6 @@ function spikesCoveredLabel(analytics: TraineeSessionAnalytics | undefined): str
   return `${count} / ${SPIKES_TOTAL_STAGES}`
 }
 
-function performanceBadge(analytics: TraineeSessionAnalytics | undefined) {
-  if (!analytics) return null
-  const empathy = analytics.empathyScore
-  const spikesCount = spikesStageCount(analytics) ?? 0
-
-  const empathyMaster = empathy >= 85
-  const strongSpikes = spikesCount >= 5
-
-  if (empathyMaster && strongSpikes) return 'Excellent Communication'
-  if (empathyMaster) return 'Empathy Master'
-  if (strongSpikes) return 'Strong SPIKES'
-  return null
-}
-
 type SessionCardProps = {
   session: Session
   caseTitle: string
@@ -67,87 +57,87 @@ type SessionCardProps = {
 
 export function SessionCard({ session, caseTitle, analytics, to, actions }: SessionCardProps) {
   const isCompleted = session.state === 'completed'
-
   const empathyRounded =
     analytics && typeof analytics.empathyScore === 'number' ? Math.round(analytics.empathyScore) : null
-
   const spikesLabel = spikesCoveredLabel(analytics)
-  const badgeText = performanceBadge(analytics)
-
-  const statusBadge = (
-    <span
-      className={cn(
-        'px-3 py-1 text-[10px] font-semibold uppercase rounded-full border',
-        isCompleted
-          ? 'bg-gray-100 text-gray-600 border-gray-200'
-          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-      )}
-    >
-      {isCompleted ? 'Completed' : 'Active'}
-    </span>
-  )
-
   const durationLabel = isCompleted ? formatDuration(session.durationSeconds ?? 0) : 'In progress'
+  const stageLabel = session.currentSpikesStage
+    ? session.currentSpikesStage.charAt(0).toUpperCase() + session.currentSpikesStage.slice(1)
+    : null
 
-  const cardElement = (
-    <Card
+  const row = (
+    <div
       className={cn(
-        'h-full rounded-lg border border-gray-200 transition',
-        'py-4 hover:shadow-md hover:border-green-400 cursor-pointer'
+        'flex items-center justify-between p-4 border rounded-lg transition cursor-pointer',
+        'hover:bg-gray-50 hover:border-gray-300'
       )}
     >
-      <CardContent className="p-0">
-        <div className="flex flex-col gap-3 px-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-base font-semibold text-gray-900 truncate">{caseTitle}</div>
-            </div>
-            {statusBadge}
+      <div className="flex items-center gap-4 min-w-0">
+        <div
+          className={cn(
+            'h-9 w-9 flex shrink-0 items-center justify-center rounded-full',
+            isCompleted ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'
+          )}
+        >
+          {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+        </div>
+
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-base font-semibold text-gray-900 truncate">{caseTitle}</span>
+            <span
+              className={cn(
+                'text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap',
+                isCompleted ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+              )}
+            >
+              {isCompleted ? 'Completed' : 'Active'}
+            </span>
+            {stageLabel && (
+              <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap">
+                {stageLabel}
+              </span>
+            )}
           </div>
 
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span>Session {session.id}</span>
-            <span className="text-gray-300">&bull;</span>
-            <span>{durationLabel}</span>
+          <div className="text-sm text-gray-500 mt-1">
+            {formatDate(session.startedAt)} &bull; {durationLabel} &bull; Session #{session.id}
           </div>
 
-          {isCompleted && (
-            <div className="flex items-center justify-start gap-3">
-              <div className={cn('text-sm font-semibold', empathyToneClass(analytics?.empathyScore ?? 0))}>
-                Empathy {empathyRounded != null ? `${empathyRounded}%` : '—'}
-              </div>
+          {isCompleted && analytics && (
+            <div className="flex items-center gap-3 mt-1 text-sm">
+              <span className="text-gray-500">
+                Empathy{' '}
+                <span className="font-semibold text-gray-700">{empathyRounded ?? '—'}%</span>
+              </span>
               <span className="text-gray-300">&bull;</span>
-              <div className="text-sm font-medium text-purple-700">
-                SPIKES {spikesLabel}
-              </div>
-            </div>
-          )}
-
-          {isCompleted && badgeText && (
-            <div className="pt-1 text-sm font-semibold text-gray-700">{badgeText}</div>
-          )}
-
-          {actions && (
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              {actions}
+              <span className="text-gray-500">
+                SPIKES{' '}
+                <span className="font-semibold text-gray-700">{spikesLabel}</span>
+              </span>
             </div>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      <div className="flex items-center gap-2 shrink-0 ml-4">
+        {actions}
+        <ChevronRight className="h-5 w-5 text-gray-400" />
+      </div>
+    </div>
   )
 
   if (to) {
     return (
       <Link
         to={to}
-        className="group block no-underline"
+        className="block no-underline"
         aria-label={`Open ${isCompleted ? 'feedback' : 'session'} for session ${session.id}`}
       >
-        {cardElement}
+        {row}
       </Link>
     )
   }
 
-  return <div className="group block">{cardElement}</div>
+  return row
 }
