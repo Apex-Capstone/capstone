@@ -131,12 +131,12 @@ export const Sessions = () => {
   ]
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex h-screen flex-col overflow-hidden">
       <Navbar />
-      <div className="flex flex-1">
+      <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main className="flex-1 md:ml-64">
-          <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <main className="flex flex-1 min-h-0 flex-col md:ml-64">
+          <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col px-4 py-8 sm:px-6 lg:px-8">
             <nav className="mb-4 text-sm text-gray-500">
               <span
                 className="cursor-pointer hover:text-gray-700"
@@ -225,7 +225,7 @@ export const Sessions = () => {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-2 max-h-[420px] overflow-y-auto scroll-smooth pr-1 pb-2">
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto scroll-smooth pr-1 pb-2">
                 {displaySessions.map((session) => {
                   const caseTitle =
                     caseMap[session.caseId]?.title ?? session.caseTitle ?? `Case #${session.caseId}`

@@ -224,8 +224,7 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
       </div>
 
       <div className="overflow-x-auto rounded-lg border">
-        <div className="max-h-[460px] overflow-y-auto">
-          <table className="min-w-[1180px] w-full text-sm">
+        <table className="min-w-[1180px] w-full text-sm">
             <thead className="sticky top-0 z-10 bg-gray-50">
               <tr className="border-b text-gray-600">
                 <th className="w-10 px-2 py-3 text-left align-middle" scope="col">
@@ -355,8 +354,7 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
                 })
               )}
             </tbody>
-          </table>
-        </div>
+        </table>
       </div>
 
       <div className="flex items-center justify-end gap-3">

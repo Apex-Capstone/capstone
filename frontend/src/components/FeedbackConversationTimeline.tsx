@@ -147,6 +147,25 @@ type EmpathyMarkersByTurn = Record<
 >
 
 /**
+ * Finds the next clinician turn after a given turn number.
+ *
+ * @param turns - Full ordered transcript
+ * @param afterTurnNumber - EO turn number
+ * @returns Next clinician turn number, if present
+ */
+const getNextClinicianTurnNumber = (
+  turns: Array<Turn & { spansJson?: string }>,
+  afterTurnNumber: number,
+): number | undefined => {
+  return turns
+    .filter((turn) => turn.turnNumber > afterTurnNumber)
+    .sort((a, b) => a.turnNumber - b.turnNumber)
+    .find((turn) =>
+      ['user', 'trainee', 'doctor', 'physician', 'clinician'].includes(turn.role.toLowerCase())
+    )?.turnNumber
+}
+
+/**
  * Parses `spans_json` into validated start/end spans for highlighting.
  *
  * @param spansJson - JSON string or parsed array
@@ -258,19 +277,26 @@ const buildEmpathyTimelineMarkers = (
   // 2) Overlay missed opportunities using backend summary (has turn_number)
   if (Array.isArray(feedback.missed_opportunities)) {
     feedback.missed_opportunities.forEach((entry) => {
-      const tn = typeof (entry as any)?.turn_number === 'number'
+      const eoTurnNumber = typeof (entry as any)?.turn_number === 'number'
         ? (entry as any).turn_number
         : undefined
-      if (!tn) return
+      if (!eoTurnNumber) return
 
-      if (!markers[tn]) {
-        markers[tn] = { types: [] }
+      const clinicianTurnNumber = getNextClinicianTurnNumber(turns, eoTurnNumber)
+
+      if (!markers[eoTurnNumber]) {
+        markers[eoTurnNumber] = { types: [] }
       }
-      if (!markers[tn].types.includes('empathy_opportunity')) {
-        markers[tn].types.push('empathy_opportunity')
+      if (!markers[eoTurnNumber].types.includes('empathy_opportunity')) {
+        markers[eoTurnNumber].types.push('empathy_opportunity')
       }
-      if (!markers[tn].types.includes('missed_opportunity')) {
-        markers[tn].types.push('missed_opportunity')
+
+      const missedMarkerTurn = clinicianTurnNumber ?? eoTurnNumber
+      if (!markers[missedMarkerTurn]) {
+        markers[missedMarkerTurn] = { types: [] }
+      }
+      if (!markers[missedMarkerTurn].types.includes('missed_opportunity')) {
+        markers[missedMarkerTurn].types.push('missed_opportunity')
       }
     })
   }
@@ -410,7 +436,7 @@ export const FeedbackConversationTimeline = ({
         {sortedTurns.length === 0 ? (
           <p className="text-sm text-gray-500">No conversation turns recorded for this session.</p>
         ) : (
-          <div className="space-y-4">
+          <div className="h-[32rem] space-y-4 overflow-y-auto pr-2">
             {sortedTurns.map((turn) => {
               const roleLabel = formatRoleLabel(turn.role)
               const side = mapRoleToSide(turn.role)
@@ -449,9 +475,11 @@ export const FeedbackConversationTimeline = ({
                       >
                         {roleLabel}
                       </span>
-                      <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-700">
-                        {spikesStage}
-                      </span>
+                      {side === 'right' && (
+                        <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-700">
+                          {spikesStage}
+                        </span>
+                      )}
                       <span
                         className={cn(
                           'ml-auto text-[10px]',
@@ -474,7 +502,14 @@ export const FeedbackConversationTimeline = ({
                           </div>
                         )}
                         {markersForTurn.types.includes('missed_opportunity') && (
-                          <div className="font-medium text-amber-600">
+                          <div
+                            className={cn(
+                              'inline-flex rounded-full px-2 py-1 font-medium',
+                              side === 'right'
+                                ? 'bg-amber-50 text-amber-700'
+                                : 'bg-amber-100 text-amber-700'
+                            )}
+                          >
                             ⚠ Missed Empathy Opportunity
                           </div>
                         )}

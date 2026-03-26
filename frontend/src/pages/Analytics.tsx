@@ -170,7 +170,7 @@ export const Analytics = () => {
 
   if (loading) {
     return (
-      <div className="h-screen flex flex-col">
+      <div className="fixed inset-0 overflow-hidden flex flex-col bg-white">
         <Navbar />
         <div className="flex flex-1 min-h-0">
           <Sidebar />
@@ -186,7 +186,7 @@ export const Analytics = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="fixed inset-0 overflow-hidden flex flex-col bg-white">
       <Navbar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />
