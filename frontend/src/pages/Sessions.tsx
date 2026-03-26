@@ -2,60 +2,22 @@
  * Paginated list of the user’s sessions with filters and links to case/detail/feedback.
  */
 import { useEffect, useState, useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { listActiveSessions, listCompletedSessions } from '@/api/sessions.api'
 import { getCase } from '@/api/cases.api'
+import { fetchMySessionAnalytics } from '@/api/analytics.api'
 import type { Session } from '@/types/session'
 import type { Case } from '@/types/case'
+import type { TraineeSessionAnalytics } from '@/types/analytics'
+import { SessionCard } from '@/components/SessionCard'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ClipboardList, Clock, CheckCircle2, ChevronRight, BookOpen } from 'lucide-react'
+import { ClipboardList, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type FilterState = 'all' | 'active' | 'completed'
-
-/**
- * Formats elapsed seconds as `Xm Ys` or `Ys`.
- *
- * @param seconds - Duration in seconds
- * @returns Short label
- */
-function formatDuration(seconds: number): string {
-  if (seconds <= 0) return '0s'
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  if (m === 0) return `${s}s`
-  return `${m}m ${s}s`
-}
-
-/**
- * Formats an ISO timestamp for list rows.
- *
- * @param iso - ISO date string
- * @returns Locale date/time string
- */
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-/** Human-readable SPIKES stage labels keyed by backend slug. */
-const SPIKES_DISPLAY: Record<string, string> = {
-  setting: 'Setting',
-  perception: 'Perception',
-  invitation: 'Invitation',
-  knowledge: 'Knowledge',
-  empathy: 'Empathy',
-  strategy: 'Strategy',
-  summary: 'Strategy',
-}
 
 /**
  * Session history page with filter tabs and prefetch of related case titles.
@@ -66,6 +28,9 @@ export const Sessions = () => {
   const navigate = useNavigate()
   const [sessions, setSessions] = useState<Session[]>([])
   const [caseMap, setCaseMap] = useState<Record<number, Case>>({})
+  const [analyticsBySessionId, setAnalyticsBySessionId] = useState<
+    Record<number, TraineeSessionAnalytics>
+  >({})
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterState>('all')
 
@@ -75,14 +40,25 @@ export const Sessions = () => {
      */
     const load = async () => {
       try {
-        const [activeResult, completedResult] = await Promise.allSettled([
+        const [activeResult, completedResult, analyticsResult] = await Promise.allSettled([
           listActiveSessions(),
           listCompletedSessions(),
+          fetchMySessionAnalytics(),
         ])
         const all: Session[] = []
         if (activeResult.status === 'fulfilled') all.push(...activeResult.value.sessions)
         if (completedResult.status === 'fulfilled') all.push(...completedResult.value.sessions)
         setSessions(all)
+
+        if (analyticsResult.status === 'fulfilled') {
+          const map: Record<number, TraineeSessionAnalytics> = {}
+          analyticsResult.value.forEach((a) => {
+            map[a.sessionId] = a
+          })
+          setAnalyticsBySessionId(map)
+        } else {
+          setAnalyticsBySessionId({})
+        }
 
         const caseIds = [...new Set(all.map((s) => s.caseId))]
         const cases = await Promise.all(
@@ -102,9 +78,20 @@ export const Sessions = () => {
     load()
   }, [])
 
-  const filtered = useMemo(() => {
-    if (filter === 'all') return sessions
-    return sessions.filter((s) => s.state === filter)
+  const displaySessions = useMemo(() => {
+    const byStartedAtDesc = (items: Session[]) =>
+      [...items].sort(
+        (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+      )
+
+    const active = sessions.filter((s) => s.state === 'active')
+    const completed = sessions.filter((s) => s.state === 'completed')
+
+    if (filter === 'active') return byStartedAtDesc(active)
+    if (filter === 'completed') return byStartedAtDesc(completed)
+
+    // filter === 'all': active first, then completed; newest first within each group.
+    return [...byStartedAtDesc(active), ...byStartedAtDesc(completed)]
   }, [sessions, filter])
 
   const counts = useMemo(() => {
@@ -144,7 +131,7 @@ export const Sessions = () => {
                   Review your past and active training sessions
                 </p>
               </div>
-              <Button onClick={() => navigate('/dashboard')} variant="outline" className="gap-2">
+              <Button onClick={() => navigate('/cases')} variant="outline" className="gap-2">
                 <BookOpen className="h-4 w-4" />
                 Browse Cases
               </Button>
@@ -179,7 +166,7 @@ export const Sessions = () => {
             {loading ? (
               <div className="space-y-3">
                 {[1, 2, 3, 4].map((n) => (
-                  <div key={n} className="animate-pulse rounded-lg border bg-white p-5">
+                  <div key={n} className="animate-pulse rounded-lg bg-gray-200 p-6">
                     <div className="flex items-center justify-between">
                       <div className="space-y-2">
                         <div className="h-5 w-48 rounded bg-gray-200" />
@@ -190,103 +177,50 @@ export const Sessions = () => {
                   </div>
                 ))}
               </div>
-            ) : filtered.length === 0 ? (
+            ) : displaySessions.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center py-16 text-center">
                   <ClipboardList className="mb-4 h-12 w-12 text-gray-300" />
                   <p className="text-lg font-medium text-gray-700">
                     {filter === 'all'
-                      ? 'No sessions yet'
+                      ? 'No sessions yet. Start your first training session.'
                       : `No ${filter} sessions`}
                   </p>
                   <p className="mt-1 text-sm text-gray-500">
                     {filter === 'all'
-                      ? 'Start a practice session from the Dashboard.'
+                      ? 'Choose a patient case and begin your next practice.'
                       : 'Try a different filter or start a new session.'}
                   </p>
                   <Button
                     className="mt-6"
                     onClick={() => navigate('/cases')}
                   >
-                    Browse Cases
+                    {filter === 'all' ? 'Start Session' : 'Browse Cases'}
                   </Button>
                 </CardContent>
               </Card>
             ) : (
               <div className="space-y-3">
-                {filtered
-                  .slice()
-                  .sort(
-                    (a, b) =>
-                      new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+                {displaySessions.map((session) => {
+                  const caseTitle =
+                    caseMap[session.caseId]?.title ?? `Case #${session.caseId}`
+                  const isCompleted = session.state === 'completed'
+                  const analytics = isCompleted ? analyticsBySessionId[session.id] : undefined
+
+                  const to = isCompleted
+                    ? `/feedback/${session.id}`
+                    : `/case/${session.caseId}?sessionId=${session.id}`
+
+                  return (
+                    <SessionCard
+                      key={session.id}
+                      session={session}
+                      caseTitle={caseTitle}
+                      analytics={analytics}
+                      to={to}
+                    />
                   )
-                  .map((session) => {
-                    const caseTitle = caseMap[session.caseId]?.title ?? `Case #${session.caseId}`
-                    const isCompleted = session.state === 'completed'
-                    const spikesLabel = session.currentSpikesStage
-                      ? (SPIKES_DISPLAY[session.currentSpikesStage] ?? session.currentSpikesStage)
-                      : null
-
-                    return (
-                      <Link
-                        key={session.id}
-                        to={`/sessions/${session.id}`}
-                        className="group flex cursor-pointer items-center justify-between rounded-lg border bg-white p-5 transition-shadow hover:shadow-md hover:border-emerald-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 no-underline text-inherit block"
-                      >
-                        <div className="flex items-start gap-4">
-                          <div
-                            className={cn(
-                              'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
-                              isCompleted
-                                ? 'bg-emerald-100 text-emerald-600'
-                                : 'bg-amber-100 text-amber-600'
-                            )}
-                          >
-                            {isCompleted ? (
-                              <CheckCircle2 className="h-5 w-5" />
-                            ) : (
-                              <Clock className="h-5 w-5" />
-                            )}
-                          </div>
-
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-gray-900">{caseTitle}</span>
-                              <span
-                                className={cn(
-                                  'rounded-full px-2 py-0.5 text-xs font-medium',
-                                  isCompleted
-                                    ? 'bg-emerald-100 text-emerald-700'
-                                    : 'bg-amber-100 text-amber-700'
-                                )}
-                              >
-                                {isCompleted ? 'Completed' : 'Active'}
-                              </span>
-                              {spikesLabel && (
-                                <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
-                                  {spikesLabel}
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="mt-1 flex items-center gap-3 text-sm text-gray-500">
-                              <span>{formatDate(session.startedAt)}</span>
-                              <span className="text-gray-300">•</span>
-                              <span>
-                                {isCompleted
-                                  ? formatDuration(session.durationSeconds)
-                                  : 'In progress'}
-                              </span>
-                              <span className="text-gray-300">•</span>
-                              <span>Session #{session.id}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <ChevronRight className="h-5 w-5 text-gray-300 transition-colors group-hover:text-emerald-500" />
-                      </Link>
-                    )
-                  })}
+                })}
               </div>
             )}
           </div>

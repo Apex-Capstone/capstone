@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { closeSession, listActiveSessions, listCompletedSessions } from '@/api/sessions.api'
+import { fetchMySessionAnalytics } from '@/api/analytics.api'
 import type { Session } from '@/types/session'
 import { Button } from '@/components/ui/button'
+import { StatsCard } from '@/components/StatsCard'
 import { useNavigate } from 'react-router-dom'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { useAuthStore } from '@/store/authStore'
 import { toast } from 'sonner'
+import { Activity, BarChart3, CheckCircle2, ClipboardList, HeartHandshake } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -25,13 +28,17 @@ export const Dashboard = () => {
   const [confirmCloseSession, setConfirmCloseSession] = useState<Session | null>(null)
   const { user } = useAuthStore()
   const navigate = useNavigate()
+  const totalSessions = activeTotal + completedTotal
+  const [avgEmpathy, setAvgEmpathy] = useState<number | null>(null)
+  const [avgSpikesCoverageStageCount, setAvgSpikesCoverageStageCount] = useState<number | null>(null)
 
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
-        const [activeResult, completedResult] = await Promise.allSettled([
+        const [activeResult, completedResult, analyticsResult] = await Promise.allSettled([
           listActiveSessions({ limit: 3 }),
           listCompletedSessions({ limit: 3 }),
+          fetchMySessionAnalytics(),
         ])
         if (activeResult.status === 'fulfilled') {
           setActiveSessions(activeResult.value.sessions ?? [])
@@ -44,6 +51,26 @@ export const Dashboard = () => {
           setCompletedTotal(completedResult.value.total ?? 0)
         } else {
           console.error('Failed to fetch completed sessions:', completedResult.reason)
+        }
+
+        if (analyticsResult.status === 'fulfilled') {
+          const analytics = analyticsResult.value
+          const empathyValues = analytics
+            .map((a) => (typeof a.empathyScore === 'number' && Number.isFinite(a.empathyScore) ? a.empathyScore : null))
+            .filter((v): v is number => v != null)
+
+          const stagesValues = analytics
+            .map((a) => spikesStageCountFromAnalytics(a))
+            .filter((v): v is number => v != null)
+
+          const empathyAvg = empathyValues.length ? empathyValues.reduce((s, v) => s + v, 0) / empathyValues.length : null
+          const spikesAvg = stagesValues.length ? stagesValues.reduce((s, v) => s + v, 0) / stagesValues.length : null
+
+          setAvgEmpathy(empathyAvg)
+          setAvgSpikesCoverageStageCount(spikesAvg)
+        } else {
+          setAvgEmpathy(null)
+          setAvgSpikesCoverageStageCount(null)
         }
       } finally {
         setLoading(false)
@@ -59,6 +86,27 @@ export const Dashboard = () => {
       return `${mins}m ${secs}s`
     }
     return `${secs}s`
+  }
+
+  const SPIKES_TOTAL_STAGES = 6
+
+  const clampStageCount = (stageCount: number) => {
+    if (!Number.isFinite(stageCount)) return 0
+    return Math.max(0, Math.min(SPIKES_TOTAL_STAGES, Math.round(stageCount)))
+  }
+
+  const spikesStageCountFromAnalytics = (analytics: {
+    spikesStagesCovered?: string[]
+    spikesCoveragePercent: number
+  }): number | null => {
+    if (analytics.spikesStagesCovered?.length) {
+      return clampStageCount(analytics.spikesStagesCovered.length)
+    }
+    const pct = analytics.spikesCoveragePercent
+    if (typeof pct === 'number' && Number.isFinite(pct)) {
+      return clampStageCount((pct / 100) * SPIKES_TOTAL_STAGES)
+    }
+    return null
   }
 
   const handleStartNewSession = async () => {
@@ -177,24 +225,27 @@ export const Dashboard = () => {
 
             {loading ? (
               <div>
-                <div className="mb-6">
-                  <div className="h-6 w-48 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse mb-2" />
-                  <div className="h-4 w-64 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-pulse" />
+                <div className="mb-8">
+                  <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <div key={n} className="h-20 rounded-lg bg-gray-200 animate-pulse" />
+                    ))}
+                  </div>
                 </div>
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   {[1, 2, 3, 4, 5, 6].map((n) => (
-                    <div key={n} className="bg-white border rounded-lg p-6 animate-pulse">
+                    <div key={n} className="rounded-lg bg-gray-200 p-6 animate-pulse">
                       <div className="flex justify-between items-start mb-4">
-                        <div className="h-5 w-32 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded" />
-                        <div className="h-5 w-14 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-full" />
+                        <div className="h-5 w-32 bg-gray-200 rounded" />
+                        <div className="h-5 w-14 bg-gray-200 rounded-full" />
                       </div>
                       <div className="space-y-2 mb-4">
-                        <div className="h-4 w-full bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded" />
-                        <div className="h-4 w-3/4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded" />
+                        <div className="h-4 w-full bg-gray-200 rounded" />
+                        <div className="h-4 w-3/4 bg-gray-200 rounded" />
                       </div>
                       <div className="flex justify-between items-center">
-                        <div className="h-3 w-24 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded" />
-                        <div className="h-3 w-20 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded" />
+                        <div className="h-3 w-24 bg-gray-200 rounded" />
+                        <div className="h-3 w-20 bg-gray-200 rounded" />
                       </div>
                     </div>
                   ))}
@@ -202,14 +253,50 @@ export const Dashboard = () => {
               </div>
             ) : (
               <div>
+                <div className="mb-8">
+                  <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
+                    <StatsCard
+                      icon={ClipboardList}
+                      title="Total Sessions"
+                      value={totalSessions}
+                    />
+                    <StatsCard
+                      icon={Activity}
+                      title="Active Sessions"
+                      value={activeTotal}
+                      valueClassName="text-emerald-700"
+                    />
+                    <StatsCard
+                      icon={CheckCircle2}
+                      title="Completed Sessions"
+                      value={completedTotal}
+                      valueClassName="text-gray-700"
+                    />
+                    <StatsCard
+                      icon={HeartHandshake}
+                      title="Average Empathy Score"
+                      value={avgEmpathy == null ? '—' : Math.round(avgEmpathy)}
+                    />
+                    <StatsCard
+                      icon={BarChart3}
+                      title="Average SPIKES Coverage"
+                      value={
+                        avgSpikesCoverageStageCount == null
+                          ? '—'
+                          : `${avgSpikesCoverageStageCount.toFixed(1)} / 6`
+                      }
+                    />
+                  </div>
+                </div>
+
                 {/* Quick actions */}
                 <div className="mb-8">
                   <div className="flex flex-wrap items-center gap-3">
                     <Button variant="success" onClick={handleStartNewSession}>
-                      Start Session
+                      Start New Session
                     </Button>
-                    <Button variant="outline" onClick={() => navigate('/cases')}>
-                      Browse Cases
+                    <Button variant="outline" onClick={() => navigate('/sessions')}>
+                      View My Sessions
                     </Button>
                     <Button variant="outline" onClick={() => navigate('/analytics')}>
                       View Analytics
@@ -234,9 +321,6 @@ export const Dashboard = () => {
                   <div className="mb-6">
                     <h3 className="text-base font-medium text-gray-800 mb-3 flex items-center gap-2">
                       Active
-                      {activeTotal > 0 && (
-                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">{activeTotal}</span>
-                      )}
                     </h3>
                     {activeSessions.length === 0 ? (
                       <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
@@ -253,9 +337,6 @@ export const Dashboard = () => {
                   <div>
                     <h3 className="text-base font-medium text-gray-800 mb-3 flex items-center gap-2">
                       Completed
-                      {completedTotal > 0 && (
-                        <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-600">{completedTotal}</span>
-                      )}
                     </h3>
                     {completedSessions.length === 0 ? (
                       <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">

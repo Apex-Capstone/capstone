@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils'
 
 const difficultyConfig: Record<string, { label: string; color: string }> = {
   beginner: { label: 'Beginner', color: 'text-emerald-700 bg-emerald-100' },
-  intermediate: { label: 'Intermediate', color: 'text-amber-700 bg-amber-100' },
-  advanced: { label: 'Advanced', color: 'text-rose-700 bg-rose-100' },
+  intermediate: { label: 'Intermediate', color: 'text-yellow-700 bg-yellow-100' },
+  advanced: { label: 'Advanced', color: 'text-red-700 bg-red-100' },
 }
 
 interface CaseCardProps {
@@ -42,8 +42,10 @@ export const CaseCard = ({ caseData, onClick, selected }: CaseCardProps) => {
     >
       <Card
         className={cn(
-          'h-full transition-shadow hover:shadow-md hover:border-emerald-300',
-          selected ? 'border-2 border-emerald-500' : 'border'
+          'h-full transition-shadow hover:shadow-md',
+          selected
+            ? 'border-2 border-emerald-500 hover:border-emerald-500'
+            : 'border border-gray-200 hover:border-gray-300'
         )}
       >
         <CardHeader className="pb-3">
