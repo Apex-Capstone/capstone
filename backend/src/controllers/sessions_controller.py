@@ -350,11 +350,20 @@ async def close_session_and_get_feedback(
     # Close session
     session_service = SessionService(db)
     await session_service.close_session(session_id)
-    
+
     # Generate and return feedback
     scoring_service = ScoringService(db)
     feedback = await scoring_service.generate_feedback(session_id)
-    # Post-process to remove empty values (FastAPI will use model_dump)
+    meta = feedback.evaluator_meta if isinstance(feedback.evaluator_meta, dict) else None
+    logger.info(
+        "session_close_feedback_generated",
+        extra={
+            "session_id": session_id,
+            "evaluator_plugin_frozen": getattr(sess, "evaluator_plugin", None),
+            "evaluator_meta_status": meta.get("status") if meta else None,
+            "evaluator_meta_phase": meta.get("phase") if meta else None,
+        },
+    )
     return feedback
 
 

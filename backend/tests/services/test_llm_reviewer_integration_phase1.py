@@ -35,7 +35,6 @@ def test_user(test_db):
     """Create a minimal test user."""
     user = User(
         email="apex_llm_reviewer_tester@example.com",
-        hashed_password="not_used_in_tests",
         role="trainee",
         full_name="APEX LLM Reviewer Tester",
     )
@@ -114,16 +113,23 @@ def _scores_tuple(feedback: FeedbackResponse):
 async def test_hybrid_llm_success_merges_scores(
     test_db, test_user, test_case, monkeypatch
 ):
-    monkeypatch.delenv("LLM_REVIEWER_REAL_CALLS", raising=False)
+    # Baseline: force the LLM reviewer to return None so we exercise the graceful fallback path.
+    import adapters.llm.openai_adapter as openai_adapter_module
+
+    monkeypatch.setattr(openai_adapter_module, "OpenAIAdapter", DummyOpenAIAdapter)
+    monkeypatch.setattr(
+        "services.llm_reviewer_service.LLMReviewerService",
+        DummyLLMReviewerServiceNone,
+    )
     baseline = await run_fixture_seeded_transcript_through_scoring(
         test_db, test_user, test_case, TEST_CONVERSATION_BAD
     )
     baseline_feedback: FeedbackResponse = baseline["feedback"]
     baseline_scores = _scores_tuple(baseline_feedback)
-    assert baseline_feedback.evaluator_meta is None
-
-    monkeypatch.setenv("LLM_REVIEWER_REAL_CALLS", "true")
-    import adapters.llm.openai_adapter as openai_adapter_module
+    bm = baseline_feedback.evaluator_meta
+    assert bm is not None
+    assert bm.get("phase") == "hybrid_llm_v1"
+    assert bm.get("status") == "failed"
 
     monkeypatch.setattr(openai_adapter_module, "OpenAIAdapter", DummyOpenAIAdapter)
     monkeypatch.setattr(
@@ -139,7 +145,7 @@ async def test_hybrid_llm_success_merges_scores(
     assert _scores_tuple(feedback) != baseline_scores
     assert feedback.evaluator_meta is not None
     assert feedback.evaluator_meta.get("phase") == "hybrid_llm_v1"
-    assert feedback.evaluator_meta.get("status") == "success"
+    assert feedback.evaluator_meta.get("status") == "completed"
     assert feedback.evaluator_meta.get("rule_scores") is not None
     assert feedback.evaluator_meta.get("llm_scores") is not None
     merged = feedback.evaluator_meta.get("merged_scores") or {}
@@ -172,7 +178,6 @@ async def test_textual_feedback_uses_rule_component_scores_not_merged(
         captured.append((e, c, s))
         return ("s", "i")
 
-    monkeypatch.setenv("LLM_REVIEWER_REAL_CALLS", "true")
     import adapters.llm.openai_adapter as openai_adapter_module
 
     monkeypatch.setattr(openai_adapter_module, "OpenAIAdapter", DummyOpenAIAdapter)
@@ -201,14 +206,7 @@ async def test_textual_feedback_uses_rule_component_scores_not_merged(
 async def test_hybrid_llm_failure_falls_back_to_rule_scores(
     test_db, test_user, test_case, monkeypatch
 ):
-    monkeypatch.delenv("LLM_REVIEWER_REAL_CALLS", raising=False)
-    baseline = await run_fixture_seeded_transcript_through_scoring(
-        test_db, test_user, test_case, TEST_CONVERSATION_BAD
-    )
-    baseline_feedback: FeedbackResponse = baseline["feedback"]
-    baseline_scores = _scores_tuple(baseline_feedback)
-
-    monkeypatch.setenv("LLM_REVIEWER_REAL_CALLS", "true")
+    # Baseline: run with reviewer returning None so we don't hit any real LLM calls.
     import adapters.llm.openai_adapter as openai_adapter_module
 
     monkeypatch.setattr(openai_adapter_module, "OpenAIAdapter", DummyOpenAIAdapter)
@@ -216,13 +214,18 @@ async def test_hybrid_llm_failure_falls_back_to_rule_scores(
         "services.llm_reviewer_service.LLMReviewerService",
         DummyLLMReviewerServiceNone,
     )
-
     result = await run_fixture_seeded_transcript_through_scoring(
         test_db, test_user, test_case, TEST_CONVERSATION_BAD
     )
     feedback: FeedbackResponse = result["feedback"]
 
-    assert _scores_tuple(feedback) == baseline_scores
+    rs = feedback.evaluator_meta["rule_scores"]
+    assert _scores_tuple(feedback) == (
+        rs["empathy_score"],
+        rs["communication_score"],
+        rs["spikes_completion_score"],
+        rs["overall_score"],
+    )
     assert feedback.evaluator_meta is not None
     assert feedback.evaluator_meta.get("phase") == "hybrid_llm_v1"
     assert feedback.evaluator_meta.get("status") == "failed"

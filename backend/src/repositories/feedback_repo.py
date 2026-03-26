@@ -6,7 +6,10 @@ from typing import Any, Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from config.logging import get_logger
 from domain.entities.feedback import Feedback
+
+logger = get_logger(__name__)
 
 
 class FeedbackRepository:
@@ -15,13 +18,15 @@ class FeedbackRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def _serialize_json_fields(self, feedback: Feedback) -> None:
+    def _serialize_json_fields(self, feedback: Feedback, *, operation: str) -> None:
         """Ensure JSON-ish fields are stored as strings (for SQLite compatibility).
 
         Feedback uses Text columns (JSONType) for many dict/list fields. When running
         against SQLite, we must not persist raw dict/list objects. This helper
         defensively json-serializes any such values. On Postgres (where Text is also
         acceptable for pre-serialized JSON), this is a no-op behavior change.
+
+        Important: `None` is intentionally preserved as SQL NULL.
         """
         import json
 
@@ -47,6 +52,17 @@ class FeedbackRepository:
         for field in json_fields:
             value: Any = getattr(feedback, field, None)
             if value is None:
+                # Preserve NULLs intentionally; do not silently coerce.
+                if field == "evaluator_meta":
+                    logger.debug(
+                        "feedback_json_field_none",
+                        extra={
+                            "operation": operation,
+                            "field": field,
+                            "session_id": getattr(feedback, "session_id", None),
+                            "feedback_id": getattr(feedback, "id", None),
+                        },
+                    )
                 continue
             # If already a string, assume it's serialized JSON
             if isinstance(value, str):
@@ -88,7 +104,7 @@ class FeedbackRepository:
     
     def create(self, feedback: Feedback) -> Feedback:
         """Create new feedback."""
-        self._serialize_json_fields(feedback)
+        self._serialize_json_fields(feedback, operation="create")
         self.db.add(feedback)
         self.db.commit()
         self.db.refresh(feedback)
@@ -96,7 +112,7 @@ class FeedbackRepository:
     
     def update(self, feedback: Feedback) -> Feedback:
         """Update existing feedback."""
-        self._serialize_json_fields(feedback)
+        self._serialize_json_fields(feedback, operation="update")
         self.db.commit()
         self.db.refresh(feedback)
         return feedback
