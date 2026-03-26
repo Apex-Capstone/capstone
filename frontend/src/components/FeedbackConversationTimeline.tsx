@@ -1,6 +1,7 @@
 /**
  * Conversation transcript with per-turn SPIKES labels, metric badges, and empathy span highlights.
  */
+import { useEffect, useRef, useState } from 'react'
 import type React from 'react'
 import type { Turn } from '@/types/session'
 import type { Feedback } from '@/api/feedback.api'
@@ -146,23 +147,43 @@ type EmpathyMarkersByTurn = Record<
   }
 >
 
+const MIN_TIMELINE_HEIGHT_PX = 320
+const VIEWPORT_BOTTOM_GUTTER_PX = 24
+
 /**
- * Finds the next clinician turn after a given turn number.
+ * Returns whether a role belongs to the clinician/user side.
+ *
+ * @param role - Raw role from the turn
+ * @returns True when the turn should appear on the clinician side
+ */
+const isClinicianRole = (role: string): boolean => {
+  return ['user', 'trainee', 'doctor', 'physician', 'clinician'].includes(role.toLowerCase())
+}
+
+/**
+ * Finds the nearest clinician turn for a missed opportunity.
  *
  * @param turns - Full ordered transcript
  * @param afterTurnNumber - EO turn number
- * @returns Next clinician turn number, if present
+ * @returns Next clinician turn when available, otherwise previous clinician turn
  */
-const getNextClinicianTurnNumber = (
+const getNearestClinicianTurnNumber = (
   turns: Array<Turn & { spansJson?: string }>,
   afterTurnNumber: number,
 ): number | undefined => {
-  return turns
+  const nextClinicianTurn = turns
     .filter((turn) => turn.turnNumber > afterTurnNumber)
     .sort((a, b) => a.turnNumber - b.turnNumber)
-    .find((turn) =>
-      ['user', 'trainee', 'doctor', 'physician', 'clinician'].includes(turn.role.toLowerCase())
-    )?.turnNumber
+    .find((turn) => isClinicianRole(turn.role))?.turnNumber
+
+  if (nextClinicianTurn) {
+    return nextClinicianTurn
+  }
+
+  return turns
+    .filter((turn) => turn.turnNumber < afterTurnNumber)
+    .sort((a, b) => b.turnNumber - a.turnNumber)
+    .find((turn) => isClinicianRole(turn.role))?.turnNumber
 }
 
 /**
@@ -282,7 +303,7 @@ const buildEmpathyTimelineMarkers = (
         : undefined
       if (!eoTurnNumber) return
 
-      const clinicianTurnNumber = getNextClinicianTurnNumber(turns, eoTurnNumber)
+      const clinicianTurnNumber = getNearestClinicianTurnNumber(turns, eoTurnNumber)
 
       if (!markers[eoTurnNumber]) {
         markers[eoTurnNumber] = { types: [] }
@@ -424,19 +445,57 @@ export const FeedbackConversationTimeline = ({
   turns,
   feedback,
 }: FeedbackConversationTimelineProps) => {
+  const cardRef = useRef<HTMLDivElement | null>(null)
+  const headerRef = useRef<HTMLDivElement | null>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  const [timelineMaxHeight, setTimelineMaxHeight] = useState<number>(MIN_TIMELINE_HEIGHT_PX)
   const sortedTurns = [...turns].sort((a, b) => a.turnNumber - b.turnNumber)
   const empathyMarkers = buildEmpathyTimelineMarkers(feedback, sortedTurns)
 
+  useEffect(() => {
+    const updateTimelineHeight = () => {
+      if (!cardRef.current) {
+        return
+      }
+
+      const cardTop = cardRef.current.getBoundingClientRect().top
+      const contentStyles = contentRef.current
+        ? window.getComputedStyle(contentRef.current)
+        : null
+      const contentVerticalPadding =
+        (contentStyles ? Number.parseFloat(contentStyles.paddingTop) : 0) +
+        (contentStyles ? Number.parseFloat(contentStyles.paddingBottom) : 0)
+      const availableHeight =
+        window.innerHeight -
+        cardTop -
+        (headerRef.current?.offsetHeight ?? 0) -
+        contentVerticalPadding -
+        VIEWPORT_BOTTOM_GUTTER_PX
+
+      setTimelineMaxHeight(Math.max(MIN_TIMELINE_HEIGHT_PX, Math.floor(availableHeight)))
+    }
+
+    updateTimelineHeight()
+    window.addEventListener('resize', updateTimelineHeight)
+
+    return () => {
+      window.removeEventListener('resize', updateTimelineHeight)
+    }
+  }, [])
+
   return (
-    <Card>
-      <CardHeader>
+    <Card ref={cardRef} className="flex flex-col overflow-hidden">
+      <CardHeader ref={headerRef}>
         <CardTitle>Conversation Analysis</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent ref={contentRef} className="min-h-0 flex-1">
         {sortedTurns.length === 0 ? (
           <p className="text-sm text-gray-500">No conversation turns recorded for this session.</p>
         ) : (
-          <div className="h-[32rem] space-y-4 overflow-y-auto pr-2">
+          <div
+            className="space-y-4 overflow-y-auto pr-2"
+            style={{ maxHeight: `${timelineMaxHeight}px` }}
+          >
             {sortedTurns.map((turn) => {
               const roleLabel = formatRoleLabel(turn.role)
               const side = mapRoleToSide(turn.role)

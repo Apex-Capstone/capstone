@@ -30,7 +30,6 @@ interface SpikesProgressBarProps {
 export const SpikesProgressBar = ({ currentStage }: SpikesProgressBarProps) => {
   const normalizedStage = currentStage?.toLowerCase() as SpikesStageId | undefined
   const currentIndex = STAGES.findIndex((s) => s.id === normalizedStage)
-  const progressWidth = currentIndex >= 0 ? `${((currentIndex + 1) / STAGES.length) * 100}%` : '0%'
 
   return (
     <div className="space-y-0.5">
@@ -70,12 +69,6 @@ export const SpikesProgressBar = ({ currentStage }: SpikesProgressBarProps) => {
             </div>
           )
         })}
-      </div>
-      <div className="mt-1 h-1 rounded-full bg-slate-200">
-        <div
-          className="h-full rounded-full bg-apex-500 transition-all duration-300 ease-out"
-          style={{ width: progressWidth }}
-        />
       </div>
     </div>
   )

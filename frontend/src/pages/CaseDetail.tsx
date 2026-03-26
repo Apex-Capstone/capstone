@@ -106,7 +106,7 @@ export const CaseDetail = () => {
   const [currentSpikesStage, setCurrentSpikesStage] = useState<string>('setting')
   const [error, setError] = useState<string | null>(null)
   const [closing, setClosing] = useState(false)
-  const [briefingExpanded, setBriefingExpanded] = useState(true)
+  const [briefingExpanded, setBriefingExpanded] = useState(false)
   type BriefingTab = 'patientBackground' | 'objectives' | 'script' | 'expectedSpikesFlow'
   const [briefingTab, setBriefingTab] = useState<BriefingTab>('patientBackground')
   const messagesEndRef = useRef<HTMLDivElement>(null)
