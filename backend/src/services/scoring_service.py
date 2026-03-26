@@ -1,7 +1,6 @@
 """Scoring service for empathy, communication, and SPIKES metrics."""
 
 import json
-import os
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -491,20 +490,6 @@ class ScoringService:
             "spikes_completion_score": float(state.spikes_score),
             "overall_score": float(state.overall_score),
         }
-        real_llm_enabled = os.getenv("LLM_REVIEWER_REAL_CALLS", "").strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
-        if not real_llm_enabled:
-            return (
-                state.empathy_score,
-                state.communication_score,
-                state.spikes_score,
-                state.overall_score,
-                None,
-            )
 
         from schemas.llm_reviewer import LLMReviewerInput, TranscriptTurnLite
         from services.llm_reviewer_service import LLMReviewerService
@@ -570,7 +555,7 @@ class ScoringService:
             }
             evaluator_meta = {
                 "phase": "hybrid_llm_v1",
-                "status": "success",
+                "status": "completed",
                 "merge_policy": {
                     "components": "0.7 * rule + 0.3 * llm",
                     "overall": "0.5 * merged_empathy + 0.2 * merged_communication + 0.3 * merged_spikes",
@@ -609,20 +594,6 @@ class ScoringService:
             "spikes_completion_score": float(state.spikes_score),
             "overall_score": float(state.overall_score),
         }
-        real_llm_enabled = os.getenv("LLM_REVIEWER_REAL_CALLS", "").strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
-        if not real_llm_enabled:
-            return (
-                state.empathy_score,
-                state.communication_score,
-                state.spikes_score,
-                state.overall_score,
-                None,
-            )
 
         from schemas.llm_reviewer import LLMReviewerInput, TranscriptTurnLite
         from services.hybrid_v2_llm_service import (
@@ -708,10 +679,14 @@ class ScoringService:
                 outcome.communication,
             )
 
+            # Normalize status to completed|failed (no "partial" exposed at top-level).
+            status = "completed" if agg_status == "success" else "failed"
+            error = None if status == "completed" else "partial_llm_prompts_failed"
             evaluator_meta: dict[str, Any] = {
                 "phase": "hybrid_llm_v2",
-                "status": agg_status,
+                "status": status,
                 "prompt_status": outcome.prompt_status,
+                "error": error,
                 "merge_policy": {
                     "components": "0.7 * rule + 0.3 * llm",
                     "overall": "0.5 * merged_empathy + 0.2 * merged_communication + 0.3 * merged_spikes",
@@ -768,40 +743,22 @@ class ScoringService:
         feedback.spikes_completion_score = spikes_score
         feedback.overall_score = overall_score
 
-        feedback.eo_counts_by_dimension = (
-            json.dumps(state.eo_counts_by_dimension) if state.eo_counts_by_dimension is not None else None
-        )
-        feedback.elicitation_counts_by_type = (
-            json.dumps(state.elicitation_counts_by_type) if state.elicitation_counts_by_type is not None else None
-        )
-        feedback.response_counts_by_type = (
-            json.dumps(state.response_counts_by_type) if state.response_counts_by_type is not None else None
-        )
-
-        feedback.linkage_stats = json.dumps(state.linkage_stats) if state.linkage_stats is not None else None
-        feedback.missed_opportunities_by_dimension = (
-            json.dumps(state.missed_opportunities_by_dimension)
-            if state.missed_opportunities_by_dimension is not None
-            else None
-        )
-        feedback.eo_to_elicitation_links = (
-            json.dumps(state.eo_to_elicitation_links) if state.eo_to_elicitation_links is not None else None
-        )
-        feedback.eo_to_response_links = (
-            json.dumps(state.eo_to_response_links) if state.eo_to_response_links is not None else None
-        )
-        feedback.missed_opportunities = (
-            json.dumps(state.missed_opportunities) if state.missed_opportunities is not None else None
-        )
-
-        feedback.spikes_coverage = json.dumps(state.spikes_coverage) if state.spikes_coverage is not None else None
-        feedback.spikes_timestamps = json.dumps(state.spikes_timestamps) if state.spikes_timestamps is not None else None
-        feedback.spikes_strategies = json.dumps(state.spikes_strategies) if state.spikes_strategies is not None else None
-
-        feedback.question_breakdown = json.dumps(state.question_breakdown) if state.question_breakdown is not None else None
-
-        feedback.bias_probe_info = json.dumps(bias_probe_info) if bias_probe_info is not None else None
-        feedback.evaluator_meta = json.dumps(evaluator_meta) if evaluator_meta is not None else None
+        # Keep structured fields as native Python objects in the service layer.
+        # FeedbackRepository is the single serialization boundary before commit.
+        feedback.eo_counts_by_dimension = state.eo_counts_by_dimension
+        feedback.elicitation_counts_by_type = state.elicitation_counts_by_type
+        feedback.response_counts_by_type = state.response_counts_by_type
+        feedback.linkage_stats = state.linkage_stats
+        feedback.missed_opportunities_by_dimension = state.missed_opportunities_by_dimension
+        feedback.eo_to_elicitation_links = state.eo_to_elicitation_links
+        feedback.eo_to_response_links = state.eo_to_response_links
+        feedback.missed_opportunities = state.missed_opportunities
+        feedback.spikes_coverage = state.spikes_coverage
+        feedback.spikes_timestamps = state.spikes_timestamps
+        feedback.spikes_strategies = state.spikes_strategies
+        feedback.question_breakdown = state.question_breakdown
+        feedback.bias_probe_info = bias_probe_info
+        feedback.evaluator_meta = evaluator_meta
         feedback.latency_ms_avg = state.latency_ms_avg
 
         feedback.strengths = state.strengths if state.strengths and state.strengths.strip() else None

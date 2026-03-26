@@ -34,7 +34,6 @@ def test_db():
 def test_user(test_db):
     user = User(
         email="eval_mode_tester@example.com",
-        hashed_password="x",
         role="trainee",
         full_name="Eval Mode Tester",
     )
@@ -69,7 +68,6 @@ async def test_baseline_plugin_never_calls_llm_even_when_env_on(
 
     mock_llm_cls = MagicMock()
     monkeypatch.setattr("services.llm_reviewer_service.LLMReviewerService", mock_llm_cls)
-    monkeypatch.setenv("LLM_REVIEWER_REAL_CALLS", "true")
 
     result = await run_fixture_seeded_transcript_through_scoring(
         test_db,
@@ -110,7 +108,6 @@ async def test_hybrid_plugin_calls_llm_when_env_on(test_db, test_user, test_case
             )
 
     monkeypatch.setattr("services.llm_reviewer_service.LLMReviewerService", _MockLLM)
-    monkeypatch.setenv("LLM_REVIEWER_REAL_CALLS", "true")
     import adapters.llm.openai_adapter as openai_adapter_module
 
     monkeypatch.setattr(openai_adapter_module, "OpenAIAdapter", object)
@@ -127,7 +124,7 @@ async def test_hybrid_plugin_calls_llm_when_env_on(test_db, test_user, test_case
     fb = result["feedback"]
     assert fb.evaluator_meta is not None
     assert fb.evaluator_meta.get("phase") == "hybrid_llm_v1"
-    assert fb.evaluator_meta.get("status") == "success"
+    assert fb.evaluator_meta.get("status") == "completed"
     merged = fb.evaluator_meta.get("merged_scores") or {}
     r_emp = fb.evaluator_meta["rule_scores"]["empathy_score"]
     assert merged["empathy_score"] == pytest.approx(0.7 * r_emp + 0.3 * 50.0, rel=1e-4)
@@ -146,7 +143,6 @@ async def test_hybrid_plugin_skips_llm_when_env_off(test_db, test_user, test_cas
             return None
 
     monkeypatch.setattr("services.llm_reviewer_service.LLMReviewerService", _MockLLM)
-    monkeypatch.delenv("LLM_REVIEWER_REAL_CALLS", raising=False)
 
     result = await run_fixture_seeded_transcript_through_scoring(
         test_db,
@@ -155,5 +151,9 @@ async def test_hybrid_plugin_skips_llm_when_env_off(test_db, test_user, test_cas
         TEST_CONVERSATION_BAD,
         evaluator_plugin=ApexHybridEvaluator.name,
     )
-    assert review_calls == []
-    assert result["feedback"].evaluator_meta is None
+    assert len(review_calls) == 1
+    meta = result["feedback"].evaluator_meta
+    assert meta is not None
+    assert meta.get("phase") == "hybrid_llm_v1"
+    assert meta.get("status") == "failed"
+    assert meta.get("error") == "llm_reviewer_returned_none"
