@@ -18,11 +18,11 @@ export function AnalyticsEmptyState() {
           <BarChart3 className="h-7 w-7" strokeWidth={1.75} />
         </div>
         <h2 className="text-lg font-semibold text-gray-900 sm:text-xl">
-          Your analytics will appear here
+          Complete a session to see your performance analytics.
         </h2>
         <p className="mt-3 max-w-md text-sm leading-relaxed text-gray-600">
-          Complete a training session and come back to see your scores, trends, and how your
-          communication skills grow over time. Every session helps build your picture.
+          End a practice session to generate feedback and unlock your empathy score, SPIKES
+          coverage, and score trends.
         </p>
         <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:justify-center">
           <Link

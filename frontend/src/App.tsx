@@ -9,6 +9,7 @@ import { Home } from './pages/Home'
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
 import { Dashboard } from './pages/Dashboard'
+import { Cases } from './pages/Cases'
 import { CaseDetail } from './pages/CaseDetail'
 import { Feedback } from './pages/Feedback'
 import { Sessions } from './pages/Sessions'
@@ -98,6 +99,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Sessions />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cases"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'trainee']}>
+              <Cases />
             </ProtectedRoute>
           }
         />
