@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Check, Eye, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import apexLogo from '@/assets/apex-capstone-logo.png'
 
 const GENDER_OPTIONS = [
   { value: '', label: 'Select gender (optional)' },
@@ -80,8 +81,8 @@ export const Signup = () => {
         : strengthPct <= 60
           ? 'bg-yellow-500'
           : strengthPct <= 80
-            ? 'bg-emerald-500'
-            : 'bg-emerald-500'
+            ? 'bg-apex-500'
+            : 'bg-apex-500'
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -133,36 +134,59 @@ export const Signup = () => {
   if (success) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold">Check your email</CardTitle>
-            <CardDescription>
-              We've sent a verification link to <strong>{email}</strong>. Please check your inbox and click the link to verify your account.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link to="/login">
-              <Button variant="outline" className="w-full">
-                Back to Sign in
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+        <div className="w-full max-w-md space-y-6">
+          <div className="flex items-center justify-center gap-3">
+            <img src={apexLogo} alt="APEX logo" className="h-14 w-14 rounded-2xl object-cover shadow-sm" />
+            <div className="flex flex-col items-start leading-none">
+                <span className="brand-font text-2xl font-bold tracking-[0.24em] text-apex-700">
+                APEX
+              </span>
+              <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-gray-500">
+                AI Patient Experience Simulator
+              </span>
+            </div>
+          </div>
+          <Card>
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-2xl font-bold">Check your email</CardTitle>
+              <CardDescription>
+                We've sent a verification link to <strong>{email}</strong>. Please check your inbox and click the link to verify your account.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link to="/login">
+                <Button variant="outline" className="w-full">
+                  Back to Sign in
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-8">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
-          <CardDescription>
-            Sign up to start practicing with APEX
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="w-full max-w-md space-y-6">
+        <div className="flex items-center justify-center gap-3">
+          <img src={apexLogo} alt="APEX logo" className="h-14 w-14 rounded-2xl object-cover shadow-sm" />
+          <div className="flex flex-col items-start leading-none">
+              <span className="brand-font text-2xl font-bold tracking-[0.24em] text-apex-700">
+              APEX
+            </span>
+            <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-gray-500">
+              AI Patient Experience Simulator
+            </span>
+          </div>
+        </div>
+        <Card>
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
+            <CardDescription>Start practicing with APEX</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
             {/* Full Name */}
             <div className="space-y-2">
               <label htmlFor="fullName" className="text-sm font-medium">
@@ -241,11 +265,11 @@ export const Signup = () => {
                   {passwordChecks.map((check) => (
                     <li key={check.key} className="flex items-center gap-1.5 text-xs">
                       {check.passed ? (
-                        <Check className="h-3 w-3 text-emerald-500" />
+                        <Check className="h-3 w-3 text-apex-500" />
                       ) : (
                         <X className="h-3 w-3 text-gray-300" />
                       )}
-                      <span className={check.passed ? 'text-emerald-600' : 'text-gray-400'}>
+                      <span className={check.passed ? 'text-apex-600' : 'text-gray-400'}>
                         {check.label}
                       </span>
                     </li>
@@ -314,18 +338,19 @@ export const Signup = () => {
                 {error}
               </div>
             )}
-            <Button type="submit" className="w-full" disabled={loading || !allPassed}>
-              {loading ? 'Creating account...' : 'Create account'}
-            </Button>
-          </form>
-          <p className="mt-4 text-center text-sm text-gray-600">
-            Already have an account?{' '}
-            <Link to="/login" className="font-medium text-emerald-600 hover:text-emerald-700">
-              Sign in
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
+              <Button type="submit" className="w-full" disabled={loading || !allPassed}>
+                {loading ? 'Creating account...' : 'Create account'}
+              </Button>
+            </form>
+            <p className="mt-4 text-center text-sm text-gray-600">
+              Already have an account?{' '}
+            <Link to="/login" className="font-medium text-apex-600 hover:text-apex-700">
+                Sign in
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

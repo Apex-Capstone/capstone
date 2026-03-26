@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 type SpikesStageId = 'setting' | 'perception' | 'invitation' | 'knowledge' | 'emotion' | 'strategy'
 
-/** Ordered SPIKES stages for the progress visualization. */
+/** Ordered SPIKES stages for the session overview indicator. */
 const STAGES: { id: SpikesStageId; label: string }[] = [
   { id: 'setting', label: 'Setting' },
   { id: 'perception', label: 'Perception' },
@@ -22,7 +22,7 @@ interface SpikesProgressBarProps {
 }
 
 /**
- * Shows six SPIKES checkpoints with completion/current/empty styling.
+ * Shows six SPIKES checkpoints and underlines only the active stage.
  *
  * @param props - {@link SpikesProgressBarProps}
  * @returns Progress bar JSX
@@ -30,7 +30,6 @@ interface SpikesProgressBarProps {
 export const SpikesProgressBar = ({ currentStage }: SpikesProgressBarProps) => {
   const normalizedStage = currentStage?.toLowerCase() as SpikesStageId | undefined
   const currentIndex = STAGES.findIndex((s) => s.id === normalizedStage)
-  const progressWidth = currentIndex >= 0 ? `${((currentIndex + 1) / STAGES.length) * 100}%` : '0%'
 
   return (
     <div className="space-y-0.5">
@@ -44,9 +43,8 @@ export const SpikesProgressBar = ({ currentStage }: SpikesProgressBarProps) => {
               <div
                 className={cn(
                   'flex h-9 w-9 items-center justify-center rounded-full border text-xs font-medium',
-                  isCompleted && 'border-emerald-200 bg-emerald-50 text-emerald-700',
-                  isCurrent &&
-                    'border-emerald-500 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-100',
+                  isCompleted && 'border-apex-200 bg-apex-50 text-apex-700',
+                  isCurrent && 'border-apex-500 bg-apex-50 text-apex-700 ring-2 ring-apex-100',
                   !isCompleted && !isCurrent && 'border-slate-200 bg-slate-50 text-slate-400'
                 )}
               >
@@ -55,22 +53,22 @@ export const SpikesProgressBar = ({ currentStage }: SpikesProgressBarProps) => {
               <span
                 className={cn(
                   'min-h-[22px] w-full px-0.5 text-center text-[8.5px] leading-tight whitespace-normal sm:text-[9.5px]',
-                  isCompleted && 'text-emerald-700',
-                  isCurrent && 'font-semibold text-emerald-700',
+                  isCompleted && 'text-apex-700',
+                  isCurrent && 'font-semibold text-apex-700',
                   !isCompleted && !isCurrent && 'text-slate-500'
                 )}
               >
                 {stage.label}
               </span>
+              <div
+                className={cn(
+                  'h-1 w-full rounded-full transition-colors duration-300 ease-out',
+                  isCurrent || isCompleted ? 'bg-apex-500' : 'bg-slate-200'
+                )}
+              />
             </div>
           )
         })}
-      </div>
-      <div className="mt-1 h-1 rounded-full bg-slate-200">
-        <div
-          className="h-full rounded-full bg-emerald-500 transition-all duration-300 ease-out"
-          style={{ width: progressWidth }}
-        />
       </div>
     </div>
   )

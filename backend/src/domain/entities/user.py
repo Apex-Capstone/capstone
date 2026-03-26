@@ -1,12 +1,12 @@
 """User entity model."""
 
-from datetime import datetime
-
-from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import Column, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
+from core.time import utc_now
 from db.base import Base
+from db.types import UTCDateTimeType
 
 
 class User(Base):
@@ -22,8 +22,8 @@ class User(Base):
     gender = Column(String, nullable=True)
     race = Column(String, nullable=True)
     year_of_study = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(UTCDateTimeType(), default=utc_now)
+    updated_at = Column(UTCDateTimeType(), default=utc_now, onupdate=utc_now)
     
     # Relationships
     sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")

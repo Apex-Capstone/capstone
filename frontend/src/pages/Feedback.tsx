@@ -11,6 +11,7 @@ import { FeedbackChart } from '@/components/FeedbackChart'
 import { FeedbackConversationTimeline } from '@/components/FeedbackConversationTimeline'
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
+import { formatDateTimeInUserTimeZone } from '@/lib/dateTime'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -203,7 +204,7 @@ export const Feedback = () => {
                   <div className="flex items-center gap-2">
                     <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-red-500 via-yellow-500 to-emerald-500 rounded-full"
+                        className="h-full rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-apex-500"
                         style={{ width: `${overallPercent}%` }}
                       />
                     </div>
@@ -214,15 +215,8 @@ export const Feedback = () => {
                 </div>
               </div>
 
-              {/* Hero: Empathy Score & SPIKES Coverage */}
+              {/* Hero: SPIKES Coverage & Empathy Score */}
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-6 text-center">
-                  <div className="text-sm font-medium text-emerald-800 uppercase tracking-wide">Empathy Score</div>
-                  <div className="text-4xl font-bold text-emerald-600 mt-1">
-                    {feedback.empathyScore.toFixed(1)}<span className="text-xl font-semibold text-emerald-500">/100</span>
-                  </div>
-                  <p className="text-xs text-emerald-700 mt-1">Session empathy recognition</p>
-                </div>
                 <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-6 text-center">
                   <div className="text-sm font-medium text-purple-800 uppercase tracking-wide">SPIKES Coverage</div>
                   <div className="text-4xl font-bold text-purple-600 mt-1">
@@ -231,6 +225,13 @@ export const Feedback = () => {
                   <p className="text-xs text-purple-700 mt-1">
                     {coveredStages.size}/6 stages reached
                   </p>
+                </div>
+                <div className="rounded-xl border-2 border-apex-200 bg-apex-50 p-6 text-center">
+                  <div className="text-sm font-medium uppercase tracking-wide text-apex-800">Empathy Score</div>
+                  <div className="mt-1 text-4xl font-bold text-apex-600">
+                    {feedback.empathyScore.toFixed(1)}<span className="text-xl font-semibold text-apex-500">/100</span>
+                  </div>
+                  <p className="mt-1 text-xs text-apex-700">Session empathy recognition</p>
                 </div>
               </div>
             </div>
@@ -271,7 +272,7 @@ export const Feedback = () => {
                                   {stage.label}
                                 </span>
                                 {covered ? (
-                                  <span className="text-sm font-semibold text-emerald-500">
+                                  <span className="text-sm font-semibold text-apex-500">
                                     ✓ Covered
                                   </span>
                                 ) : (
@@ -310,7 +311,7 @@ export const Feedback = () => {
                                 <span
                                   className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                                     reached
-                                      ? 'bg-emerald-100 text-emerald-700'
+                                      ? 'bg-apex-100 text-apex-700'
                                       : 'bg-gray-100 text-gray-500'
                                   }`}
                                 >
@@ -320,7 +321,6 @@ export const Feedback = () => {
                             )
                           })}
                         </div>
-
                         <div className="text-xs text-gray-500 pt-2 border-t">
                           SPIKES Completion Score: {feedback.spikesCompletionScore.toFixed(1)}/100
                         </div>
@@ -335,16 +335,16 @@ export const Feedback = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      <div className="bg-emerald-50 p-4 rounded-lg">
+                      <div className="rounded-lg bg-apex-50 p-4">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">Empathy Score</span>
-                          <span className="text-xl font-bold text-emerald-600">
+                          <span className="text-xl font-bold text-apex-600">
                             {feedback.empathyScore.toFixed(1)}/100
                           </span>
                         </div>
                         <div className="w-full h-4 bg-gray-200 rounded-full mt-2 overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-emerald-500 transition-[width]"
+                            className="h-full rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-apex-500 transition-[width]"
                             style={{ width: `${empathyPercent}%` }}
                           />
                         </div>
@@ -352,16 +352,16 @@ export const Feedback = () => {
                       </div>
 
                       {openRatio !== null && (
-                        <div className="bg-emerald-50 p-4 rounded-lg">
+                        <div className="rounded-lg bg-apex-50 p-4">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">Open Question Ratio</span>
-                            <span className="text-lg font-bold text-emerald-600">
+                            <span className="text-lg font-bold text-apex-600">
                               {openRatio}%
                             </span>
                           </div>
-                          <div className="w-full h-2 bg-emerald-200 rounded-full mt-2">
+                          <div className="mt-2 h-2 w-full rounded-full bg-apex-200">
                             <div
-                              className="h-full bg-emerald-500 rounded-full"
+                              className="h-full rounded-full bg-apex-500"
                               style={{ width: `${openRatio}%` }}
                             />
                           </div>
@@ -370,8 +370,8 @@ export const Feedback = () => {
 
                       {feedback.questionBreakdown && (
                         <div className="grid grid-cols-3 gap-3 pt-2">
-                          <div className="text-center p-3 bg-emerald-50 rounded-lg">
-                            <div className="text-lg font-bold text-emerald-800">
+                          <div className="rounded-lg bg-apex-50 p-3 text-center">
+                            <div className="text-lg font-bold text-apex-800">
                               {feedback.questionBreakdown.open}
                             </div>
                             <div className="text-xs text-gray-600">Open</div>
@@ -399,7 +399,7 @@ export const Feedback = () => {
                           </div>
                           <div className="flex justify-between">
                             <span>Addressed</span>
-                            <span className="font-medium text-emerald-600">
+                            <span className="font-medium text-apex-600">
                               {feedback.linkageStats.addressed_count} ({Math.round(feedback.linkageStats.addressed_rate * 100)}%)
                             </span>
                           </div>
@@ -433,38 +433,46 @@ export const Feedback = () => {
               )}
 
               {/* Original metrics chart */}
-              <div className="grid gap-6 lg:grid-cols-2">
+              <div className="grid gap-4 lg:grid-cols-2">
                 <FeedbackChart feedback={feedback} />
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Session Details</CardTitle>
+                <Card className="overflow-hidden border-gray-200">
+                  <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-5 py-4">
+                    <CardTitle className="text-lg">Session Details</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 text-sm">
-                      <div>
-                        <span className="font-medium">Session ID:</span>{' '}
-                        {feedback.sessionId}
+                  <CardContent className="space-y-4 px-5 pb-5 pt-5">
+                    <div className="grid gap-2.5 sm:grid-cols-2">
+                      <div className="rounded-lg border border-gray-100 bg-gray-50/80 p-3">
+                        <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Session ID</div>
+                        <div className="mt-1 text-sm font-semibold text-gray-900">{feedback.sessionId}</div>
                       </div>
-                      <div>
-                        <span className="font-medium">Date:</span>{' '}
-                        {new Date(feedback.createdAt).toLocaleString()}
+                      <div className="rounded-lg border border-gray-100 bg-gray-50/80 p-3">
+                        <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Date</div>
+                        <div className="mt-1 text-sm text-gray-900">
+                          {formatDateTimeInUserTimeZone(feedback.createdAt)}
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-medium">Overall Score:</span>{' '}
-                        <span className="font-bold">{feedback.overallScore.toFixed(1)}/100</span>
+                      <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
+                        <div className="text-xs font-medium uppercase tracking-wide text-emerald-700">Overall Score</div>
+                        <div className="mt-1 text-sm font-bold text-emerald-700">
+                          {feedback.overallScore.toFixed(1)}/100
+                        </div>
                       </div>
                       {feedback.latencyMsAvg > 0 && (
-                        <div>
-                          <span className="font-medium">Avg Response Latency:</span>{' '}
-                          {Math.round(feedback.latencyMsAvg)}ms
+                        <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
+                          <div className="text-xs font-medium uppercase tracking-wide text-amber-700">
+                            Avg Response Latency
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-amber-700">
+                            {Math.round(feedback.latencyMsAvg)}ms
+                          </div>
                         </div>
                       )}
                     </div>
                     {feedback.detailedFeedback && (
-                      <div className="mt-4 pt-4 border-t">
+                      <div className="rounded-lg border border-gray-100 bg-white p-3 shadow-sm">
                         <span className="text-sm font-medium text-gray-700">Summary</span>
-                        <p className="text-sm text-gray-600 mt-1">{feedback.detailedFeedback}</p>
+                        <p className="mt-1.5 text-sm leading-6 text-gray-600">{feedback.detailedFeedback}</p>
                       </div>
                     )}
                   </CardContent>
@@ -472,14 +480,14 @@ export const Feedback = () => {
 
                 {feedback.evaluatorMeta != null &&
                   Object.keys(feedback.evaluatorMeta).length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Evaluator metadata</CardTitle>
+                    <Card className="overflow-hidden border-gray-200">
+                      <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-5 py-4">
+                        <CardTitle className="text-lg">Evaluator metadata</CardTitle>
                         <p className="text-sm text-gray-500 font-normal mt-1">
                           Scoring pipeline details (phase, merge status, optional LLM fields).
                         </p>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="px-5 pb-5 pt-5">
                         <pre className="text-xs overflow-x-auto bg-gray-50 border border-gray-100 rounded-lg p-4 text-left whitespace-pre-wrap break-words">
                           {JSON.stringify(feedback.evaluatorMeta, null, 2)}
                         </pre>
@@ -490,24 +498,30 @@ export const Feedback = () => {
 
               {/* AFCE Breakdown (if data available) */}
               {(feedback.eoCountsByDimension || feedback.responseCountsByType) && (
-                <div className="grid gap-6 lg:grid-cols-2">
+                <div className="grid gap-4 lg:grid-cols-2">
                   {feedback.eoCountsByDimension && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Empathic Opportunities by Dimension</CardTitle>
+                    <Card className="overflow-hidden border-gray-200">
+                      <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-apex-50 to-white px-5 py-4">
+                        <CardTitle className="text-lg">Empathic Opportunities by Dimension</CardTitle>
                       </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
+                      <CardContent className="px-5 pb-5 pt-5">
+                        <div className="space-y-2.5">
                           {Object.entries(feedback.eoCountsByDimension).map(([dim, counts]) => {
                             const total = counts.explicit + counts.implicit
                             return (
-                              <div key={dim} className="flex items-center justify-between">
-                                <span className="text-sm font-medium">{dim}</span>
+                              <div
+                                key={dim}
+                                className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50/80 p-3"
+                              >
+                                <span className="text-sm font-semibold text-gray-900">{dim}</span>
                                 <div className="flex items-center gap-3 text-xs">
-                                  <span className="text-emerald-800">{counts.explicit} explicit</span>
-                                  <span className="text-gray-400">|</span>
-                                  <span className="text-purple-600">{counts.implicit} implicit</span>
-                                  <span className="font-semibold text-gray-700">= {total}</span>
+                                  <span className="rounded-full bg-apex-100 px-2 py-1 font-medium text-apex-800">
+                                    {counts.explicit} explicit
+                                  </span>
+                                  <span className="rounded-full bg-purple-100 px-2 py-1 font-medium text-purple-700">
+                                    {counts.implicit} implicit
+                                  </span>
+                                  <span className="font-semibold text-gray-700">Total {total}</span>
                                 </div>
                               </div>
                             )
@@ -518,16 +532,21 @@ export const Feedback = () => {
                   )}
 
                   {feedback.responseCountsByType && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Empathic Response Types</CardTitle>
+                    <Card className="overflow-hidden border-gray-200">
+                      <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-purple-50 to-white px-5 py-4">
+                        <CardTitle className="text-lg">Empathic Response Types</CardTitle>
                       </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
+                      <CardContent className="px-5 pb-5 pt-5">
+                        <div className="space-y-2.5">
                           {Object.entries(feedback.responseCountsByType).map(([type, count]) => (
-                            <div key={type} className="flex items-center justify-between">
-                              <span className="text-sm font-medium capitalize">{type}</span>
-                              <span className="text-sm font-bold text-gray-700">{count}</span>
+                            <div
+                              key={type}
+                              className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50/80 p-3"
+                            >
+                              <span className="text-sm font-semibold capitalize text-gray-900">{type}</span>
+                              <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-gray-700 shadow-sm">
+                                {count}
+                              </span>
                             </div>
                           ))}
                         </div>
@@ -539,18 +558,20 @@ export const Feedback = () => {
 
               {/* Strengths & Areas for Improvement */}
               {(strengthsList.length > 0 || improvementsList.length > 0) && (
-                <div className="grid gap-6 lg:grid-cols-2">
+                <div className="grid gap-4 lg:grid-cols-2">
                   {strengthsList.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-emerald-700">Strengths</CardTitle>
+                    <Card className="overflow-hidden border-gray-200">
+                      <CardHeader className="border-b border-apex-100 bg-gradient-to-r from-apex-50 to-white px-5 py-4">
+                        <CardTitle className="text-lg text-apex-700">Strengths</CardTitle>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="px-5 pb-5 pt-5">
                         <ul className="space-y-2">
                           {strengthsList.map((strength, index) => (
-                            <li key={index} className="flex items-start gap-2">
-                              <span className="text-emerald-600 mt-0.5">&#10003;</span>
-                              <span className="text-sm">{strength}</span>
+                            <li key={index} className="flex items-start gap-3 rounded-lg border border-apex-100 bg-apex-50/60 p-2.5">
+                              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-apex-100 text-xs font-bold text-apex-700">
+                                ✓
+                              </span>
+                              <span className="text-sm leading-6 text-gray-700">{strength}</span>
                             </li>
                           ))}
                         </ul>
@@ -559,16 +580,16 @@ export const Feedback = () => {
                   )}
 
                   {improvementsList.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-orange-700">Areas for Improvement</CardTitle>
+                    <Card className="overflow-hidden border-gray-200">
+                      <CardHeader className="border-b border-orange-100 bg-gradient-to-r from-orange-50 to-white px-5 py-4">
+                        <CardTitle className="text-lg text-orange-700">Areas for Improvement</CardTitle>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="px-5 pb-5 pt-5">
                         <ul className="space-y-2">
                           {improvementsList.map((area, index) => (
-                            <li key={index} className="flex items-start gap-2">
-                              <span className="text-orange-600 mt-0.5">&#9679;</span>
-                              <span className="text-sm">{area}</span>
+                            <li key={index} className="flex items-start gap-3 rounded-lg border border-orange-100 bg-orange-50/60 p-2.5">
+                              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-500" />
+                              <span className="text-sm leading-6 text-gray-700">{area}</span>
                             </li>
                           ))}
                         </ul>

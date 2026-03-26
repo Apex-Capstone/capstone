@@ -8,6 +8,7 @@ import { getCase } from '@/api/cases.api'
 import { createSession, transcribeAudioTurn, submitTurn, closeSession, getSession, fetchAssistantAudioObjectUrl } from '@/api/sessions.api'
 import type { Case as CaseType } from '@/types/case'
 import type { AudioToneAnalysis, Message } from '@/types/session'
+import { parseUtcDateTime } from '@/lib/dateTime'
 
 import { ChatBubble } from '@/components/ChatBubble'
 import { Navbar } from '@/components/Navbar'
@@ -106,7 +107,7 @@ export const CaseDetail = () => {
   const [currentSpikesStage, setCurrentSpikesStage] = useState<string>('setting')
   const [error, setError] = useState<string | null>(null)
   const [closing, setClosing] = useState(false)
-  const [briefingExpanded, setBriefingExpanded] = useState(true)
+  const [briefingExpanded, setBriefingExpanded] = useState(false)
   type BriefingTab = 'patientBackground' | 'objectives' | 'script' | 'expectedSpikesFlow'
   const [briefingTab, setBriefingTab] = useState<BriefingTab>('patientBackground')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -161,7 +162,10 @@ export const CaseDetail = () => {
           }
           setSessionId(existingSession.id)
           setCurrentSpikesStage(existingSession.currentSpikesStage || 'setting')
-          const startedAt = new Date(existingSession.startedAt)
+          const startedAt = parseUtcDateTime(existingSession.startedAt)
+          if (!startedAt) {
+            throw new Error('Invalid session start time')
+          }
           const now = Date.now()
           const rawElapsed = Math.floor((now - startedAt.getTime()) / 1000)
           const clampedElapsed = Math.max(rawElapsed, 0)
@@ -787,17 +791,17 @@ export const CaseDetail = () => {
                     <div
                       className={`rounded-2xl p-2 shadow-inner transition-colors duration-200 ${
                         showVoiceIndicator
-                          ? 'border border-emerald-200 bg-emerald-50'
+                          ? 'border border-apex-200 bg-apex-50'
                           : 'border border-slate-200 bg-slate-50/80'
                       }`}
                     >
                       <div className="flex items-center gap-2">
                         {showVoiceIndicator ? (
-                          <div className="flex h-12 flex-1 items-center gap-3 rounded-xl px-3 text-emerald-900">
-                            <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-500" />
+                          <div className="flex h-12 flex-1 items-center gap-3 rounded-xl px-3 text-apex-900">
+                            <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-apex-500" />
                             <div className="min-w-0">
                               <div className="font-medium">Listening</div>
-                              <div className="truncate text-xs text-emerald-700">
+                              <div className="truncate text-xs text-apex-700">
                                 Tap the microphone again when you are done speaking.
                               </div>
                             </div>
@@ -816,7 +820,7 @@ export const CaseDetail = () => {
                             {listeningBarHeights.map((height, index) => (
                               <span
                                 key={`voice-bar-${index}`}
-                                className="w-1.5 origin-bottom rounded-full bg-emerald-500"
+                                className="w-1.5 origin-bottom rounded-full bg-apex-500"
                                 style={{
                                   height,
                                   animation: `listening-wave 0.9s ease-in-out ${index * 0.12}s infinite`,
@@ -896,7 +900,7 @@ export const CaseDetail = () => {
                               onClick={() => setBriefingTab('patientBackground')}
                               className={`rounded-full px-3.5 py-2 text-xs font-medium ${
                                 briefingTab === 'patientBackground'
-                                  ? 'bg-emerald-100 text-emerald-900'
+                                  ? 'bg-apex-100 text-apex-900'
                                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                               }`}
                             >
@@ -909,7 +913,7 @@ export const CaseDetail = () => {
                               onClick={() => setBriefingTab('objectives')}
                               className={`rounded-full px-3.5 py-2 text-xs font-medium ${
                                 briefingTab === 'objectives'
-                                  ? 'bg-emerald-100 text-emerald-900'
+                                  ? 'bg-apex-100 text-apex-900'
                                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                               }`}
                             >
@@ -921,7 +925,7 @@ export const CaseDetail = () => {
                             onClick={() => setBriefingTab('script')}
                             className={`rounded-full px-3.5 py-2 text-xs font-medium ${
                               briefingTab === 'script'
-                                ? 'bg-emerald-100 text-emerald-900'
+                                ? 'bg-apex-100 text-apex-900'
                                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                             }`}
                           >
@@ -933,7 +937,7 @@ export const CaseDetail = () => {
                               onClick={() => setBriefingTab('expectedSpikesFlow')}
                               className={`rounded-full px-3.5 py-2 text-xs font-medium ${
                                 briefingTab === 'expectedSpikesFlow'
-                                  ? 'bg-emerald-100 text-emerald-900'
+                                  ? 'bg-apex-100 text-apex-900'
                                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                               }`}
                             >
@@ -984,7 +988,7 @@ export const CaseDetail = () => {
                         }`}
                       >
                         <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-apex-50 text-apex-700">
                             <Clock className="h-3.5 w-3.5" />
                           </span>
                           Session time
@@ -1025,7 +1029,7 @@ export const CaseDetail = () => {
                             checked={audioResponsesEnabled}
                             onChange={(e) => setAudioResponsesEnabled(e.target.checked)}
                             disabled={sending || closing}
-                            className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                            className="h-4 w-4 rounded border-gray-300 text-apex-600 focus:ring-apex-500"
                           />
                           <span>Enable spoken replies</span>
                         </label>

@@ -1,7 +1,6 @@
 """Session management service."""
 
 import json
-from datetime import datetime
 
 from sqlalchemy import exc as sa_exceptions
 from sqlalchemy.orm import Session
@@ -11,6 +10,7 @@ from fastapi import HTTPException
 from config.settings import get_settings
 from core.errors import NotFoundError
 from core.plugin_manager import _load_class_from_path
+from core.time import utc_now
 from domain.entities.session import Session as SessionEntity
 from domain.models.sessions import (
     SessionCreate,
@@ -40,10 +40,10 @@ class SessionService:
         return {col.key: getattr(row, col.key) for col in row.__table__.columns}
 
     @staticmethod
-    def _resolve_turn_audio_url(turn_id: int, audio_url: str | None, audio_expires_at: datetime | None) -> str | None:
+    def _resolve_turn_audio_url(turn_id: int, audio_url: str | None, audio_expires_at) -> str | None:
         if not audio_url:
             return None
-        if audio_expires_at is not None and audio_expires_at <= datetime.utcnow():
+        if audio_expires_at is not None and audio_expires_at <= utc_now():
             return None
 
         base_url = get_settings().public_base_url.rstrip("/")
@@ -244,7 +244,7 @@ class SessionService:
             raise NotFoundError(f"Session with ID {session_id} not found")
         
         session.state = "completed"
-        session.ended_at = datetime.utcnow()
+        session.ended_at = utc_now()
         
         if session.started_at:
             duration = (session.ended_at - session.started_at).total_seconds()

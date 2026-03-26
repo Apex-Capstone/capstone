@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/authStore'
 import { Button } from './ui/button'
 import { LogOut, Menu } from 'lucide-react'
 import { useState } from 'react'
+import apexLogo from '@/assets/apex-capstone-logo.png'
 
 /**
  * Renders the authenticated header or `null` when logged out.
@@ -26,8 +27,16 @@ export const Navbar = () => {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
-            <Link to="/dashboard" className="text-xl font-bold text-gray-900">
-              APEX (AI Patient Experience Simulator)
+            <Link to="/dashboard" className="flex items-center gap-3.5 text-gray-900">
+              <img src={apexLogo} alt="APEX logo" className="h-11 w-11 rounded-xl object-cover shadow-sm" />
+              <div className="flex flex-col justify-center gap-0.5 leading-tight">
+                <span className="brand-font text-xl font-bold tracking-[0.22em] text-apex-700">
+                  APEX
+                </span>
+                <span className="text-[9px] font-medium uppercase tracking-[0.18em] text-gray-500">
+                  AI Patient Experience Simulator
+                </span>
+              </div>
             </Link>
           </div>
 
@@ -36,7 +45,7 @@ export const Navbar = () => {
               {user?.role === 'admin' && (
                 <Link
                   to="/docs/plugin-developer-guide"
-                  className="text-sm font-medium text-gray-700 hover:text-emerald-700"
+                  className="text-sm font-medium text-gray-700 hover:text-apex-700"
                 >
                   Developer Docs
                 </Link>
@@ -45,7 +54,7 @@ export const Navbar = () => {
                 <span className="text-sm text-gray-700">
                   {user?.full_name || user?.email}
                 </span>
-                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+                <span className="rounded-full bg-apex-100 px-2.5 py-0.5 text-xs font-medium text-apex-800">
                   {user?.role && user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                 </span>
                 <Button variant="default" size="sm" onClick={logout}>
@@ -83,7 +92,7 @@ export const Navbar = () => {
                 </Link>
               )}
               <div className="px-3 py-2">
-                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+                <span className="rounded-full bg-apex-100 px-2.5 py-0.5 text-xs font-medium text-apex-800">
                   {user?.role}
                 </span>
               </div>

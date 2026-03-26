@@ -1,4 +1,5 @@
 import type { TraineeSessionAnalytics } from '@/types/analytics'
+import { formatDateTimeInUserTimeZone } from '@/lib/dateTime'
 import { formatPercentWhole } from '@/utils/format'
 
 /** Canonical SPIKES stage order for display (matches backend scoring). */
@@ -39,9 +40,7 @@ function formatSessionDuration(seconds: number): string {
 }
 
 function formatCompletedAt(iso: string): string {
-  const t = Date.parse(iso)
-  if (!Number.isFinite(t)) return '—'
-  return new Date(t).toLocaleString(undefined, {
+  return formatDateTimeInUserTimeZone(iso, {
     dateStyle: 'medium',
     timeStyle: 'short',
   })
@@ -66,7 +65,7 @@ export function AnalyticsSessionPreview({ session }: AnalyticsSessionPreviewProp
       : null
 
   return (
-    <div className="border-l-2 border-blue-200 pl-4 text-sm text-gray-800">
+    <div className="border-l-2 border-apex-200 pl-4 text-sm text-gray-800">
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Completed</dt>

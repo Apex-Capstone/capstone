@@ -1,10 +1,11 @@
 """Case request/response schemas."""
 
 import json
-from datetime import datetime
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
+
+from core.time import UTCDateTime
 
 
 class CaseBase(BaseModel):
@@ -48,8 +49,8 @@ class CaseResponse(CaseBase):
     """Case response schema."""
     
     id: int
-    created_at: datetime
-    updated_at: datetime
+    created_at: UTCDateTime
+    updated_at: UTCDateTime
     
     model_config = ConfigDict(from_attributes=True, extra="ignore")
 

@@ -2,6 +2,7 @@
  * Single chat message row with optional assistant audio replay.
  */
 import type { Message } from '@/types/session'
+import { formatTimeInUserTimeZone } from '@/lib/dateTime'
 import { cn } from '@/lib/utils'
 import { User, Bot, Volume2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -33,8 +34,8 @@ export const ChatBubble = ({ message, onReplayAudio }: ChatBubbleProps) => {
       )}
     >
       {!isUser && (
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-100 bg-emerald-50 shadow-sm">
-          <Bot className="h-4 w-4 text-emerald-600" />
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-apex-100 bg-apex-50 shadow-sm">
+          <Bot className="h-4 w-4 text-apex-600" />
         </div>
       )}
 
@@ -42,7 +43,7 @@ export const ChatBubble = ({ message, onReplayAudio }: ChatBubbleProps) => {
         className={cn(
           'max-w-[88%] rounded-[22px] px-4 py-3 shadow-sm sm:max-w-[82%] xl:max-w-[78%]',
           isUser
-            ? 'bg-emerald-600 text-white'
+            ? 'bg-apex-600 text-white'
             : 'border border-slate-200 bg-white text-gray-900'
         )}
       >
@@ -58,17 +59,17 @@ export const ChatBubble = ({ message, onReplayAudio }: ChatBubbleProps) => {
         <p
           className={cn(
             'mt-1 text-xs',
-            isUser ? 'text-emerald-100' : 'text-gray-500'
+            isUser ? 'text-apex-100' : 'text-gray-500'
           )}
         >
-          {message.source === 'audio' ? 'Voice' : 'Text'} • {new Date(message.timestamp).toLocaleTimeString()}
+          {message.source === 'audio' ? 'Voice' : 'Text'} • {formatTimeInUserTimeZone(message.timestamp)}
         </p>
         {isUser && message.source === 'audio' && voiceToneLabels.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {voiceToneLabels.map((label) => (
               <span
                 key={label}
-                className="rounded-full bg-emerald-500/80 px-2 py-0.5 text-[10px] font-medium text-emerald-50"
+                className="rounded-full bg-apex-500/80 px-2 py-0.5 text-[10px] font-medium text-apex-50"
               >
                 {label}
               </span>
@@ -81,7 +82,7 @@ export const ChatBubble = ({ message, onReplayAudio }: ChatBubbleProps) => {
             onClick={() => onReplayAudio(assistantAudioUrl)}
             variant="neutral"
             size="sm"
-            className="mt-2 h-8 gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs font-medium text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800"
+            className="mt-2 h-8 gap-1 rounded-full border border-apex-200 bg-apex-50 px-3 text-xs font-medium text-apex-700 hover:bg-apex-100 hover:text-apex-800"
           >
             <Volume2 className="h-3.5 w-3.5" />
             Replay audio

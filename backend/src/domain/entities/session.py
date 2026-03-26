@@ -1,11 +1,11 @@
 """Session entity model."""
 
-from datetime import datetime
-
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Column, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
+from core.time import utc_now
 from db.base import Base
+from db.types import UTCDateTimeType
 
 
 class Session(Base):
@@ -18,8 +18,8 @@ class Session(Base):
     case_id = Column(Integer, ForeignKey("core.cases.id"), nullable=False)
     state = Column(String, nullable=False)  # active, paused, completed, abandoned
     current_spikes_stage = Column(String)  # setting, perception, invitation, knowledge, empathy, summary
-    started_at = Column(DateTime, default=datetime.utcnow)
-    ended_at = Column(DateTime, nullable=True)
+    started_at = Column(UTCDateTimeType(), default=utc_now)
+    ended_at = Column(UTCDateTimeType(), nullable=True)
     duration_seconds = Column(Integer, default=0)
     session_metadata = Column("metadata", Text)  # JSON for additional session data
     evaluator_plugin = Column(String, nullable=True)

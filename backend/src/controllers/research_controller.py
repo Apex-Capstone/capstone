@@ -1,7 +1,6 @@
 """Research controller/router — read-only, admin-only, anonymized data."""
 
 import json
-from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from config.logging import get_logger
 from core.deps import get_db, require_admin
+from core.time import serialize_utc_datetime, utc_now
 from domain.entities.user import User
 from domain.models.admin import ResearchSessionsEnvelope
 from services.research_service import ResearchService
@@ -58,7 +58,7 @@ async def export_research_data(
     logger.info(
         "Research export triggered admin_user_id=%s timestamp=%s sessions_exported=%s",
         current_user.id,
-        datetime.now(timezone.utc).isoformat(),
+        serialize_utc_datetime(utc_now()),
         record_count,
     )
     return Response(
@@ -80,7 +80,7 @@ async def export_metrics_csv(
     logger.info(
         "Research metrics CSV export admin_user_id=%s timestamp=%s",
         current_user.id,
-        datetime.now(timezone.utc).isoformat(),
+        serialize_utc_datetime(utc_now()),
     )
     return StreamingResponse(
         service.stream_metrics_csv(),
@@ -101,7 +101,7 @@ async def export_transcripts_csv(
     logger.info(
         "Research transcripts CSV export admin_user_id=%s timestamp=%s",
         current_user.id,
-        datetime.now(timezone.utc).isoformat(),
+        serialize_utc_datetime(utc_now()),
     )
     return StreamingResponse(
         service.stream_transcripts_csv(),
@@ -145,7 +145,7 @@ async def export_research_csv(
     logger.info(
         "Research CSV export triggered admin_user_id=%s timestamp=%s",
         current_user.id,
-        datetime.now(timezone.utc).isoformat(),
+        serialize_utc_datetime(utc_now()),
     )
     return StreamingResponse(
         iter([csv_content.encode("utf-8")]),

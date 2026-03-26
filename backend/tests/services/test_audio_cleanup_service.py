@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from config.settings import get_settings
+from core.time import utc_now
 from db.base import Base
 from domain.entities.case import Case
 from domain.entities.session import Session as SessionEntity
@@ -91,7 +92,7 @@ def _seed_turns(test_db):
         role="assistant",
         text="Expired reply",
         audio_url="sessions/1/assistant/expired.mp3",
-        audio_expires_at=datetime.utcnow() - timedelta(minutes=5),
+        audio_expires_at=utc_now() - timedelta(minutes=5),
     )
     fresh_assistant_turn = Turn(
         session_id=session.id,
@@ -99,7 +100,7 @@ def _seed_turns(test_db):
         role="assistant",
         text="Fresh reply",
         audio_url="sessions/1/assistant/fresh.mp3",
-        audio_expires_at=datetime.utcnow() + timedelta(minutes=5),
+        audio_expires_at=utc_now() + timedelta(minutes=5),
     )
     user_turn = Turn(
         session_id=session.id,
@@ -107,7 +108,7 @@ def _seed_turns(test_db):
         role="user",
         text="User text",
         audio_url="sessions/1/user/input.mp3",
-        audio_expires_at=datetime.utcnow() - timedelta(minutes=5),
+        audio_expires_at=utc_now() - timedelta(minutes=5),
     )
     test_db.add_all([expired_assistant_turn, fresh_assistant_turn, user_turn])
     test_db.commit()
@@ -149,6 +150,7 @@ async def test_audio_cleanup_service_clears_expired_assistant_audio(
     assert not cached_path.exists()
     assert fresh_turn.audio_url == "sessions/1/assistant/fresh.mp3"
     assert fresh_turn.audio_expires_at is not None
+    assert fresh_turn.audio_expires_at.tzinfo == timezone.utc
     assert fresh_cached_path.exists()
     assert user_turn.audio_url == "sessions/1/user/input.mp3"
     get_settings.cache_clear()

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import type { ResearchData } from '@/api/research.api'
+import { formatDateTimeInUserTimeZone, utcTimestampMs } from '@/lib/dateTime'
 import { formatPluginName as formatPluginNameFromLib } from '@/lib/formatPluginName'
 import { cn } from '@/lib/utils'
 
@@ -21,10 +22,7 @@ const safePercent = (value: number | null | undefined) => {
 }
 
 const formatTimestamp = (value: string | null | undefined) => {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleString()
+  return formatDateTimeInUserTimeZone(value)
 }
 
 const formatDuration = (value: number | undefined) => {
@@ -53,7 +51,7 @@ const StatusBadge = ({ state }: { state?: string | null }) => {
   if (!s) return <span className="text-gray-400">—</span>
   if (s === 'completed') {
     return (
-      <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+      <span className="inline-flex rounded-full bg-apex-100 px-2 py-0.5 text-xs font-medium text-apex-800">
         Completed
       </span>
     )
@@ -209,7 +207,7 @@ export function ResearchSessionsTable({
       }
 
       if (dateFilter !== 'all') {
-        const timestampMs = new Date(session.timestamp).getTime()
+        const timestampMs = utcTimestampMs(session.timestamp)
         if (Number.isNaN(timestampMs)) return false
         const dayMs = 24 * 60 * 60 * 1000
         if (dateFilter === '24h' && nowMs - timestampMs > dayMs) return false
@@ -288,8 +286,8 @@ export function ResearchSessionsTable({
           break
         case 'date':
         default:
-          left = Number.isNaN(new Date(a.timestamp).getTime()) ? 0 : new Date(a.timestamp).getTime()
-          right = Number.isNaN(new Date(b.timestamp).getTime()) ? 0 : new Date(b.timestamp).getTime()
+          left = Number.isNaN(utcTimestampMs(a.timestamp)) ? 0 : utcTimestampMs(a.timestamp)
+          right = Number.isNaN(utcTimestampMs(b.timestamp)) ? 0 : utcTimestampMs(b.timestamp)
           break
       }
       if (left < right) return -1 * direction
@@ -310,7 +308,7 @@ export function ResearchSessionsTable({
 
   const metricCell = (
     value: number | null | undefined,
-    colorClass: 'bg-emerald-500' | 'bg-sky-500' | 'bg-indigo-500' | 'bg-amber-500'
+    colorClass: 'bg-apex-500' | 'bg-sky-500' | 'bg-indigo-500' | 'bg-amber-500'
   ) => {
     if (value == null || !Number.isFinite(value)) {
       return <span className="text-gray-400">—</span>
@@ -363,12 +361,12 @@ export function ResearchSessionsTable({
           value={searchText}
           onChange={(event) => setSearchText(event.target.value)}
           placeholder="Search session ID..."
-          className="h-9 rounded-md border border-gray-300 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 lg:col-span-2"
+          className="h-9 rounded-md border border-gray-300 px-3 text-sm focus:border-apex-500 focus:outline-none focus:ring-1 focus:ring-apex-500 lg:col-span-2"
         />
         <select
           value={caseFilter}
           onChange={(event) => setCaseFilter(event.target.value)}
-          className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-apex-500 focus:outline-none focus:ring-1 focus:ring-apex-500"
         >
           <option value="all">All Cases</option>
           {caseOptions.map(({ id, label }) => (
@@ -380,7 +378,7 @@ export function ResearchSessionsTable({
         <select
           value={spikesFilter}
           onChange={(event) => setSpikesFilter(event.target.value)}
-          className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-apex-500 focus:outline-none focus:ring-1 focus:ring-apex-500"
         >
           <option value="all">All SPIKES %</option>
           {spikesOptions.map((value) => (
@@ -392,7 +390,7 @@ export function ResearchSessionsTable({
         <select
           value={empathyFilter}
           onChange={(event) => setEmpathyFilter(event.target.value)}
-          className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-apex-500 focus:outline-none focus:ring-1 focus:ring-apex-500"
         >
           <option value="all">All Empathy</option>
           <option value="0-25">0-25</option>
@@ -403,7 +401,7 @@ export function ResearchSessionsTable({
         <select
           value={dateFilter}
           onChange={(event) => setDateFilter(event.target.value)}
-          className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-apex-500 focus:outline-none focus:ring-1 focus:ring-apex-500"
         >
           <option value="all">All Dates</option>
           <option value="24h">Last 24h</option>
@@ -521,7 +519,7 @@ export function ResearchSessionsTable({
                       {formatMetricsPlugins(session.metricsPlugins)}
                     </td>
                   )}
-                  <td className={tdMetric}>{metricCell(session.scores.empathy, 'bg-emerald-500')}</td>
+                  <td className={tdMetric}>{metricCell(session.scores.empathy, 'bg-apex-500')}</td>
                   {showExperimentMetadata && (
                     <td className={tdMetric}>
                       {metricCell(session.scores.communication, 'bg-sky-500')}

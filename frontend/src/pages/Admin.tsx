@@ -21,6 +21,7 @@ import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
 import { Users, FileText, Activity, TrendingUp, Download, Plus, BarChart3, MessageSquare, Puzzle, ExternalLink, Clock, UserCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatDateInUserTimeZone, formatDateTimeInUserTimeZone } from '@/lib/dateTime'
 import { cn } from '@/lib/utils'
 
 // ---- Session detail panel ----
@@ -68,7 +69,7 @@ function SessionDetailPanel({
                     Turn {t.turn_number} ({t.role})
                   </span>
                   <span className="text-gray-500 ml-2 text-xs">
-                    {new Date(t.timestamp).toLocaleString()}
+                    {formatDateTimeInUserTimeZone(t.timestamp)}
                   </span>
                   <p className="mt-1 text-gray-900">{t.text}</p>
                 </div>
@@ -118,7 +119,7 @@ function SessionDetailPanel({
               {metrics_timeline.map((m, i) => (
                 <li key={i} className="text-sm flex justify-between gap-4">
                   <span>Turn {m.turn_number}</span>
-                  <span>{new Date(m.timestamp).toLocaleString()}</span>
+                  <span>{formatDateTimeInUserTimeZone(m.timestamp)}</span>
                   <span>Empathy: {m.empathy_score.toFixed(1)}</span>
                   <span>{m.question_type}</span>
                   <span>{m.spikes_stage}</span>
@@ -518,16 +519,16 @@ export const Admin = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Recent sessions</CardTitle>
-                <p className="text-sm text-gray-500 mt-1">
-                  Latest sessions by start time.{' '}
+                <p className="mt-1 text-sm text-gray-500">
+                  Latest sessions by start time. See
                   <button
                     type="button"
-                    className="text-primary underline-offset-4 hover:underline font-medium"
+                    className="mx-1 inline p-0 font-medium text-primary underline-offset-4 hover:underline"
                     onClick={() => setActiveTab('sessions')}
                   >
                     Session Logs
-                  </button>{' '}
-                  has the full list and transcripts.
+                  </button>
+                  for the full list and transcripts.
                 </p>
               </CardHeader>
               <CardContent>
@@ -553,7 +554,7 @@ export const Admin = () => {
                           </p>
                         </div>
                         <p className="text-xs text-gray-500 shrink-0">
-                          {new Date(session.started_at).toLocaleString()}
+                          {formatDateTimeInUserTimeZone(session.started_at)}
                         </p>
                       </div>
                     ))
@@ -641,7 +642,7 @@ export const Admin = () => {
                                     'inline-flex px-2 py-1 rounded-full text-xs font-medium',
                                     user.role === 'admin'
                                       ? 'bg-purple-100 text-purple-800'
-                                      : 'bg-emerald-100 text-emerald-800'
+                                      : 'bg-apex-100 text-apex-800'
                                   )}
                                 >
                                   {user.role}
@@ -661,11 +662,11 @@ export const Admin = () => {
                               </td>
                               <td className="px-4 py-2.5 text-left whitespace-nowrap">
                                 {user.last_session_at
-                                  ? new Date(user.last_session_at).toLocaleString()
+                                  ? formatDateTimeInUserTimeZone(user.last_session_at)
                                   : '—'}
                               </td>
                               <td className="px-4 py-2.5 text-left whitespace-nowrap text-gray-600">
-                                {new Date(user.created_at).toLocaleDateString()}
+                                {formatDateInUserTimeZone(user.created_at)}
                               </td>
                             </tr>
                           ))}
@@ -712,15 +713,15 @@ export const Admin = () => {
 
       case 'sessions':
         return (
-          <div className="space-y-6">
-            <Card>
+          <div className="flex h-full min-h-0 flex-col space-y-6">
+            <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <CardHeader>
                 <CardTitle>Session Logs</CardTitle>
                 <p className="text-sm text-gray-500 mt-1">
                   Click a row to view transcript and feedback
                 </p>
               </CardHeader>
-              <CardContent>
+              <CardContent className="min-h-0 flex-1">
                 {sessionsLoading ? (
                   <p className="text-gray-500 py-8 text-center">Loading sessions…</p>
                 ) : sessionsError ? (
@@ -728,7 +729,7 @@ export const Admin = () => {
                 ) : !sessionsData || sessionsData.sessions.length === 0 ? (
                   <p className="text-gray-500 py-8 text-center">No sessions found</p>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="h-full overflow-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b">
@@ -746,14 +747,14 @@ export const Admin = () => {
                             className={cn(
                               'border-b cursor-pointer transition-colors',
                               selectedDetail?.session.id === s.id
-                                ? 'bg-emerald-50'
+                                ? 'bg-apex-50'
                                 : 'hover:bg-gray-50'
                             )}
                           >
                             <td className="py-2">{s.id}</td>
                             <td className="py-2">{formatSessionUserLabel(s)}</td>
                             <td className="py-2">{s.case_id}</td>
-                            <td className="py-2">{new Date(s.started_at).toLocaleString()}</td>
+                            <td className="py-2">{formatDateTimeInUserTimeZone(s.started_at)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -811,7 +812,7 @@ export const Admin = () => {
                                 <span className="text-sm">{data.month}</span>
                                 <div className="flex items-center gap-2">
                                   <div className="w-20 h-2 bg-gray-200 rounded-full">
-                                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${data.score}%` }} />
+                                    <div className="h-full rounded-full bg-apex-500" style={{ width: `${data.score}%` }} />
                                   </div>
                                   <span className="text-sm font-medium">{data.score}%</span>
                                 </div>
@@ -844,7 +845,7 @@ export const Admin = () => {
                               <span className="text-sm capitalize">{data.difficulty}</span>
                               <div className="flex items-center gap-2">
                                 <div className="w-16 h-2 bg-gray-200 rounded-full">
-                                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${data.rate * 100}%` }} />
+                                  <div className="h-full rounded-full bg-apex-500" style={{ width: `${data.rate * 100}%` }} />
                                 </div>
                                 <span className="text-sm font-medium">{Math.round(data.rate * 100)}%</span>
                               </div>
@@ -999,8 +1000,18 @@ export const Admin = () => {
       <Navbar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto md:ml-64">
-          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <main
+          className={cn(
+            'flex-1 md:ml-64',
+            activeTab === 'sessions' ? 'overflow-hidden' : 'overflow-y-auto'
+          )}
+        >
+          <div
+            className={cn(
+              'mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8',
+              activeTab === 'sessions' && 'flex h-full min-h-0 flex-col'
+            )}
+          >
             <nav className="mb-4 text-sm text-gray-500">
               Dashboard / <span className="text-gray-900">Admin</span>
             </nav>
@@ -1019,7 +1030,7 @@ export const Admin = () => {
             </div>
 
             {/* Tabs */}
-            <div className="border-b border-gray-200 mb-8">
+            <div className="mb-8">
               <nav className="flex gap-8">
                 {tabs.map((tab) => {
                   const Icon = tab.icon
@@ -1030,8 +1041,8 @@ export const Admin = () => {
                       className={cn(
                         'flex items-center gap-2 py-2 px-4 rounded-md font-medium text-sm transition-colors',
                         activeTab === tab.id
-                          ? 'bg-emerald-600 text-white shadow-sm'
-                          : 'bg-gray-100 text-gray-700 hover:bg-emerald-100 hover:text-emerald-700 border border-gray-200'
+                          ? 'bg-apex-600 text-white shadow-sm'
+                          : 'border border-gray-200 bg-gray-100 text-gray-700 hover:bg-apex-100 hover:text-apex-700'
                       )}
                     >
                       <Icon className="h-4 w-4" />
@@ -1040,9 +1051,12 @@ export const Admin = () => {
                   )
                 })}
               </nav>
+              <div className="mt-4 border-b border-gray-200" />
             </div>
 
-            {renderTabContent()}
+            <div className={cn(activeTab === 'sessions' && 'min-h-0 flex-1')}>
+              {renderTabContent()}
+            </div>
           </div>
         </main>
       </div>

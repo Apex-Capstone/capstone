@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from config.settings import get_settings
 from core.errors import NotFoundError
 from core.plugin_manager import _load_class_from_path
+from core.time import serialize_utc_datetime
 from domain.entities.feedback import Feedback
 from domain.models.sessions import FeedbackResponse, SuggestedResponse, TimelineEvent
 from plugins.registry import PluginRegistry
@@ -1547,11 +1548,11 @@ class ScoringService:
                 if stage not in stage_starts:
                     stage_starts[stage] = turn.timestamp
                     timestamps[stage] = {
-                        "start_ts": str(turn.timestamp),
-                        "end_ts": str(turn.timestamp),
+                        "start_ts": serialize_utc_datetime(turn.timestamp),
+                        "end_ts": serialize_utc_datetime(turn.timestamp),
                     }
                 else:
-                    timestamps[stage]["end_ts"] = str(turn.timestamp)
+                    timestamps[stage]["end_ts"] = serialize_utc_datetime(turn.timestamp)
         
         return timestamps
     
