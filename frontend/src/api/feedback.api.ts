@@ -9,7 +9,7 @@ export interface SpikesCoverage {
   perception: boolean
   invitation: boolean
   knowledge: boolean
-  emotions: boolean
+  emotion: boolean
   strategy: boolean
   coveredCount: number
   total: number
@@ -125,14 +125,15 @@ export const fetchFeedback = async (sessionId: string): Promise<Feedback> => {
       normalizedCovered.includes('invitation') || normalizedCovered.includes('i')
     const knowledge =
       normalizedCovered.includes('knowledge') || normalizedCovered.includes('k')
-    const emotions =
+    const emotion =
       normalizedCovered.includes('emotion') ||
       normalizedCovered.includes('emotions') ||
+      normalizedCovered.includes('empathy') ||
       normalizedCovered.includes('e')
     const strategy =
       normalizedCovered.includes('strategy') || normalizedCovered.includes('s2')
 
-    const stages = { setting, perception, invitation, knowledge, emotions, strategy }
+    const stages = { setting, perception, invitation, knowledge, emotion, strategy }
     const coveredCount = Object.values(stages).filter(Boolean).length
     const total = 6
 

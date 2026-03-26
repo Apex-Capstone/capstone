@@ -59,6 +59,12 @@ export interface SessionDTO {
   user_full_name?: string | null
   /** Computed by API: "active" | "closed" (closed when ended_at is set) */
   status: 'active' | 'closed'
+  /** Evaluator plugin frozen at session creation (e.g. "apex_hybrid_evaluator"). */
+  evaluator_plugin?: string | null
+  /** Patient model plugin frozen at session creation. */
+  patient_model_plugin?: string | null
+  /** JSON-serialized array of metrics plugin names frozen at session creation. */
+  metrics_plugins?: string | string[] | null
 }
 
 /** Wire shape for one turn in a session. */

@@ -109,6 +109,36 @@ function SessionDetailPanel({
           )}
         </section>
 
+        {/* Evaluation Details */}
+        <section>
+          <h4 className="font-medium mb-3">Evaluation Details</h4>
+          <div className="space-y-2 border rounded-lg p-3 bg-gray-50">
+            <div>
+              <span className="text-sm font-medium">Evaluator Plugin: </span>
+              <span className="text-sm text-gray-700">{session.evaluator_plugin || 'default'}</span>
+            </div>
+            <div>
+              <span className="text-sm font-medium">Patient Model: </span>
+              <span className="text-sm text-gray-700">{session.patient_model_plugin || 'default'}</span>
+            </div>
+            <div>
+              <span className="text-sm font-medium">Metrics Plugins: </span>
+              <span className="text-sm text-gray-700">
+                {(() => {
+                  const mp = session.metrics_plugins
+                  if (!mp) return 'default'
+                  if (Array.isArray(mp)) return mp.length > 0 ? mp.join(', ') : 'default'
+                  try {
+                    const parsed = JSON.parse(mp)
+                    if (Array.isArray(parsed) && parsed.length > 0) return parsed.join(', ')
+                  } catch { /* not JSON */ }
+                  return mp || 'default'
+                })()}
+              </span>
+            </div>
+          </div>
+        </section>
+
         {/* Metrics timeline */}
         <section>
           <h4 className="font-medium mb-3">Metrics Timeline</h4>
@@ -139,6 +169,31 @@ import { CaseForm } from '@/components/admin/CaseForm'
 import { listCases, createCase, updateCase, deleteCase } from '@/api/cases.api'
 import type { Case } from '@/types/case'
 import type { SessionDetailDTO } from '@/types/session'
+
+const PLUGIN_DESCRIPTIONS: Record<string, Record<string, string>> = {
+  evaluator: {
+    apex_hybrid_evaluator: 'Evaluates conversations using the SPIKES communication framework and empathy detection with a hybrid rule + LLM pipeline.',
+    apex_baseline_evaluator: 'Baseline evaluator using rule-based scoring for empathy and SPIKES coverage.',
+    apex_hybrid_v2_evaluator: 'Second-generation hybrid evaluator with improved LLM merge and scoring heuristics.',
+  },
+  patient_model: {
+    default_llm_patient: 'LLM-powered patient model that generates realistic responses based on case context and conversation history.',
+  },
+  metrics: {
+    apex_metrics: 'Provides empathic opportunity counts, response type breakdowns, and SPIKES coverage analytics for research dashboards.',
+  },
+}
+
+function pluginDescription(kind: string, name: string): string {
+  const normalized = name.toLowerCase().replace(/[\s-]+/g, '_')
+  const kindMap = PLUGIN_DESCRIPTIONS[kind]
+  if (kindMap) {
+    for (const [key, desc] of Object.entries(kindMap)) {
+      if (normalized.includes(key) || key.includes(normalized)) return desc
+    }
+  }
+  return 'Custom plugin registered via the plugin configuration.'
+}
 
 const OVERVIEW_RECENT_SESSIONS_LIMIT = 8
 const USERS_PAGE_SIZE = 20
@@ -940,12 +995,18 @@ export const Admin = () => {
               <div className="space-y-6">
                 <div>
                   <h3 className="font-semibold">Patient Models</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Generate simulated patient responses during training sessions.
+                  </p>
                   {installedPlugins?.patient_models?.length ? (
                     <div className="mt-2 space-y-2">
                       {installedPlugins.patient_models.map((p) => (
-                        <div key={p.name} className="border rounded-lg p-3 bg-white shadow-sm">
+                        <div key={p.name} className="border rounded-lg p-4 bg-white shadow-sm">
                           <div className="font-medium text-gray-900">{p.name}</div>
                           <div className="text-sm text-gray-500">Version {p.version}</div>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {pluginDescription('patient_model', p.name)}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -956,12 +1017,18 @@ export const Admin = () => {
 
                 <div>
                   <h3 className="font-semibold">Evaluators</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Score clinician communication and produce feedback after each session.
+                  </p>
                   {installedPlugins?.evaluators?.length ? (
                     <div className="mt-2 space-y-2">
                       {installedPlugins.evaluators.map((p) => (
-                        <div key={p.name} className="border rounded-lg p-3 bg-white shadow-sm">
+                        <div key={p.name} className="border rounded-lg p-4 bg-white shadow-sm">
                           <div className="font-medium text-gray-900">{p.name}</div>
                           <div className="text-sm text-gray-500">Version {p.version}</div>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {pluginDescription('evaluator', p.name)}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -972,12 +1039,18 @@ export const Admin = () => {
 
                 <div>
                   <h3 className="font-semibold">Metrics Plugins</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Compute additional analytics metrics for research dashboards and data exports.
+                  </p>
                   {installedPlugins?.metrics?.length ? (
                     <div className="mt-2 space-y-2">
                       {installedPlugins.metrics.map((p) => (
-                        <div key={p.name} className="border rounded-lg p-3 bg-white shadow-sm">
+                        <div key={p.name} className="border rounded-lg p-4 bg-white shadow-sm">
                           <div className="font-medium text-gray-900">{p.name}</div>
                           <div className="text-sm text-gray-500">Version {p.version}</div>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {pluginDescription('metrics', p.name)}
+                          </p>
                         </div>
                       ))}
                     </div>

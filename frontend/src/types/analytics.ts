@@ -7,6 +7,7 @@ export interface TraineeSessionAnalyticsDTO {
   clinical_score: number
   spikes_completion_score: number
   spikes_coverage_percent: number
+  overall_score?: number | null
   duration_seconds: number
   created_at: string
   eo_addressed_rate?: number | null
@@ -22,6 +23,8 @@ export interface TraineeSessionAnalytics {
   clinicalScore: number
   spikesCompletionScore: number
   spikesCoveragePercent: number
+  /** Backend-provided overall score when available; otherwise computed on the client. */
+  overallScore?: number
   durationSeconds: number
   createdAt: string
   eoAddressedRate?: number
