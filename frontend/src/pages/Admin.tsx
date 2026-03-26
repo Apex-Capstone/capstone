@@ -712,15 +712,15 @@ export const Admin = () => {
 
       case 'sessions':
         return (
-          <div className="space-y-6">
-            <Card>
+          <div className="flex h-full min-h-0 flex-col space-y-6">
+            <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <CardHeader>
                 <CardTitle>Session Logs</CardTitle>
                 <p className="text-sm text-gray-500 mt-1">
                   Click a row to view transcript and feedback
                 </p>
               </CardHeader>
-              <CardContent>
+              <CardContent className="min-h-0 flex-1">
                 {sessionsLoading ? (
                   <p className="text-gray-500 py-8 text-center">Loading sessions…</p>
                 ) : sessionsError ? (
@@ -728,7 +728,7 @@ export const Admin = () => {
                 ) : !sessionsData || sessionsData.sessions.length === 0 ? (
                   <p className="text-gray-500 py-8 text-center">No sessions found</p>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="h-full overflow-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b">
@@ -999,8 +999,18 @@ export const Admin = () => {
       <Navbar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto md:ml-64">
-          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <main
+          className={cn(
+            'flex-1 md:ml-64',
+            activeTab === 'sessions' ? 'overflow-hidden' : 'overflow-y-auto'
+          )}
+        >
+          <div
+            className={cn(
+              'mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8',
+              activeTab === 'sessions' && 'flex h-full min-h-0 flex-col'
+            )}
+          >
             <nav className="mb-4 text-sm text-gray-500">
               Dashboard / <span className="text-gray-900">Admin</span>
             </nav>
@@ -1043,7 +1053,9 @@ export const Admin = () => {
               <div className="mt-4 border-b border-gray-200" />
             </div>
 
-            {renderTabContent()}
+            <div className={cn(activeTab === 'sessions' && 'min-h-0 flex-1')}>
+              {renderTabContent()}
+            </div>
           </div>
         </main>
       </div>
