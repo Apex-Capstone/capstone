@@ -142,6 +142,9 @@ async def test_evaluator_meta_persists_as_json_on_hybrid_success(test_db, test_u
     assert raw_meta["status"] == "completed"
     assert raw_meta["phase"] == "hybrid_llm_v1"
     assert isinstance(response.evaluator_meta, dict)
+    assert isinstance(response.spikes_coverage, dict)
+    covered = response.spikes_coverage.get("covered") or []
+    assert response.spikes_completion_score == pytest.approx(round((len(covered) / 6.0) * 100.0, 2))
 
 
 @pytest.mark.asyncio
@@ -163,3 +166,6 @@ async def test_evaluator_meta_persists_as_json_on_hybrid_failure(test_db, test_u
     assert raw_meta["status"] == "failed"
     assert raw_meta["phase"] == "hybrid_llm_v1"
     assert isinstance(response.evaluator_meta, dict)
+    assert isinstance(response.spikes_coverage, dict)
+    covered = response.spikes_coverage.get("covered") or []
+    assert response.spikes_completion_score == pytest.approx(round((len(covered) / 6.0) * 100.0, 2))

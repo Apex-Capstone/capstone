@@ -93,6 +93,16 @@ def test_spikes_completion_is_covered_stages_over_six_times_100(scoring_service:
     assert score == pytest.approx(round((2.0 / 6.0) * 100.0, 2))
 
 
+def test_spikes_completion_normalizes_empathy_alias_to_emotion(scoring_service: ScoringService) -> None:
+    session = SimpleNamespace()
+    turns = [
+        SimpleNamespace(spikes_stage="empathy", role="user"),
+        SimpleNamespace(spikes_stage="e", role="user"),
+    ]
+    score = scoring_service._calculate_spikes_completion(session, turns, [])
+    assert score == pytest.approx(round((1.0 / 6.0) * 100.0, 2))
+
+
 def test_overall_score_weights_empathy_communication_spikes(scoring_service: ScoringService) -> None:
     """overall = 0.5*empathy + 0.2*communication + 0.3*spikes after component scores."""
     empathy = 80.0
