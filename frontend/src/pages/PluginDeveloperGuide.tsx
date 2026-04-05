@@ -3,21 +3,71 @@
  */
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
+import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/store/authStore'
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { cn } from '@/lib/utils'
 
-/** In-page table of contents anchors. */
-const sections = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'architecture', label: 'Plugin Architecture' },
-  { id: 'plugin-types', label: 'Plugin Types' },
-  { id: 'patient-model', label: 'PatientModel Plugins' },
-  { id: 'evaluator', label: 'Evaluator Plugins' },
-  { id: 'metrics', label: 'Metrics Plugins' },
-  { id: 'registration', label: 'Plugin Registration' },
-  { id: 'testing', label: 'Testing Plugins' },
-  { id: 'best-practices', label: 'Best Practices' },
-]
+/** In-page table of contents anchors and searchable keywords (space-separated topics). */
+const DOC_NAV = [
+  {
+    id: 'overview',
+    label: 'Overview',
+    keywords:
+      'introduction overview apex plugin guide extend patient evaluator metrics environment configuration research session',
+  },
+  {
+    id: 'architecture',
+    label: 'Plugin Architecture',
+    keywords:
+      'architecture pipeline dialogue clinician patient model evaluator feedback response scoring metrics analytics dashboard protocol registry load_plugins',
+  },
+  {
+    id: 'plugin-types',
+    label: 'Plugin Types',
+    keywords: 'plugin types patientmodel evaluator metricsplugin protocol interface class',
+  },
+  {
+    id: 'patient-model',
+    label: 'PatientModel Plugins',
+    keywords: 'patient model patientmodel generate_response state conversation history spikes simulate utterance',
+  },
+  {
+    id: 'evaluator',
+    label: 'Evaluator Plugins',
+    keywords: 'evaluator evaluate feedbackresponse scores strengths improvement spikes empathy framework metadata',
+  },
+  {
+    id: 'metrics',
+    label: 'Metrics Plugins',
+    keywords: 'metrics metricsplugin compute dictionary research export analytics session',
+  },
+  {
+    id: 'registration',
+    label: 'Plugin Registration',
+    keywords: 'registration register pluginregistry configuration settings module path classname environment',
+  },
+  {
+    id: 'testing',
+    label: 'Testing Plugins',
+    keywords: 'testing pytest tests plugins mock get_patient_model lru_cache',
+  },
+  {
+    id: 'best-practices',
+    label: 'Best Practices',
+    keywords: 'best practices stateless repository scoring service dialogue validation',
+  },
+] as const
+
+function docSectionVisible(keywords: string, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  const b = keywords.toLowerCase()
+  return q
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((w) => b.includes(w))
+}
 
 /**
  * Scrollable developer guide with section anchors and prose blocks.
@@ -29,6 +79,16 @@ const sections = [
  */
 export const PluginDeveloperGuide = () => {
   const { user } = useAuthStore()
+  const [docSearch, setDocSearch] = useState('')
+
+  const navSections = useMemo(
+    () => DOC_NAV.filter((s) => docSectionVisible(s.keywords, docSearch)),
+    [docSearch]
+  )
+  const anySectionVisible = useMemo(
+    () => DOC_NAV.some((s) => docSectionVisible(s.keywords, docSearch)),
+    [docSearch]
+  )
 
   useEffect(() => {
     // On mount, scroll to top
@@ -60,9 +120,10 @@ export const PluginDeveloperGuide = () => {
                     On this page
                   </h2>
                   <nav className="space-y-1 text-sm">
-                    {sections.map((section) => (
+                    {navSections.map((section) => (
                       <button
                         key={section.id}
+                        type="button"
                         onClick={() => {
                           const el = document.getElementById(section.id)
                           if (el) {
@@ -75,26 +136,52 @@ export const PluginDeveloperGuide = () => {
                       </button>
                     ))}
                   </nav>
+                  {docSearch.trim() && navSections.length === 0 && (
+                    <p className="mt-2 text-xs text-gray-500">No sections match this search.</p>
+                  )}
                 </div>
               </aside>
 
               {/* Main content */}
               <article className="flex-1">
-                <header className="mb-8">
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2" id="overview">
-                    APEX Plugin Developer Guide
-                  </h1>
-                  <p className="text-gray-600 max-w-2xl">
+                <header className="mb-6">
+                  <h1 className="text-3xl font-bold text-gray-900 mb-2">APEX Plugin Developer Guide</h1>
+                  <p className="text-gray-600 max-w-2xl mb-4">
                     This guide explains how to extend APEX by writing and registering your own
                     <span className="font-semibold"> PatientModel</span>,{' '}
                     <span className="font-semibold">Evaluator</span>, and{' '}
                     <span className="font-semibold">MetricsPlugin</span> implementations.
                   </p>
+                  <div className="max-w-md">
+                    <label htmlFor="doc-search" className="sr-only">
+                      Search this guide
+                    </label>
+                    <Input
+                      id="doc-search"
+                      type="search"
+                      placeholder="Filter sections by keyword…"
+                      value={docSearch}
+                      onChange={(e) => setDocSearch(e.target.value)}
+                      className="bg-white"
+                    />
+                    <p className="mt-1.5 text-xs text-gray-500">
+                      Type one or more words; sections that match all words stay visible.
+                    </p>
+                  </div>
                 </header>
 
+                {docSearch.trim() && !anySectionVisible && (
+                  <p className="mb-6 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    No sections match &quot;{docSearch.trim()}&quot;. Clear the search box to see the full guide.
+                  </p>
+                )}
+
                 {/* 1. Introduction / Overview */}
-                <section className="mb-6">
-                  <h2 className="text-xl font-semibold mt-8 mb-3">Introduction</h2>
+                <section
+                  id="overview"
+                  className={cn('mb-6', !docSectionVisible(DOC_NAV[0].keywords, docSearch) && 'hidden')}
+                >
+                  <h2 className="text-xl font-semibold mt-2 mb-3">Introduction</h2>
                   <p className="text-gray-700 mb-3">
                     APEX allows researchers and developers to extend the system by implementing plugins.
                     Plugins are configured via settings (for example, environment variables) and loaded
@@ -104,7 +191,10 @@ export const PluginDeveloperGuide = () => {
                 </section>
 
                 {/* 2. Plugin Architecture */}
-                <section className="mb-6" id="architecture">
+                <section
+                  className={cn('mb-6', !docSectionVisible(DOC_NAV[1].keywords, docSearch) && 'hidden')}
+                  id="architecture"
+                >
                   <h2 className="text-xl font-semibold mt-8 mb-3">Plugin Architecture</h2>
                   <p className="text-gray-700 mb-4">
                     APEX uses a pipeline architecture where each stage can be swapped via plugins.
@@ -171,7 +261,10 @@ export const PluginDeveloperGuide = () => {
                 </section>
 
                 {/* 4. PatientModel Plugins */}
-                <section className="mb-6" id="patient-model">
+                <section
+                  className={cn('mb-6', !docSectionVisible(DOC_NAV[3].keywords, docSearch) && 'hidden')}
+                  id="patient-model"
+                >
                   <h2 className="text-xl font-semibold mt-8 mb-3">PatientModel Plugins</h2>
                   <p className="text-gray-700 mb-3">
                     Implement the <span className="font-mono">PatientModel</span> protocol: an async
@@ -207,7 +300,10 @@ class MyPatientModel:
                 </section>
 
                 {/* 3. Evaluator Plugins */}
-                <section className="mb-6" id="evaluator">
+                <section
+                  className={cn('mb-6', !docSectionVisible(DOC_NAV[4].keywords, docSearch) && 'hidden')}
+                  id="evaluator"
+                >
                   <h2 className="text-xl font-semibold mt-8 mb-3">Evaluator Plugins</h2>
                   <p className="text-gray-700 mb-3">
                     Implement the <span className="font-mono">Evaluator</span> protocol: an async method{' '}
@@ -293,7 +389,10 @@ class MyCustomEvaluator:
                 </section>
 
                 {/* 4. Metrics Plugins */}
-                <section className="mb-6" id="metrics">
+                <section
+                  className={cn('mb-6', !docSectionVisible(DOC_NAV[5].keywords, docSearch) && 'hidden')}
+                  id="metrics"
+                >
                   <h2 className="text-xl font-semibold mt-8 mb-3">Metrics Plugins</h2>
                   <p className="text-gray-700 mb-3">
                     Implement the <span className="font-mono">MetricsPlugin</span> protocol: a synchronous
@@ -317,17 +416,26 @@ class MyMetricsPlugin:
                   </pre>
 
                   <p className="text-gray-700">
-                    The scoring / feedback pipeline calls all configured metrics plugins and merges or
-                    stores their results. These metrics can be used for research export and analytics.
+                    Metrics plugins implement <span className="font-mono text-sm">compute(db, session_id)</span>.
+                    Session records can store which metrics plugins were configured for a run. Whether results
+                    are merged into feedback or export depends on the backend integration in your deployment—see{' '}
+                    <span className="font-mono text-sm">docs/plugin_architecture.md</span> for the current contract.
                   </p>
                 </section>
 
                 {/* 5. Plugin Registration */}
-                <section className="mb-6" id="registration">
+                <section
+                  className={cn('mb-6', !docSectionVisible(DOC_NAV[6].keywords, docSearch) && 'hidden')}
+                  id="registration"
+                >
                   <h2 className="text-xl font-semibold mt-8 mb-3">Plugin Registration</h2>
                   <p className="text-gray-700 mb-3">
-                    Plugins are registered by <span className="font-semibold">configuration</span>, not by
-                    code registration. Set the following in your environment or settings:
+                    Plugin <span className="font-semibold">classes</span> register on import (e.g.{' '}
+                    <span className="font-mono text-sm">PluginRegistry.register_evaluator</span>
+                    ). Startup imports a fixed list in{' '}
+                    <span className="font-mono text-sm">plugins/load_plugins.py</span> (<span className="font-mono text-sm">PLUGIN_MODULES</span>
+                    ). Then <span className="font-semibold">configuration</span> selects which plugin ids run.
+                    Set paths in your environment or settings:
                   </p>
                   <ul className="list-disc pl-6 text-gray-700 space-y-1 mb-3">
                     <li>
@@ -356,7 +464,10 @@ class MyMetricsPlugin:
                 </section>
 
                 {/* 6. Testing Plugins */}
-                <section className="mb-6" id="testing">
+                <section
+                  className={cn('mb-6', !docSectionVisible(DOC_NAV[7].keywords, docSearch) && 'hidden')}
+                  id="testing"
+                >
                   <h2 className="text-xl font-semibold mt-8 mb-3">Testing Plugins</h2>
                   <ul className="list-disc pl-6 text-gray-700 space-y-1 mb-3">
                     <li>
@@ -381,7 +492,10 @@ class MyMetricsPlugin:
                 </section>
 
                 {/* 7. Best Practices */}
-                <section className="mb-6" id="best-practices">
+                <section
+                  className={cn('mb-6', !docSectionVisible(DOC_NAV[8].keywords, docSearch) && 'hidden')}
+                  id="best-practices"
+                >
                   <h2 className="text-xl font-semibold mt-8 mb-3">Best Practices</h2>
                   <ul className="list-disc pl-6 text-gray-700 space-y-2">
                     <li>

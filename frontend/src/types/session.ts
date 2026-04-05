@@ -129,6 +129,12 @@ export interface Session {
   userFullName?: string
   /** From API: "active" | "closed" */
   status: 'active' | 'closed'
+  /** Evaluator plugin id frozen at session creation */
+  evaluatorPlugin?: string | null
+  /** Patient model plugin id frozen at session creation */
+  patientModelPlugin?: string | null
+  /** Metrics plugin ids frozen at session creation */
+  metricsPlugins?: string[] | null
 }
 
 /** One conversational turn in the UI domain model. */
