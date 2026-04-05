@@ -12,6 +12,7 @@ import { FeedbackConversationTimeline } from '@/components/FeedbackConversationT
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { formatDateTimeInUserTimeZone } from '@/lib/dateTime'
+import { formatPluginName, formatMetricsPluginsDisplay } from '@/lib/formatPluginName'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -235,6 +236,49 @@ export const Feedback = () => {
                 </div>
               </div>
             </div>
+
+            {sessionDetail && (
+              <Card className="mb-8 border-slate-200 bg-slate-50/90">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg text-slate-900">Evaluation details</CardTitle>
+                  <p className="text-sm font-normal text-slate-600">
+                    Plugins recorded for this session (for reproducibility).
+                  </p>
+                </CardHeader>
+                <CardContent className="grid gap-4 sm:grid-cols-2 text-sm">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Evaluator
+                    </div>
+                    <div className="mt-1 font-medium text-slate-900">
+                      {sessionDetail.evaluatorPlugin
+                        ? formatPluginName(sessionDetail.evaluatorPlugin)
+                        : 'Server default'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Patient model
+                    </div>
+                    <div className="mt-1 font-medium text-slate-900">
+                      {sessionDetail.patientModelPlugin
+                        ? formatPluginName(sessionDetail.patientModelPlugin)
+                        : 'Server default'}
+                    </div>
+                  </div>
+                  {formatMetricsPluginsDisplay(sessionDetail.metricsPlugins) ? (
+                    <div className="sm:col-span-2">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Metrics plugins
+                      </div>
+                      <div className="mt-1 font-medium text-slate-900">
+                        {formatMetricsPluginsDisplay(sessionDetail.metricsPlugins)}
+                      </div>
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
 
             <div className="space-y-8">
               {/* SPIKES Coverage & Conversation Metrics */}

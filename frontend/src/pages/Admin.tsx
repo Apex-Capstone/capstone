@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Users, FileText, Activity, TrendingUp, Download, Plus, BarChart3, MessageSquare, Puzzle, ExternalLink, Clock, UserCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDateInUserTimeZone, formatDateTimeInUserTimeZone } from '@/lib/dateTime'
+import { formatPluginName, formatMetricsPluginsDisplay } from '@/lib/formatPluginName'
 import { cn } from '@/lib/utils'
 
 // ---- Session detail panel ----
@@ -114,26 +115,23 @@ function SessionDetailPanel({
           <h4 className="font-medium mb-3">Evaluation Details</h4>
           <div className="space-y-2 border rounded-lg p-3 bg-gray-50">
             <div>
-              <span className="text-sm font-medium">Evaluator Plugin: </span>
-              <span className="text-sm text-gray-700">{session.evaluator_plugin || 'default'}</span>
+              <span className="text-sm font-medium">Evaluator: </span>
+              <span className="text-sm text-gray-700" title={session.evaluator_plugin || undefined}>
+                {session.evaluator_plugin ? formatPluginName(session.evaluator_plugin) : 'Server default'}
+              </span>
             </div>
             <div>
-              <span className="text-sm font-medium">Patient Model: </span>
-              <span className="text-sm text-gray-700">{session.patient_model_plugin || 'default'}</span>
+              <span className="text-sm font-medium">Patient model: </span>
+              <span className="text-sm text-gray-700" title={session.patient_model_plugin || undefined}>
+                {session.patient_model_plugin ? formatPluginName(session.patient_model_plugin) : 'Server default'}
+              </span>
             </div>
             <div>
-              <span className="text-sm font-medium">Metrics Plugins: </span>
+              <span className="text-sm font-medium">Metrics plugins: </span>
               <span className="text-sm text-gray-700">
-                {(() => {
-                  const mp = session.metrics_plugins
-                  if (!mp) return 'default'
-                  if (Array.isArray(mp)) return mp.length > 0 ? mp.join(', ') : 'default'
-                  try {
-                    const parsed = JSON.parse(mp)
-                    if (Array.isArray(parsed) && parsed.length > 0) return parsed.join(', ')
-                  } catch { /* not JSON */ }
-                  return mp || 'default'
-                })()}
+                {formatMetricsPluginsDisplay(
+                  session.metrics_plugins as string | string[] | null | undefined
+                ) || '—'}
               </span>
             </div>
           </div>
@@ -977,14 +975,22 @@ export const Admin = () => {
       case 'plugins':
         return (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-xl font-semibold">Installed Plugins</h2>
-              <Button variant="outline" size="sm" asChild>
-                <a href="/docs/plugin-developer-guide" className="flex items-center gap-2">
-                  <ExternalLink className="h-4 w-4" />
-                  View Developer Docs
-                </a>
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" asChild>
+                  <a href="/docs/developer-onboarding" className="flex items-center gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    Onboarding
+                  </a>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <a href="/docs/plugin-developer-guide" className="flex items-center gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    Plugin guide
+                  </a>
+                </Button>
+              </div>
             </div>
 
             {pluginsLoading ? (
@@ -1002,7 +1008,9 @@ export const Admin = () => {
                     <div className="mt-2 space-y-2">
                       {installedPlugins.patient_models.map((p) => (
                         <div key={p.name} className="border rounded-lg p-4 bg-white shadow-sm">
-                          <div className="font-medium text-gray-900">{p.name}</div>
+                          <div className="font-medium text-gray-900" title={p.name}>
+                            {formatPluginName(p.name)}
+                          </div>
                           <div className="text-sm text-gray-500">Version {p.version}</div>
                           <p className="text-sm text-gray-600 mt-1">
                             {pluginDescription('patient_model', p.name)}
@@ -1024,7 +1032,9 @@ export const Admin = () => {
                     <div className="mt-2 space-y-2">
                       {installedPlugins.evaluators.map((p) => (
                         <div key={p.name} className="border rounded-lg p-4 bg-white shadow-sm">
-                          <div className="font-medium text-gray-900">{p.name}</div>
+                          <div className="font-medium text-gray-900" title={p.name}>
+                            {formatPluginName(p.name)}
+                          </div>
                           <div className="text-sm text-gray-500">Version {p.version}</div>
                           <p className="text-sm text-gray-600 mt-1">
                             {pluginDescription('evaluator', p.name)}
@@ -1046,7 +1056,9 @@ export const Admin = () => {
                     <div className="mt-2 space-y-2">
                       {installedPlugins.metrics.map((p) => (
                         <div key={p.name} className="border rounded-lg p-4 bg-white shadow-sm">
-                          <div className="font-medium text-gray-900">{p.name}</div>
+                          <div className="font-medium text-gray-900" title={p.name}>
+                            {formatPluginName(p.name)}
+                          </div>
                           <div className="text-sm text-gray-500">Version {p.version}</div>
                           <p className="text-sm text-gray-600 mt-1">
                             {pluginDescription('metrics', p.name)}

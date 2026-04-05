@@ -43,12 +43,20 @@ export const Navbar = () => {
           <div className="hidden md:block">
             <div className="ml-4 flex items-center space-x-6">
               {user?.role === 'admin' && (
-                <Link
-                  to="/docs/plugin-developer-guide"
-                  className="text-sm font-medium text-gray-700 hover:text-apex-700"
-                >
-                  Developer Docs
-                </Link>
+                <div className="flex items-center gap-4">
+                  <Link
+                    to="/docs/developer-onboarding"
+                    className="text-sm font-medium text-gray-700 hover:text-apex-700"
+                  >
+                    Onboarding
+                  </Link>
+                  <Link
+                    to="/docs/plugin-developer-guide"
+                    className="text-sm font-medium text-gray-700 hover:text-apex-700"
+                  >
+                    Plugin guide
+                  </Link>
+                </div>
               )}
               <div className="flex items-center space-x-4">
                 <span className="text-sm text-gray-700">
@@ -83,13 +91,22 @@ export const Navbar = () => {
                 {user?.full_name || user?.email}
               </div>
               {user?.role === 'admin' && (
-                <Link
-                  to="/docs/plugin-developer-guide"
-                  className="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-md"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Developer Docs
-                </Link>
+                <>
+                  <Link
+                    to="/docs/developer-onboarding"
+                    className="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-md"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Onboarding
+                  </Link>
+                  <Link
+                    to="/docs/plugin-developer-guide"
+                    className="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-md"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Plugin guide
+                  </Link>
+                </>
               )}
               <div className="px-3 py-2">
                 <span className="rounded-full bg-apex-100 px-2.5 py-0.5 text-xs font-medium text-apex-800">
