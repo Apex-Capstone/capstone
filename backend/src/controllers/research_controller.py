@@ -12,7 +12,7 @@ from core.deps import get_db, require_admin
 from core.time import serialize_utc_datetime, utc_now
 from domain.entities.user import User
 from domain.models.admin import ResearchSessionsEnvelope
-from services.research_service import ResearchService
+from services.research_service import ResearchService, resolve_anon_to_session_id
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/research", tags=["research"])
@@ -120,13 +120,13 @@ async def export_session_transcript_csv(
 ):
     """Stream single session transcript CSV by anon_session_id (admin only)."""
     service = ResearchService(db)
-    try:
-        stream = service.stream_session_transcript_csv(anon_session_id)
-    except ValueError:
+    # Resolve before StreamingResponse: generator body runs on first read, so ValueError
+    # there would surface as 500 instead of 404.
+    if resolve_anon_to_session_id(anon_session_id, service.session_repo) is None:
         raise HTTPException(status_code=404, detail="Session not found")
     safe_anon = "".join(c if c.isalnum() or c == "_" else "_" for c in anon_session_id)[:32]
     return StreamingResponse(
-        stream,
+        service.stream_session_transcript_csv(anon_session_id),
         media_type="text/csv",
         headers={
             "Content-Disposition": f'attachment; filename="session_{safe_anon}.csv"',

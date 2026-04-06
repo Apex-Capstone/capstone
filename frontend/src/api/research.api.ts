@@ -124,7 +124,9 @@ export interface ResearchData {
  * @returns Whether `err` represents HTTP 403
  */
 function isForbidden(err: unknown): boolean {
-  return (err as AxiosError)?.response?.status === 403
+  const ax = err as AxiosError
+  const status = ax.response?.status ?? ax.status
+  return Number(status) === 403
 }
 
 /**
