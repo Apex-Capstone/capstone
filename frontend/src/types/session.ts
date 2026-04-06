@@ -172,3 +172,30 @@ export interface SessionListResponse {
   sessions: Session[]
   total: number
 }
+
+export type ConversationConnectionStatus =
+  | 'disabled'
+  | 'connecting'
+  | 'connected'
+  | 'disconnected'
+  | 'error'
+
+export interface RealtimeClientMessage {
+  type: 'user_message'
+  content: string
+  meta?: {
+    enable_tts?: boolean
+  }
+}
+
+export interface RealtimeServerMessage {
+  type: 'connected' | 'assistant_message' | 'stage_update' | 'error'
+  content: string
+  meta?: {
+    session_id?: number
+    user_id?: number
+    turn_id?: number
+    spikes_stage?: string
+    assistant_audio_url?: string | null
+  }
+}
