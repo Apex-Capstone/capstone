@@ -40,17 +40,17 @@ const DOC_NAV = [
   {
     id: 'metrics',
     label: 'Metrics Plugins',
-    keywords: 'metrics metricsplugin compute dictionary research export analytics session',
+    keywords: 'metrics metricsplugin compute dictionary research export analytics session metrics_json generate_feedback',
   },
   {
     id: 'registration',
     label: 'Plugin Registration',
-    keywords: 'registration register pluginregistry configuration settings module path classname environment',
+    keywords: 'registration register pluginregistry configuration settings module path classname environment case session frozen',
   },
   {
     id: 'testing',
     label: 'Testing Plugins',
-    keywords: 'testing pytest tests plugins mock get_patient_model lru_cache',
+    keywords: 'testing pytest tests plugins mock dialogue_service scoring_service registry session lru_cache',
   },
   {
     id: 'best-practices',
@@ -184,9 +184,11 @@ export const PluginDeveloperGuide = () => {
                   <h2 className="text-xl font-semibold mt-2 mb-3">Introduction</h2>
                   <p className="text-gray-700 mb-3">
                     APEX allows researchers and developers to extend the system by implementing plugins.
-                    Plugins are configured via settings (for example, environment variables) and loaded
-                    at runtime. You can swap the default patient model, evaluator, or metrics without
-                    modifying core application code.
+                    Defaults come from settings (for example, environment variables); cases can override
+                    plugins for new sessions. At session creation, resolved plugin ids are frozen on the
+                    session row so dialogue and scoring use that configuration for reproducibility. You can
+                    swap the patient model, evaluator, or metrics without modifying core application code
+                    beyond registration and config.
                   </p>
                 </section>
 
@@ -416,10 +418,15 @@ class MyMetricsPlugin:
                   </pre>
 
                   <p className="text-gray-700">
-                    Metrics plugins implement <span className="font-mono text-sm">compute(db, session_id)</span>.
-                    Session records can store which metrics plugins were configured for a run. Whether results
-                    are merged into feedback or export depends on the backend integration in your deployment—see{' '}
-                    <span className="font-mono text-sm">docs/plugin_architecture.md</span> for the current contract.
+                    When <span className="font-mono text-sm">ScoringService.generate_feedback</span> runs (for
+                    example on session close), after the evaluator finishes the backend runs each plugin in
+                    the session&apos;s frozen <span className="font-mono text-sm">metrics_plugins</span>,
+                    calls <span className="font-mono text-sm">compute(db, session_id)</span>, and stores one
+                    JSON object on <span className="font-mono text-sm">sessions.metrics_json</span> (API field{' '}
+                    <span className="font-mono text-sm">metrics_json</span>): keys are plugin ids, values are
+                    each <span className="font-mono text-sm">compute</span> return dict. Metrics plugins are not
+                    run if code bypasses <span className="font-mono text-sm">generate_feedback</span>. See{' '}
+                    <span className="font-mono text-sm">docs/plugin_architecture.md</span> for the full contract.
                   </p>
                 </section>
 
@@ -430,23 +437,33 @@ class MyMetricsPlugin:
                 >
                   <h2 className="text-xl font-semibold mt-8 mb-3">Plugin Registration</h2>
                   <p className="text-gray-700 mb-3">
-                    Plugin <span className="font-semibold">classes</span> register on import (e.g.{' '}
-                    <span className="font-mono text-sm">PluginRegistry.register_evaluator</span>
-                    ). Startup imports a fixed list in{' '}
-                    <span className="font-mono text-sm">plugins/load_plugins.py</span> (<span className="font-mono text-sm">PLUGIN_MODULES</span>
-                    ). Then <span className="font-semibold">configuration</span> selects which plugin ids run.
-                    Set paths in your environment or settings:
+                    <span className="font-semibold">1. Code registration (import time).</span> Each plugin module
+                    calls <span className="font-mono text-sm">PluginRegistry.register_*</span> when imported.
+                    Startup imports the list in{' '}
+                    <span className="font-mono text-sm">plugins/load_plugins.py</span> (
+                    <span className="font-mono text-sm">PLUGIN_MODULES</span>); add your module there.
+                  </p>
+                  <p className="text-gray-700 mb-3">
+                    <span className="font-semibold">2. Configuration (which plugin runs).</span> Resolution is
+                    typically case override → settings default at session creation; the session row stores the
+                    frozen ids.
                   </p>
                   <ul className="list-disc pl-6 text-gray-700 space-y-1 mb-3">
                     <li>
-                      <span className="font-mono">patient_model_plugin=module.path:ClassName</span>
+                      <span className="font-semibold">Patient model:</span>{' '}
+                      <span className="font-mono">patient_model_plugin</span> in settings and/or on the case.
+                      Dialogue loads using <span className="font-mono">session.patient_model_plugin</span>{' '}
+                      (fallback: <span className="font-mono">settings.patient_model_plugin</span>).
                     </li>
                     <li>
-                      <span className="font-mono">evaluator_plugin=module.path:ClassName</span>
+                      <span className="font-semibold">Evaluator:</span>{' '}
+                      <span className="font-mono">evaluator_plugin</span> on case/settings → frozen{' '}
+                      <span className="font-mono">session.evaluator_plugin</span> for scoring.
                     </li>
                     <li>
-                      <span className="font-mono">metrics_plugins=module.path:ClassA module.path:ClassB</span>{' '}
-                      (or the equivalent list in your config)
+                      <span className="font-semibold">Metrics (list):</span>{' '}
+                      <span className="font-mono">metrics_plugins</span> on case/settings → frozen{' '}
+                      <span className="font-mono">session.metrics_plugins</span> (JSON array text) for scoring.
                     </li>
                   </ul>
 
@@ -475,12 +492,18 @@ class MyMetricsPlugin:
                       <span className="font-mono">backend/tests/plugins/</span>.
                     </li>
                     <li>
-                      <span className="font-semibold">Patterns:</span> Reuse the patterns from existing plugin
-                      tests: mock or override <span className="font-mono">get_patient_model</span>,{' '}
-                      <span className="font-mono">get_evaluator</span>, or{' '}
-                      <span className="font-mono">get_metrics_plugins</span> where needed, and clear{' '}
-                      <span className="font-mono">lru_cache</span> on the plugin manager in tests that change
-                      configuration so the new plugin is loaded.
+                      <span className="font-semibold">Patterns:</span> Dialogue resolves the patient model from
+                      the session and <span className="font-mono">PluginRegistry</span> (not{' '}
+                      <span className="font-mono">get_patient_model()</span> alone). Prefer registering a dummy
+                      class and setting <span className="font-mono">session.patient_model_plugin</span>, or patch{' '}
+                      <span className="font-mono">_instantiate_patient_model</span> in{' '}
+                      <span className="font-mono">dialogue_service</span>. For scoring, exercise{' '}
+                      <span className="font-mono">ScoringService.generate_feedback</span> with frozen evaluator /
+                      metrics on the session. Clear <span className="font-mono">lru_cache</span> on{' '}
+                      <span className="font-mono">get_patient_model</span>, <span className="font-mono">get_evaluator</span>,{' '}
+                      <span className="font-mono">get_metrics_plugins</span> in{' '}
+                      <span className="font-mono">core/plugin_manager</span> only when tests hit those
+                      settings-based entry points directly.
                     </li>
                     <li>
                       <span className="font-semibold">Interfaces:</span> Prefer testing against the public

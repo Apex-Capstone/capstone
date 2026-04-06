@@ -6,7 +6,7 @@ This guide explains how to extend APEX by writing and registering your own **Pat
 
 ## 1. Introduction
 
-APEX allows researchers and developers to extend the system by implementing plugins. Plugins are configured via settings (e.g. environment variables) and loaded at runtime. You can swap the default patient model, evaluator, or metrics without modifying core application code.
+APEX allows researchers and developers to extend the system by implementing plugins. **Defaults** come from **settings** (e.g. environment variables); **cases** can override plugins for new sessions. At **session creation**, resolved plugin ids are **frozen on the session row** so dialogue and scoring use that configuration for reproducibility. You can swap the patient model, evaluator, or metrics without modifying core application code beyond registration and config.
 
 ---
 
@@ -82,17 +82,21 @@ class MyMetricsPlugin:
         }
 ```
 
-**Integration:** The scoring/feedback pipeline calls all configured metrics plugins and merges or stores their results. These metrics can be used for research export and analytics.
+**Integration:** When **`ScoringService.generate_feedback`** runs (e.g. on session close), after the **evaluator** finishes the backend runs each plugin listed in the session’s frozen **`metrics_plugins`**, calls **`compute(db, session_id)`**, and stores a single JSON object on **`sessions.metrics_json`**: keys are plugin ids, values are each **`compute`** return dict. Use that column (or the API field **`metrics_json`**) for research export and analytics. Metrics plugins are **not** run if code calls only the internal hybrid/rule helpers without going through **`generate_feedback`**.
 
 ---
 
 ## 5. Plugin Registration
 
-Plugins are registered by **configuration**, not by code registration. Set the following in your environment or settings:
+1. **Code registration (import time)**  
+   Each plugin module calls **`PluginRegistry.register_*`** when imported. **`plugins/load_plugins.py`** lists **`PLUGIN_MODULES`** so startup imports run registration. Add your module there.
 
-- **Patient model:** `patient_model_plugin=module.path:ClassName`
-- **Evaluator:** `evaluator_plugin=module.path:ClassName`
-- **Metrics (list):** `metrics_plugins=module.path:ClassA module.path:ClassB` (or the equivalent list in your config)
+2. **Configuration (which plugin runs)**  
+   Resolution order is typically **case override → settings default** at **session creation**; the **session row** stores the frozen ids.
+
+- **Patient model:** `patient_model_plugin` in settings and/or on the **case**. **Dialogue** loads the class using **`session.patient_model_plugin`** (fallback: **`settings.patient_model_plugin`**).
+- **Evaluator:** `evaluator_plugin` on case/settings → frozen **`session.evaluator_plugin`** for **scoring**.
+- **Metrics (list):** `metrics_plugins` on case/settings → frozen **`session.metrics_plugins`** (JSON array text) for **scoring**.
 
 **Example plugin path:**
 
@@ -106,9 +110,11 @@ Format is always `module.path:ClassName`. The module must be importable (e.g. un
 
 ## 6. Testing Plugins
 
-- **Location:** Add tests under `backend/tests/plugins/`.
-- **Patterns:** Reuse the patterns from existing plugin tests: mock or override `get_patient_model`, `get_evaluator`, or `get_metrics_plugins` where needed, and clear `lru_cache` on the plugin manager in tests that change configuration so the new plugin is loaded.
-- **Interfaces:** Prefer testing against the public interface (e.g. `generate_response`, `evaluate`, `compute`) so that refactors preserve behavior.
+- **Location:** Add tests under `backend/tests/plugins/` and, for integration coverage, `backend/tests/services/` (e.g. dialogue and scoring plugin tests).
+- **Patient model:** **`DialogueService`** resolves from the **session** and **`PluginRegistry`** (not `get_patient_model()`). Prefer registering a dummy class on **`PluginRegistry`** and setting **`session.patient_model_plugin`** (or patching **`_instantiate_patient_model`** in `dialogue_service`) instead of mocking deprecated globals.
+- **Evaluator / metrics:** **`ScoringService.generate_feedback`** uses the session’s frozen evaluator and metrics list; **`PluginRegistry`** + tests that clear registry between runs (see existing scoring plugin tests) match production.
+- **`lru_cache`:** Clear **`get_patient_model`**, **`get_evaluator`**, **`get_metrics_plugins`** in **`core/plugin_manager`** only when tests still exercise those **settings-based** entry points directly.
+- **Interfaces:** Prefer testing against **`generate_response`**, **`evaluate`**, and **`compute`** so refactors preserve behavior.
 
 ---
 
