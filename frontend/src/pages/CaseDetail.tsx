@@ -450,7 +450,7 @@ export const CaseDetail = () => {
       console.warn('Assistant audio playback failed:', playbackError)
       requestConversationResumeRef.current()
     }
-  }, [stopAssistantAudioPlayback])
+  }, [])
 
   /**
    * Merges updates into an existing chat message by id.
