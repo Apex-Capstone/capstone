@@ -19,6 +19,15 @@ import type { AudioToneAnalysis, Message } from '@/types/session'
 import { parseUtcDateTime } from '@/lib/dateTime'
 import { useAuthStore } from '@/store/authStore'
 import { useRealtimeSession } from '@/hooks/useRealtimeSession'
+import {
+  evaluateVoiceCaptureForUpload,
+  getPreferredRecordingMimeType,
+  getRecordingFileExtension,
+  isBrowserVoiceRecordingSupported,
+  MIN_VOICE_ACTIVE_FRAMES,
+  VOICE_ACTIVITY_RMS_THRESHOLD,
+} from '@/lib/voiceMedia'
+import { playAssistantAudioTrack, revokeAssistantAudioSession } from '@/lib/assistantAudioPlayback'
 
 import { ChatBubble } from '@/components/ChatBubble'
 import { Navbar } from '@/components/Navbar'
@@ -29,29 +38,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Mic, Send, Clock, PhoneOff, ChevronDown, ChevronUp } from 'lucide-react'
 import { SpikesProgressBar } from '@/components/SpikesProgressBar'
 
-const audioExtensionByMimeType: Record<string, string> = {
-  'audio/webm;codecs=opus': 'webm',
-  'audio/webm': 'webm',
-  'audio/ogg;codecs=opus': 'ogg',
-  'audio/ogg': 'ogg',
-  'audio/mp4': 'm4a',
-  'audio/x-m4a': 'm4a',
-  'audio/mpeg': 'mp3',
-  'audio/mp3': 'mp3',
-  'audio/wav': 'wav',
-  'audio/x-wav': 'wav',
-}
-
-const preferredMimeTypes = [
-  'audio/webm;codecs=opus',
-  'audio/webm',
-  'audio/ogg;codecs=opus',
-  'audio/ogg',
-  'audio/mp4',
-]
-
-const VOICE_ACTIVITY_RMS_THRESHOLD = 0.02
-const MIN_VOICE_ACTIVE_FRAMES = 5
 const CONVERSATION_AUTO_STOP_SILENCE_MS = 2200
 const CONVERSATION_AUTO_RESUME_DELAY_MS = 350
 
@@ -426,12 +412,7 @@ export const CaseDetail = () => {
         window.clearTimeout(pendingConversationResumeTimeoutRef.current)
         pendingConversationResumeTimeoutRef.current = null
       }
-      activeAssistantAudioRef.current?.pause()
-      activeAssistantAudioRef.current = null
-      if (activeAssistantAudioObjectUrlRef.current) {
-        URL.revokeObjectURL(activeAssistantAudioObjectUrlRef.current)
-        activeAssistantAudioObjectUrlRef.current = null
-      }
+      revokeAssistantAudioSession(activeAssistantAudioRef, activeAssistantAudioObjectUrlRef)
       mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop())
       mediaRecorderRef.current = null
       stopMediaStream()
@@ -459,24 +440,12 @@ export const CaseDetail = () => {
    */
   const playAssistantAudio = useCallback(async (audioUrl: string) => {
     try {
-      stopAssistantAudioPlayback()
-
-      const objectUrl = await fetchAssistantAudioObjectUrl(audioUrl)
-      activeAssistantAudioObjectUrlRef.current = objectUrl
-
-      const audio = new Audio(objectUrl)
-      activeAssistantAudioRef.current = audio
-      audio.onended = () => {
-        if (activeAssistantAudioRef.current === audio) {
-          activeAssistantAudioRef.current = null
-        }
-        if (activeAssistantAudioObjectUrlRef.current === objectUrl) {
-          URL.revokeObjectURL(objectUrl)
-          activeAssistantAudioObjectUrlRef.current = null
-        }
-        requestConversationResumeRef.current()
-      }
-      await audio.play()
+      await playAssistantAudioTrack(audioUrl, {
+        activeAudioRef: activeAssistantAudioRef,
+        activeObjectUrlRef: activeAssistantAudioObjectUrlRef,
+        fetchObjectUrl: fetchAssistantAudioObjectUrl,
+        onPlaybackEnded: () => requestConversationResumeRef.current(),
+      })
     } catch (playbackError) {
       console.warn('Assistant audio playback failed:', playbackError)
       requestConversationResumeRef.current()
@@ -590,27 +559,6 @@ export const CaseDetail = () => {
   })
 
   /**
-   * Picks the first supported MIME type from {@link preferredMimeTypes}.
-   *
-   * @returns MIME type string or undefined
-   */
-  const getPreferredAudioMimeType = () => {
-    if (typeof MediaRecorder === 'undefined') return ''
-
-    return preferredMimeTypes.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? ''
-  }
-
-  /**
-   * Maps a recorder MIME type to a file extension for `File` construction.
-   *
-   * @param mimeType - MIME type string
-   * @returns File extension without dot
-   */
-  const getAudioExtension = (mimeType: string) => {
-    return audioExtensionByMimeType[mimeType.toLowerCase()] ?? 'webm'
-  }
-
-  /**
    * Extracts API error detail/message for toast-style display.
    *
    * @param error - Caught error
@@ -712,11 +660,7 @@ export const CaseDetail = () => {
   const startVoiceRecording = async () => {
     if (!sessionId || sending || closing) return
 
-    if (
-      typeof navigator === 'undefined' ||
-      !navigator.mediaDevices?.getUserMedia ||
-      typeof MediaRecorder === 'undefined'
-    ) {
+    if (!isBrowserVoiceRecordingSupported()) {
       setError('Voice input is not supported in this browser.')
       return
     }
@@ -732,7 +676,7 @@ export const CaseDetail = () => {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mimeType = getPreferredAudioMimeType()
+      const mimeType = getPreferredRecordingMimeType((m) => MediaRecorder.isTypeSupported(m))
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
 
       audioChunksRef.current = []
@@ -769,20 +713,20 @@ export const CaseDetail = () => {
         audioChunksRef.current = []
         stopMediaStream()
 
-        if (audioBlob.size === 0) {
-          setVoiceStatus(null)
-          setError('No audio was captured. Please try again.')
-          return
-        }
+        const captureDecision = evaluateVoiceCaptureForUpload({
+          blobByteSize: audioBlob.size,
+          maxRms,
+          activeFrames,
+          recordingDurationMs,
+        })
 
-        const detectedSpeech =
-          maxRms >= VOICE_ACTIVITY_RMS_THRESHOLD &&
-          activeFrames >= MIN_VOICE_ACTIVE_FRAMES &&
-          recordingDurationMs > 0
-
-        if (!detectedSpeech) {
+        if (!captureDecision.upload) {
           setVoiceStatus(null)
-          setError('No speech was detected. Please try again and speak before stopping the microphone.')
+          if (captureDecision.reason === 'empty_blob') {
+            setError('No audio was captured. Please try again.')
+          } else {
+            setError('No speech was detected. Please try again and speak before stopping the microphone.')
+          }
           return
         }
 
@@ -797,7 +741,7 @@ export const CaseDetail = () => {
         }
         setMessages((prev) => [...prev, pendingMessage])
 
-        const extension = getAudioExtension(recordedMimeType)
+        const extension = getRecordingFileExtension(recordedMimeType)
         const audioFile = new File([audioBlob], `voice-message-${Date.now()}.${extension}`, {
           type: recordedMimeType,
         })
