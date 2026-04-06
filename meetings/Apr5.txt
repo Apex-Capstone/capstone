@@ -1,0 +1,4 @@
+Meeting Notes – April 5, 2025
+Adding tests to all code
+V&V updates assigned and reflection doc 
+Another meeting 7pm April 6 to go through final review before submission
