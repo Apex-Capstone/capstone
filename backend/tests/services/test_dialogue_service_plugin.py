@@ -26,7 +26,10 @@ from domain.entities.case import Case
 from domain.entities.session import Session as SessionEntity
 from domain.entities.user import User
 from domain.models.sessions import TurnCreate, TurnResponse
+from plugins.registry import PluginRegistry
 from services.dialogue_service import DialogueService
+
+_DUMMY_PATIENT_KEY = "tests.services.test_dialogue_service_plugin:_DummyPatientModel"
 
 
 class _DummyLLMAdapter(LLMAdapter):
@@ -50,17 +53,17 @@ class _DummyLLMAdapter(LLMAdapter):
 
 
 class _DummyPatientModel:
-    def __init__(self) -> None:
-        self.calls: list[dict] = []
+    """Registry-backed patient plugin; uses class-level `calls` for assertions."""
+
+    calls: list[dict] = []
 
     async def generate_response(self, state, clinician_input: str) -> str:
-        self.calls.append(
+        _DummyPatientModel.calls.append(
             {
                 "state": state,
                 "clinician_input": clinician_input,
             }
         )
-        # Return a recognizable reply
         return "plugin patient reply"
 
 
@@ -106,6 +109,14 @@ class _DummyStorageAdapter:
         return file_name
 
 
+@pytest.fixture(autouse=True)
+def _register_dummy_patient_plugin():
+    PluginRegistry.register_patient_model(_DUMMY_PATIENT_KEY, _DummyPatientModel)
+    _DummyPatientModel.calls.clear()
+    yield
+    PluginRegistry.patient_models.pop(_DUMMY_PATIENT_KEY, None)
+
+
 @pytest.fixture
 def test_db():
     engine = create_engine("sqlite:///:memory:")
@@ -147,6 +158,7 @@ def seeded_session(test_db):
         case_id=case.id,
         state="active",
         current_spikes_stage="setting",
+        patient_model_plugin=_DUMMY_PATIENT_KEY,
     )
     test_db.add(session)
     test_db.commit()
@@ -156,14 +168,7 @@ def seeded_session(test_db):
 
 
 @pytest.mark.asyncio
-async def test_dialogue_service_uses_patient_model_plugin(test_db, seeded_session, monkeypatch: pytest.MonkeyPatch):
-    import services.dialogue_service as dialogue_service_module
-
-    dummy_patient_model = _DummyPatientModel()
-    # Patch where get_patient_model is used (dialogue_service imports it at load time)
-    monkeypatch.setattr(dialogue_service_module, "get_patient_model", lambda: dummy_patient_model)
-
-    # Use a simple NLU adapter; DialogueService wraps it in NLUPipeline
+async def test_dialogue_service_uses_patient_model_plugin(test_db, seeded_session):
     nlu = SimpleRuleNLU()
     llm_adapter = _DummyLLMAdapter()
 
@@ -173,23 +178,15 @@ async def test_dialogue_service_uses_patient_model_plugin(test_db, seeded_sessio
     response = await service.process_user_turn(seeded_session.id, turn)
 
     assert isinstance(response, TurnResponse)
-    # The assistant's text should come from the plugin reply
     assert response.text == "plugin patient reply"
-    # And our dummy plugin should have been called at least once
-    assert dummy_patient_model.calls
+    assert _DummyPatientModel.calls
 
 
 @pytest.mark.asyncio
 async def test_dialogue_service_generates_assistant_audio_when_enabled(
     test_db,
     seeded_session,
-    monkeypatch: pytest.MonkeyPatch,
 ):
-    import services.dialogue_service as dialogue_service_module
-
-    dummy_patient_model = _DummyPatientModel()
-    monkeypatch.setattr(dialogue_service_module, "get_patient_model", lambda: dummy_patient_model)
-
     tts = _DummyTTSAdapter()
     storage = _DummyStorageAdapter()
     service = DialogueService(
@@ -224,13 +221,7 @@ async def test_dialogue_service_generates_assistant_audio_when_enabled(
 async def test_dialogue_service_leaves_tts_off_by_default(
     test_db,
     seeded_session,
-    monkeypatch: pytest.MonkeyPatch,
 ):
-    import services.dialogue_service as dialogue_service_module
-
-    dummy_patient_model = _DummyPatientModel()
-    monkeypatch.setattr(dialogue_service_module, "get_patient_model", lambda: dummy_patient_model)
-
     tts = _DummyTTSAdapter()
     storage = _DummyStorageAdapter()
     service = DialogueService(
@@ -255,13 +246,7 @@ async def test_dialogue_service_leaves_tts_off_by_default(
 async def test_dialogue_service_skips_assistant_audio_when_tts_fails(
     test_db,
     seeded_session,
-    monkeypatch: pytest.MonkeyPatch,
 ):
-    import services.dialogue_service as dialogue_service_module
-
-    dummy_patient_model = _DummyPatientModel()
-    monkeypatch.setattr(dialogue_service_module, "get_patient_model", lambda: dummy_patient_model)
-
     tts = _DummyTTSAdapter(should_fail=True)
     storage = _DummyStorageAdapter()
     service = DialogueService(

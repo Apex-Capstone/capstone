@@ -27,6 +27,7 @@ class Session(Base):
     patient_model_plugin = Column(String, nullable=True)  # Frozen at session creation
     patient_model_version = Column(String, nullable=True)
     metrics_plugins = Column(Text, nullable=True)  # JSON array of metrics plugin names frozen at creation
+    metrics_json = Column(Text, nullable=True)  # JSON: plugin_id -> MetricsPlugin.compute() result
 
     # Relationships
     user = relationship("User", back_populates="sessions")

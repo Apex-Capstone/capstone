@@ -15,6 +15,28 @@ import type {
   SessionListResponseDTO,
 } from '@/types/session'
 
+function normalizeMetricsPlugins(
+  v: string | string[] | null | undefined
+): string[] | undefined {
+  if (v == null) return undefined
+  if (Array.isArray(v)) {
+    const out = v.map((x) => String(x).trim()).filter(Boolean)
+    return out.length ? out : undefined
+  }
+  const t = String(v).trim()
+  if (!t) return undefined
+  try {
+    const parsed = JSON.parse(t) as unknown
+    if (Array.isArray(parsed)) {
+      const out = parsed.map((x) => String(x).trim()).filter(Boolean)
+      return out.length ? out : undefined
+    }
+  } catch {
+    /* ignore */
+  }
+  return undefined
+}
+
 export function audioToneFromDTO(dto?: TurnResponseWithAudioDTO['audio_tone']): AudioToneAnalysis | undefined {
   if (!dto) return undefined
 
@@ -44,6 +66,8 @@ export function audioToneFromDTO(dto?: TurnResponseWithAudioDTO['audio_tone']): 
  * @returns Domain session
  */
 export function sessionFromDTO(dto: SessionDTO): Session {
+  const ev = dto.evaluator_plugin?.trim()
+  const pm = dto.patient_model_plugin?.trim()
   return {
     id: dto.id,
     userId: dto.user_id,
@@ -55,7 +79,13 @@ export function sessionFromDTO(dto: SessionDTO): Session {
     durationSeconds: dto.duration_seconds,
     meta: dto.meta ?? undefined,
     caseTitle: dto.case_title ?? undefined,
+    userEmail: dto.user_email ?? undefined,
+    userFullName: dto.user_full_name ?? undefined,
     status: dto.status,
+    evaluatorPlugin: ev || undefined,
+    patientModelPlugin: pm || undefined,
+    metricsPlugins: normalizeMetricsPlugins(dto.metrics_plugins),
+    metricsJson: dto.metrics_json ?? undefined,
   }
 }
 

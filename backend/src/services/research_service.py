@@ -27,6 +27,31 @@ def generate_anon_session_id(session_id: int) -> str:
     return f"anon_{h[:12]}"
 
 
+def _plugin_field_csv(val: str | None) -> str:
+    """Single plugin id/path for a CSV cell (plain string, not JSON)."""
+    if val is None:
+        return ""
+    return str(val).strip()
+
+
+def _format_metrics_plugins_csv(raw: str | None) -> str:
+    """Flatten session.metrics_plugins JSON text to a comma-separated string for CSV."""
+    if not raw:
+        return ""
+    text = str(raw).strip()
+    if not text:
+        return ""
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, list):
+            return ", ".join(
+                str(x).strip() for x in parsed if x is not None and str(x).strip()
+            )
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return text
+
+
 def resolve_anon_to_session_id(anon_session_id: str, session_repo: SessionRepository) -> int | None:
     """Reverse lookup: anon_session_id -> internal session id. Returns None if not found."""
     if not anon_session_id or not anon_session_id.startswith("anon_"):
@@ -179,6 +204,9 @@ class ResearchService:
             "anon_session_id",
             "case_id",
             "started_at",
+            "patient_model_plugin",
+            "evaluator_plugin",
+            "metrics_plugins",
             "empathy_score",
             "spikes_completion",
             "turn_number",
@@ -202,12 +230,18 @@ class ResearchService:
                 if session.started_at
                 else ""
             )
+            patient_plugin = _plugin_field_csv(session.patient_model_plugin)
+            evaluator_plugin = _plugin_field_csv(session.evaluator_plugin)
+            metrics_plugins = _format_metrics_plugins_csv(session.metrics_plugins)
             for turn in session_data.get("turns", []):
                 rows.append(
                     {
                         "anon_session_id": session_data["session_id"],
                         "case_id": session_data["case_id"],
                         "started_at": started_at_str,
+                        "patient_model_plugin": patient_plugin,
+                        "evaluator_plugin": evaluator_plugin,
+                        "metrics_plugins": metrics_plugins,
                         "empathy_score": empathy,
                         "spikes_completion": spikes,
                         "turn_number": turn["turn_number"],
@@ -234,6 +268,9 @@ class ResearchService:
             "case_id",
             "started_at",
             "duration_seconds",
+            "patient_model_plugin",
+            "evaluator_plugin",
+            "metrics_plugins",
             "empathy_score",
             "spikes_completion",
             "communication_score",
@@ -260,6 +297,9 @@ class ResearchService:
                 session.case_id,
                 serialize_utc_datetime(session.started_at) if session.started_at else "",
                 session.duration_seconds or 0,
+                _plugin_field_csv(session.patient_model_plugin),
+                _plugin_field_csv(session.evaluator_plugin),
+                _format_metrics_plugins_csv(session.metrics_plugins),
                 feedback.empathy_score if feedback else "",
                 feedback.spikes_completion_score if feedback else "",
                 feedback.communication_score if feedback else "",
@@ -277,6 +317,9 @@ class ResearchService:
         header = [
             "anon_session_id",
             "case_id",
+            "patient_model_plugin",
+            "evaluator_plugin",
+            "metrics_plugins",
             "turn_number",
             "speaker",
             "text",
@@ -300,12 +343,18 @@ class ResearchService:
         )
         for session in sessions:
             anon_id = generate_anon_session_id(session.id)
+            patient_plugin = _plugin_field_csv(session.patient_model_plugin)
+            evaluator_plugin = _plugin_field_csv(session.evaluator_plugin)
+            metrics_plugins = _format_metrics_plugins_csv(session.metrics_plugins)
             turns = self.turn_repo.get_by_session(session.id)
             for turn in turns:
                 voice_tone = self._extract_voice_tone_fields(turn.metrics_json)
                 row = [
                     anon_id,
                     session.case_id,
+                    patient_plugin,
+                    evaluator_plugin,
+                    metrics_plugins,
                     turn.turn_number,
                     turn.role,
                     self._anonymize_text(turn.text or ""),
@@ -334,6 +383,9 @@ class ResearchService:
         header = [
             "anon_session_id",
             "case_id",
+            "patient_model_plugin",
+            "evaluator_plugin",
+            "metrics_plugins",
             "turn_number",
             "speaker",
             "text",
@@ -352,6 +404,10 @@ class ResearchService:
         buf.seek(0)
         buf.truncate(0)
 
+        patient_plugin = _plugin_field_csv(session.patient_model_plugin)
+        evaluator_plugin = _plugin_field_csv(session.evaluator_plugin)
+        metrics_plugins = _format_metrics_plugins_csv(session.metrics_plugins)
+
         turns = self.turn_repo.get_by_session(session.id)
         aid = generate_anon_session_id(session.id)
         for turn in turns:
@@ -359,6 +415,9 @@ class ResearchService:
             row = [
                 aid,
                 session.case_id,
+                patient_plugin,
+                evaluator_plugin,
+                metrics_plugins,
                 turn.turn_number,
                 turn.role,
                 self._anonymize_text(turn.text or ""),

@@ -1019,9 +1019,9 @@ Researchers need to experiment with different models and scoring approaches **ar
   - Exposed via an `Evaluator` plugin interface that always returns `FeedbackResponse`.
 - **Metrics calculators**:
   - Additional research-oriented metrics or analytic summaries derived from persisted sessions and feedback.
-  - Exposed via `Metrics` plugin interfaces that compute extra, non-breaking analytics.
+  - Exposed via `MetricsPlugin` interfaces (`compute(db, session_id)`). Results for a closed session are stored on **`sessions.metrics_json`** when scoring runs through **`ScoringService.generate_feedback`**, keyed by the frozen metrics plugin ids on that session.
 
-These components are **experimental** in the sense that researchers are expected to swap them in and out without touching controllers, session lifecycle, or database schemas.
+These components are **experimental** in the sense that researchers are expected to swap them in and out without changing controllers, session lifecycle semantics, or core turn/SPIKES tables—aside from **additive** columns such as **`metrics_json`** for research exports.
 
 ### 17.3 Research Extensibility
 

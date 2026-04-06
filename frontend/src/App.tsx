@@ -20,6 +20,7 @@ import { Research } from './pages/Research'
 import { ResearchSessions } from './pages/ResearchSessions'
 import { AdminResearchSessionPage } from './pages/AdminResearchSessionPage'
 import { PluginDeveloperGuide } from './pages/PluginDeveloperGuide'
+import { DeveloperOnboarding } from './pages/DeveloperOnboarding'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { useAuthGate } from './hooks/useAuthGate'
 import apexLogo from './assets/apex-capstone-logo.png'
@@ -204,6 +205,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['admin']}>
               <PluginDeveloperGuide />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/docs/developer-onboarding"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <DeveloperOnboarding />
             </ProtectedRoute>
           }
         />

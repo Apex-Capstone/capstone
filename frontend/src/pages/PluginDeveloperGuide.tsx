@@ -3,21 +3,71 @@
  */
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
+import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/store/authStore'
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { cn } from '@/lib/utils'
 
-/** In-page table of contents anchors. */
-const sections = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'architecture', label: 'Plugin Architecture' },
-  { id: 'plugin-types', label: 'Plugin Types' },
-  { id: 'patient-model', label: 'PatientModel Plugins' },
-  { id: 'evaluator', label: 'Evaluator Plugins' },
-  { id: 'metrics', label: 'Metrics Plugins' },
-  { id: 'registration', label: 'Plugin Registration' },
-  { id: 'testing', label: 'Testing Plugins' },
-  { id: 'best-practices', label: 'Best Practices' },
-]
+/** In-page table of contents anchors and searchable keywords (space-separated topics). */
+const DOC_NAV = [
+  {
+    id: 'overview',
+    label: 'Overview',
+    keywords:
+      'introduction overview apex plugin guide extend patient evaluator metrics environment configuration research session',
+  },
+  {
+    id: 'architecture',
+    label: 'Plugin Architecture',
+    keywords:
+      'architecture pipeline dialogue clinician patient model evaluator feedback response scoring metrics analytics dashboard protocol registry load_plugins',
+  },
+  {
+    id: 'plugin-types',
+    label: 'Plugin Types',
+    keywords: 'plugin types patientmodel evaluator metricsplugin protocol interface class',
+  },
+  {
+    id: 'patient-model',
+    label: 'PatientModel Plugins',
+    keywords: 'patient model patientmodel generate_response state conversation history spikes simulate utterance',
+  },
+  {
+    id: 'evaluator',
+    label: 'Evaluator Plugins',
+    keywords: 'evaluator evaluate feedbackresponse scores strengths improvement spikes empathy framework metadata',
+  },
+  {
+    id: 'metrics',
+    label: 'Metrics Plugins',
+    keywords: 'metrics metricsplugin compute dictionary research export analytics session metrics_json generate_feedback',
+  },
+  {
+    id: 'registration',
+    label: 'Plugin Registration',
+    keywords: 'registration register pluginregistry configuration settings module path classname environment case session frozen',
+  },
+  {
+    id: 'testing',
+    label: 'Testing Plugins',
+    keywords: 'testing pytest tests plugins mock dialogue_service scoring_service registry session lru_cache',
+  },
+  {
+    id: 'best-practices',
+    label: 'Best Practices',
+    keywords: 'best practices stateless repository scoring service dialogue validation',
+  },
+] as const
+
+function docSectionVisible(keywords: string, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  const b = keywords.toLowerCase()
+  return q
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((w) => b.includes(w))
+}
 
 /**
  * Scrollable developer guide with section anchors and prose blocks.
@@ -29,6 +79,16 @@ const sections = [
  */
 export const PluginDeveloperGuide = () => {
   const { user } = useAuthStore()
+  const [docSearch, setDocSearch] = useState('')
+
+  const navSections = useMemo(
+    () => DOC_NAV.filter((s) => docSectionVisible(s.keywords, docSearch)),
+    [docSearch]
+  )
+  const anySectionVisible = useMemo(
+    () => DOC_NAV.some((s) => docSectionVisible(s.keywords, docSearch)),
+    [docSearch]
+  )
 
   useEffect(() => {
     // On mount, scroll to top
@@ -60,9 +120,10 @@ export const PluginDeveloperGuide = () => {
                     On this page
                   </h2>
                   <nav className="space-y-1 text-sm">
-                    {sections.map((section) => (
+                    {navSections.map((section) => (
                       <button
                         key={section.id}
+                        type="button"
                         onClick={() => {
                           const el = document.getElementById(section.id)
                           if (el) {
@@ -75,36 +136,67 @@ export const PluginDeveloperGuide = () => {
                       </button>
                     ))}
                   </nav>
+                  {docSearch.trim() && navSections.length === 0 && (
+                    <p className="mt-2 text-xs text-gray-500">No sections match this search.</p>
+                  )}
                 </div>
               </aside>
 
               {/* Main content */}
               <article className="flex-1">
-                <header className="mb-8">
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2" id="overview">
-                    APEX Plugin Developer Guide
-                  </h1>
-                  <p className="text-gray-600 max-w-2xl">
+                <header className="mb-6">
+                  <h1 className="text-3xl font-bold text-gray-900 mb-2">APEX Plugin Developer Guide</h1>
+                  <p className="text-gray-600 max-w-2xl mb-4">
                     This guide explains how to extend APEX by writing and registering your own
                     <span className="font-semibold"> PatientModel</span>,{' '}
                     <span className="font-semibold">Evaluator</span>, and{' '}
                     <span className="font-semibold">MetricsPlugin</span> implementations.
                   </p>
+                  <div className="max-w-md">
+                    <label htmlFor="doc-search" className="sr-only">
+                      Search this guide
+                    </label>
+                    <Input
+                      id="doc-search"
+                      type="search"
+                      placeholder="Filter sections by keyword…"
+                      value={docSearch}
+                      onChange={(e) => setDocSearch(e.target.value)}
+                      className="bg-white"
+                    />
+                    <p className="mt-1.5 text-xs text-gray-500">
+                      Type one or more words; sections that match all words stay visible.
+                    </p>
+                  </div>
                 </header>
 
+                {docSearch.trim() && !anySectionVisible && (
+                  <p className="mb-6 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    No sections match &quot;{docSearch.trim()}&quot;. Clear the search box to see the full guide.
+                  </p>
+                )}
+
                 {/* 1. Introduction / Overview */}
-                <section className="mb-6">
-                  <h2 className="text-xl font-semibold mt-8 mb-3">Introduction</h2>
+                <section
+                  id="overview"
+                  className={cn('mb-6', !docSectionVisible(DOC_NAV[0].keywords, docSearch) && 'hidden')}
+                >
+                  <h2 className="text-xl font-semibold mt-2 mb-3">Introduction</h2>
                   <p className="text-gray-700 mb-3">
                     APEX allows researchers and developers to extend the system by implementing plugins.
-                    Plugins are configured via settings (for example, environment variables) and loaded
-                    at runtime. You can swap the default patient model, evaluator, or metrics without
-                    modifying core application code.
+                    Defaults come from settings (for example, environment variables); cases can override
+                    plugins for new sessions. At session creation, resolved plugin ids are frozen on the
+                    session row so dialogue and scoring use that configuration for reproducibility. You can
+                    swap the patient model, evaluator, or metrics without modifying core application code
+                    beyond registration and config.
                   </p>
                 </section>
 
                 {/* 2. Plugin Architecture */}
-                <section className="mb-6" id="architecture">
+                <section
+                  className={cn('mb-6', !docSectionVisible(DOC_NAV[1].keywords, docSearch) && 'hidden')}
+                  id="architecture"
+                >
                   <h2 className="text-xl font-semibold mt-8 mb-3">Plugin Architecture</h2>
                   <p className="text-gray-700 mb-4">
                     APEX uses a pipeline architecture where each stage can be swapped via plugins.
@@ -171,7 +263,10 @@ export const PluginDeveloperGuide = () => {
                 </section>
 
                 {/* 4. PatientModel Plugins */}
-                <section className="mb-6" id="patient-model">
+                <section
+                  className={cn('mb-6', !docSectionVisible(DOC_NAV[3].keywords, docSearch) && 'hidden')}
+                  id="patient-model"
+                >
                   <h2 className="text-xl font-semibold mt-8 mb-3">PatientModel Plugins</h2>
                   <p className="text-gray-700 mb-3">
                     Implement the <span className="font-mono">PatientModel</span> protocol: an async
@@ -207,7 +302,10 @@ class MyPatientModel:
                 </section>
 
                 {/* 3. Evaluator Plugins */}
-                <section className="mb-6" id="evaluator">
+                <section
+                  className={cn('mb-6', !docSectionVisible(DOC_NAV[4].keywords, docSearch) && 'hidden')}
+                  id="evaluator"
+                >
                   <h2 className="text-xl font-semibold mt-8 mb-3">Evaluator Plugins</h2>
                   <p className="text-gray-700 mb-3">
                     Implement the <span className="font-mono">Evaluator</span> protocol: an async method{' '}
@@ -293,7 +391,10 @@ class MyCustomEvaluator:
                 </section>
 
                 {/* 4. Metrics Plugins */}
-                <section className="mb-6" id="metrics">
+                <section
+                  className={cn('mb-6', !docSectionVisible(DOC_NAV[5].keywords, docSearch) && 'hidden')}
+                  id="metrics"
+                >
                   <h2 className="text-xl font-semibold mt-8 mb-3">Metrics Plugins</h2>
                   <p className="text-gray-700 mb-3">
                     Implement the <span className="font-mono">MetricsPlugin</span> protocol: a synchronous
@@ -317,28 +418,52 @@ class MyMetricsPlugin:
                   </pre>
 
                   <p className="text-gray-700">
-                    The scoring / feedback pipeline calls all configured metrics plugins and merges or
-                    stores their results. These metrics can be used for research export and analytics.
+                    When <span className="font-mono text-sm">ScoringService.generate_feedback</span> runs (for
+                    example on session close), after the evaluator finishes the backend runs each plugin in
+                    the session&apos;s frozen <span className="font-mono text-sm">metrics_plugins</span>,
+                    calls <span className="font-mono text-sm">compute(db, session_id)</span>, and stores one
+                    JSON object on <span className="font-mono text-sm">sessions.metrics_json</span> (API field{' '}
+                    <span className="font-mono text-sm">metrics_json</span>): keys are plugin ids, values are
+                    each <span className="font-mono text-sm">compute</span> return dict. Metrics plugins are not
+                    run if code bypasses <span className="font-mono text-sm">generate_feedback</span>. See{' '}
+                    <span className="font-mono text-sm">docs/plugin_architecture.md</span> for the full contract.
                   </p>
                 </section>
 
                 {/* 5. Plugin Registration */}
-                <section className="mb-6" id="registration">
+                <section
+                  className={cn('mb-6', !docSectionVisible(DOC_NAV[6].keywords, docSearch) && 'hidden')}
+                  id="registration"
+                >
                   <h2 className="text-xl font-semibold mt-8 mb-3">Plugin Registration</h2>
                   <p className="text-gray-700 mb-3">
-                    Plugins are registered by <span className="font-semibold">configuration</span>, not by
-                    code registration. Set the following in your environment or settings:
+                    <span className="font-semibold">1. Code registration (import time).</span> Each plugin module
+                    calls <span className="font-mono text-sm">PluginRegistry.register_*</span> when imported.
+                    Startup imports the list in{' '}
+                    <span className="font-mono text-sm">plugins/load_plugins.py</span> (
+                    <span className="font-mono text-sm">PLUGIN_MODULES</span>); add your module there.
+                  </p>
+                  <p className="text-gray-700 mb-3">
+                    <span className="font-semibold">2. Configuration (which plugin runs).</span> Resolution is
+                    typically case override → settings default at session creation; the session row stores the
+                    frozen ids.
                   </p>
                   <ul className="list-disc pl-6 text-gray-700 space-y-1 mb-3">
                     <li>
-                      <span className="font-mono">patient_model_plugin=module.path:ClassName</span>
+                      <span className="font-semibold">Patient model:</span>{' '}
+                      <span className="font-mono">patient_model_plugin</span> in settings and/or on the case.
+                      Dialogue loads using <span className="font-mono">session.patient_model_plugin</span>{' '}
+                      (fallback: <span className="font-mono">settings.patient_model_plugin</span>).
                     </li>
                     <li>
-                      <span className="font-mono">evaluator_plugin=module.path:ClassName</span>
+                      <span className="font-semibold">Evaluator:</span>{' '}
+                      <span className="font-mono">evaluator_plugin</span> on case/settings → frozen{' '}
+                      <span className="font-mono">session.evaluator_plugin</span> for scoring.
                     </li>
                     <li>
-                      <span className="font-mono">metrics_plugins=module.path:ClassA module.path:ClassB</span>{' '}
-                      (or the equivalent list in your config)
+                      <span className="font-semibold">Metrics (list):</span>{' '}
+                      <span className="font-mono">metrics_plugins</span> on case/settings → frozen{' '}
+                      <span className="font-mono">session.metrics_plugins</span> (JSON array text) for scoring.
                     </li>
                   </ul>
 
@@ -356,20 +481,30 @@ class MyMetricsPlugin:
                 </section>
 
                 {/* 6. Testing Plugins */}
-                <section className="mb-6" id="testing">
+                <section
+                  className={cn('mb-6', !docSectionVisible(DOC_NAV[7].keywords, docSearch) && 'hidden')}
+                  id="testing"
+                >
                   <h2 className="text-xl font-semibold mt-8 mb-3">Testing Plugins</h2>
                   <ul className="list-disc pl-6 text-gray-700 space-y-1 mb-3">
                     <li>
                       <span className="font-semibold">Location:</span> Add tests under{' '}
-                      <span className="font-mono">backend/tests/plugins/</span>.
+                      <span className="font-mono">backend/tests/plugins/</span> and{' '}
+                      <span className="font-mono">backend/tests/services/</span> for integration coverage.
                     </li>
                     <li>
-                      <span className="font-semibold">Patterns:</span> Reuse the patterns from existing plugin
-                      tests: mock or override <span className="font-mono">get_patient_model</span>,{' '}
-                      <span className="font-mono">get_evaluator</span>, or{' '}
-                      <span className="font-mono">get_metrics_plugins</span> where needed, and clear{' '}
-                      <span className="font-mono">lru_cache</span> on the plugin manager in tests that change
-                      configuration so the new plugin is loaded.
+                      <span className="font-semibold">Patterns:</span> Dialogue resolves the patient model from
+                      the session and <span className="font-mono">PluginRegistry</span> (not{' '}
+                      <span className="font-mono">get_patient_model()</span> alone). Prefer registering a dummy
+                      class and setting <span className="font-mono">session.patient_model_plugin</span>, or patch{' '}
+                      <span className="font-mono">_instantiate_patient_model</span> in{' '}
+                      <span className="font-mono">dialogue_service</span>. For scoring, exercise{' '}
+                      <span className="font-mono">ScoringService.generate_feedback</span> with frozen evaluator /
+                      metrics on the session. Clear <span className="font-mono">lru_cache</span> on{' '}
+                      <span className="font-mono">get_patient_model</span>, <span className="font-mono">get_evaluator</span>,{' '}
+                      <span className="font-mono">get_metrics_plugins</span> in{' '}
+                      <span className="font-mono">core/plugin_manager</span> only when tests hit those
+                      settings-based entry points directly.
                     </li>
                     <li>
                       <span className="font-semibold">Interfaces:</span> Prefer testing against the public
@@ -381,7 +516,10 @@ class MyMetricsPlugin:
                 </section>
 
                 {/* 7. Best Practices */}
-                <section className="mb-6" id="best-practices">
+                <section
+                  className={cn('mb-6', !docSectionVisible(DOC_NAV[8].keywords, docSearch) && 'hidden')}
+                  id="best-practices"
+                >
                   <h2 className="text-xl font-semibold mt-8 mb-3">Best Practices</h2>
                   <ul className="list-disc pl-6 text-gray-700 space-y-2">
                     <li>
