@@ -4,6 +4,7 @@
 import api from '@/api/client'
 import type {
   AudioToneAnalysis,
+  RealtimeClientMessage,
   Session,
   SessionDTO,
   SessionDetail,
@@ -24,6 +25,7 @@ import {
 } from '@/adapters/session.adapter'
 
 const BASE = '/v1/sessions'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 /**
  * Creates a new training session for a case.
@@ -93,7 +95,7 @@ export const listCompletedSessions = async (opts?: {
 /**
  * Closes a session and triggers server-side feedback generation.
  */
-export const closeSession = async (sessionId: number): Promise<any> => {
+export const closeSession = async (sessionId: number): Promise<unknown> => {
   const res = await api.post(`${BASE}/${sessionId}:close`)
   return res.data
 }
@@ -163,3 +165,32 @@ export const fetchAssistantAudioObjectUrl = async (audioUrl: string): Promise<st
   })
   return URL.createObjectURL(res.data)
 }
+
+/**
+ * Builds the conversation-mode websocket URL for a session.
+ */
+export const buildSessionWebSocketUrl = (sessionId: number, token: string): string => {
+  const url = new URL(API_URL)
+  const basePath = url.pathname.replace(/\/$/, '')
+
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  url.pathname = `${basePath}/v1/ws/sessions/${sessionId}`
+  url.search = ''
+  url.searchParams.set('token', token)
+
+  return url.toString()
+}
+
+/**
+ * Creates a websocket payload for a text turn in conversation mode.
+ */
+export const toRealtimeTurnPayload = (
+  text: string,
+  enableTts = false
+): RealtimeClientMessage => ({
+  type: 'user_message',
+  content: text,
+  meta: {
+    enable_tts: enableTts,
+  },
+})
