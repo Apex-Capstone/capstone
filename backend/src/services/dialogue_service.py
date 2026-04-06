@@ -13,8 +13,10 @@ from adapters.storage.base import StorageAdapter
 from config.logging import get_logger
 from config.settings import get_settings
 from core.errors import NotFoundError
+from core.plugin_manager import _load_class_from_path
 from core.time import utc_now
-from core.plugin_manager import get_patient_model
+from interfaces.patient_model import PatientModel
+from plugins.registry import PluginRegistry
 from domain.entities.turn import Turn
 from domain.models.sessions import TurnCreate, TurnResponse
 from repositories.case_repo import CaseRepository
@@ -28,6 +30,21 @@ from services.patient_voice_profile import infer_patient_voice_profile
 from services.turn_analysis import analyze_user_input, analyze_assistant_response
 
 logger = get_logger(__name__)
+
+
+def _instantiate_patient_model(plugin_name: str) -> PatientModel:
+    """Resolve patient model class by registry key or module path, then instantiate."""
+    try:
+        model_cls = PluginRegistry.get_patient_model(plugin_name)
+    except ValueError:
+        try:
+            model_cls = _load_class_from_path(plugin_name)
+        except (ValueError, ImportError) as exc:
+            raise RuntimeError(
+                f"Invalid patient model plugin: {plugin_name}"
+            ) from exc
+        PluginRegistry.register_patient_model(plugin_name, model_cls)
+    return model_cls()  # type: ignore[return-value]
 
 
 class DialogueService:
@@ -128,7 +145,15 @@ class DialogueService:
         state.session = session
         state.conversation_history = conversation_history
 
-        patient_model = get_patient_model()
+        plugin_name: str | None = getattr(session, "patient_model_plugin", None)
+        if not plugin_name:
+            plugin_name = getattr(self.settings, "patient_model_plugin", None)
+        if not plugin_name:
+            raise RuntimeError(
+                "Patient model plugin path is not configured "
+                "(missing 'patient_model_plugin' in settings)."
+            )
+        patient_model = _instantiate_patient_model(plugin_name)
 
         # Track latency for patient model call
         start_time = time.time()

@@ -85,6 +85,7 @@ export function sessionFromDTO(dto: SessionDTO): Session {
     evaluatorPlugin: ev || undefined,
     patientModelPlugin: pm || undefined,
     metricsPlugins: normalizeMetricsPlugins(dto.metrics_plugins),
+    metricsJson: dto.metrics_json?.trim() ? dto.metrics_json : undefined,
   }
 }
 

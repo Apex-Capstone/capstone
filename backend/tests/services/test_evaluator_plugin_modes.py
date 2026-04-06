@@ -131,6 +131,10 @@ async def test_hybrid_plugin_calls_llm_when_env_on(test_db, test_user, test_case
     merged = fb.evaluator_meta.get("merged_scores") or {}
     r_emp = fb.evaluator_meta["rule_scores"]["empathy_score"]
     assert merged["empathy_score"] == pytest.approx(0.7 * r_emp + 0.3 * 50.0, rel=1e-4)
+    sp = fb.evaluator_meta.get("session_plugins")
+    assert isinstance(sp, dict)
+    assert sp.get("evaluator_plugin") == ApexHybridEvaluator.name
+    assert "patient_model_plugin" in sp and "metrics_plugins" in sp
 
 
 @pytest.mark.asyncio

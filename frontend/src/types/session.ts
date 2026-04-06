@@ -65,6 +65,8 @@ export interface SessionDTO {
   patient_model_plugin?: string | null
   /** JSON-serialized array of metrics plugin names frozen at session creation. */
   metrics_plugins?: string | string[] | null
+  /** After close/scoring: JSON object mapping metrics plugin id -> compute() result. */
+  metrics_json?: string | null
 }
 
 /** Wire shape for one turn in a session. */
@@ -135,6 +137,8 @@ export interface Session {
   patientModelPlugin?: string | null
   /** Metrics plugin ids frozen at session creation */
   metricsPlugins?: string[] | null
+  /** Session-level metrics plugin outputs (JSON text), set after scoring */
+  metricsJson?: string | null
 }
 
 /** One conversational turn in the UI domain model. */

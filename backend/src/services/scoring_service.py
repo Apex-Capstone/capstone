@@ -19,6 +19,55 @@ from repositories.session_repo import SessionRepository
 from repositories.turn_repo import TurnRepository
 
 
+def _parse_frozen_metrics_plugin_names(raw: str | None) -> list[str]:
+    if not raw or not str(raw).strip():
+        return []
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(parsed, list):
+        return []
+    return [str(x).strip() for x in parsed if x and str(x).strip()]
+
+
+def _session_plugin_context_for_evaluator_meta(session: Any) -> dict[str, Any]:
+    """Frozen session plugin ids/versions for reproducibility (nested under evaluator_meta)."""
+    if session is None:
+        return {
+            "evaluator_plugin": None,
+            "evaluator_version": None,
+            "patient_model_plugin": None,
+            "patient_model_version": None,
+            "metrics_plugins": None,
+        }
+    raw_m = getattr(session, "metrics_plugins", None)
+    if not raw_m or not str(raw_m).strip():
+        metrics_plugins: list[str] | None = None
+    else:
+        parsed_list = _parse_frozen_metrics_plugin_names(raw_m)
+        metrics_plugins = parsed_list if parsed_list else []
+    return {
+        "evaluator_plugin": getattr(session, "evaluator_plugin", None),
+        "evaluator_version": getattr(session, "evaluator_version", None),
+        "patient_model_plugin": getattr(session, "patient_model_plugin", None),
+        "patient_model_version": getattr(session, "patient_model_version", None),
+        "metrics_plugins": metrics_plugins,
+    }
+
+
+def _instantiate_metrics_plugin(plugin_name: str) -> Any:
+    try:
+        plugin_cls = PluginRegistry.get_metrics_plugin(plugin_name)
+    except ValueError:
+        try:
+            plugin_cls = _load_class_from_path(plugin_name)
+        except (ValueError, ImportError) as exc:
+            raise RuntimeError(f"Invalid metrics plugin: {plugin_name}") from exc
+        PluginRegistry.register_metrics_plugin(plugin_name, plugin_cls)
+    return plugin_cls()
+
+
 def _truncate_meta_str(value: str | None, max_len: int) -> str | None:
     if value is None:
         return None
@@ -772,37 +821,15 @@ class ScoringService:
         feedback.eo_counts_by_dimension = (
             json.dumps(state.eo_counts_by_dimension) if state.eo_counts_by_dimension is not None else None
         )
-        feedback.elicitation_counts_by_type = (
-            json.dumps(state.elicitation_counts_by_type) if state.elicitation_counts_by_type is not None else None
+        feedback.spikes_timestamps = state.spikes_timestamps
+        feedback.spikes_strategies = state.spikes_strategies
+        feedback.question_breakdown = state.question_breakdown
+        feedback.bias_probe_info = bias_probe_info
+        meta_out: dict[str, Any] = (
+            dict(evaluator_meta) if isinstance(evaluator_meta, dict) else {}
         )
-        feedback.response_counts_by_type = (
-            json.dumps(state.response_counts_by_type) if state.response_counts_by_type is not None else None
-        )
-
-        feedback.linkage_stats = json.dumps(state.linkage_stats) if state.linkage_stats is not None else None
-        feedback.missed_opportunities_by_dimension = (
-            json.dumps(state.missed_opportunities_by_dimension)
-            if state.missed_opportunities_by_dimension is not None
-            else None
-        )
-        feedback.eo_to_elicitation_links = (
-            json.dumps(state.eo_to_elicitation_links) if state.eo_to_elicitation_links is not None else None
-        )
-        feedback.eo_to_response_links = (
-            json.dumps(state.eo_to_response_links) if state.eo_to_response_links is not None else None
-        )
-        feedback.missed_opportunities = (
-            json.dumps(state.missed_opportunities) if state.missed_opportunities is not None else None
-        )
-
-        feedback.spikes_coverage = json.dumps(state.spikes_coverage) if state.spikes_coverage is not None else None
-        feedback.spikes_timestamps = json.dumps(state.spikes_timestamps) if state.spikes_timestamps is not None else None
-        feedback.spikes_strategies = json.dumps(state.spikes_strategies) if state.spikes_strategies is not None else None
-
-        feedback.question_breakdown = json.dumps(state.question_breakdown) if state.question_breakdown is not None else None
-
-        feedback.bias_probe_info = json.dumps(bias_probe_info) if bias_probe_info is not None else None
-        feedback.evaluator_meta = json.dumps(evaluator_meta) if evaluator_meta is not None else None
+        meta_out["session_plugins"] = _session_plugin_context_for_evaluator_meta(state.session)
+        feedback.evaluator_meta = meta_out
         feedback.latency_ms_avg = state.latency_ms_avg
 
         feedback.strengths = state.strengths if state.strengths and state.strengths.strip() else None
@@ -921,10 +948,30 @@ class ScoringService:
             PluginRegistry.register_evaluator(plugin_key, plugin_cls)
 
         evaluator = plugin_cls()
-        return await evaluator.evaluate(self.db, session_id)
-    
+        feedback = await evaluator.evaluate(self.db, session_id)
+        self._run_and_store_metrics_plugins(session_id)
+        return feedback
+
+    def _run_and_store_metrics_plugins(self, session_id: int) -> None:
+        """Run frozen metrics plugins after evaluator; persist results on session.metrics_json."""
+        sess = self.session_repo.get_by_id(session_id)
+        if not sess:
+            return
+        raw_plugins = getattr(sess, "metrics_plugins", None)
+        if not raw_plugins:
+            return
+        names = _parse_frozen_metrics_plugin_names(raw_plugins)
+        if not names:
+            return
+        aggregated: dict[str, Any] = {}
+        for plugin_name in names:
+            plugin = _instantiate_metrics_plugin(plugin_name)
+            aggregated[plugin_name] = plugin.compute(self.db, session_id)
+        sess.metrics_json = json.dumps(aggregated)
+        self.session_repo.update(sess)
+
     # AFCE span-based metric calculation methods
-    
+
     def _extract_spans_from_turns(self, turns: list) -> list[dict[str, Any]]:
         """Extract all spans from turns' spans_json."""
         all_spans = []

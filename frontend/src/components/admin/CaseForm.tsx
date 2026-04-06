@@ -15,6 +15,23 @@ import type { PluginsResponse, PluginInfo } from '@/types/plugins'
 const EVALUATOR_DEFAULT = ''
 const PATIENT_MODEL_DEFAULT = ''
 
+/** Fresh form state (no merge with prior row — avoids stale plugin fields). */
+function defaultCaseFormValues(): Partial<Case> {
+  return {
+    title: '',
+    script: '',
+    description: '',
+    objectives: '',
+    difficultyLevel: 'intermediate',
+    category: '',
+    patientBackground: '',
+    expectedSpikesFlow: '',
+    evaluatorPlugin: null,
+    patientModelPlugin: null,
+    metricsPlugins: [],
+  }
+}
+
 /** Props for {@link CaseForm}. */
 type Props = {
   open: boolean
@@ -62,26 +79,28 @@ function resolveActivePluginLabel(path: string | undefined, registry: PluginInfo
  * @returns Dialog + form JSX
  */
 export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }: Props) => {
-  const [values, setValues] = useState<Partial<Case>>({
-    title: '',
-    script: '',
-    description: '',
-    objectives: '',
-    difficultyLevel: 'intermediate',
-    category: '',
-    patientBackground: '',
-    expectedSpikesFlow: '',
-    evaluatorPlugin: '',
-    patientModelPlugin: '',
-    metricsPlugins: [],
-  })
+  const [values, setValues] = useState<Partial<Case>>(defaultCaseFormValues)
   const [plugins, setPlugins] = useState<PluginsResponse | null>(null)
   const [pluginsLoading, setPluginsLoading] = useState(false)
   const [activeConfig, setActiveConfig] = useState<ActivePluginConfig | null>(null)
 
+  // Reset when the dialog opens so plugin fields never inherit a previous case/edit session.
   useEffect(() => {
-    if (initial) setValues((v) => ({ ...v, ...initial }))
-  }, [initial])
+    if (!open) return
+    if (mode === 'edit' && initial) {
+      const ev = initial.evaluatorPlugin
+      const pm = initial.patientModelPlugin
+      setValues({
+        ...defaultCaseFormValues(),
+        ...initial,
+        evaluatorPlugin: ev != null && ev !== '' ? ev : null,
+        patientModelPlugin: pm != null && pm !== '' ? pm : null,
+        metricsPlugins: Array.isArray(initial.metricsPlugins) ? [...initial.metricsPlugins] : [],
+      })
+    } else if (mode === 'create') {
+      setValues(defaultCaseFormValues())
+    }
+  }, [open, mode, initial])
 
   useEffect(() => {
     if (!open) return
@@ -114,14 +133,15 @@ export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }:
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     const toSend = { ...values }
-    if (toSend.evaluatorPlugin === EVALUATOR_DEFAULT || toSend.evaluatorPlugin === '') {
-      toSend.evaluatorPlugin = undefined
+    // Use null (not undefined) so PATCH includes the key and the API clears DB columns.
+    if (!toSend.evaluatorPlugin || toSend.evaluatorPlugin === EVALUATOR_DEFAULT) {
+      toSend.evaluatorPlugin = null
     }
-    if (toSend.patientModelPlugin === PATIENT_MODEL_DEFAULT || toSend.patientModelPlugin === '') {
-      toSend.patientModelPlugin = undefined
+    if (!toSend.patientModelPlugin || toSend.patientModelPlugin === PATIENT_MODEL_DEFAULT) {
+      toSend.patientModelPlugin = null
     }
-    if (toSend.metricsPlugins?.length === 0) {
-      toSend.metricsPlugins = undefined
+    if (!toSend.metricsPlugins?.length) {
+      toSend.metricsPlugins = null
     }
     await onSubmit(toSend)
   }
@@ -250,7 +270,9 @@ export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }:
                   <select
                     className="w-full border rounded-md h-10 px-3 text-sm"
                     value={values.patientModelPlugin ?? PATIENT_MODEL_DEFAULT}
-                    onChange={(e) => set('patientModelPlugin', e.target.value || undefined)}
+                    onChange={(e) =>
+                      set('patientModelPlugin', e.target.value ? e.target.value : null)
+                    }
                     disabled={pluginsLoading}
                   >
                     <option value={PATIENT_MODEL_DEFAULT}>System Default</option>
@@ -276,7 +298,9 @@ export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }:
                   <select
                     className="w-full border rounded-md h-10 px-3 text-sm"
                     value={values.evaluatorPlugin ?? EVALUATOR_DEFAULT}
-                    onChange={(e) => set('evaluatorPlugin', e.target.value || undefined)}
+                    onChange={(e) =>
+                      set('evaluatorPlugin', e.target.value ? e.target.value : null)
+                    }
                     disabled={pluginsLoading}
                   >
                     <option value={EVALUATOR_DEFAULT}>Default (use system default evaluator)</option>
