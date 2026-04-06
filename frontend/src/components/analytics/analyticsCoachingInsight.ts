@@ -4,7 +4,6 @@ type SummaryNonEmpty = {
   empty: false
   empathy: number
   communication: number
-  clinical: number
   spikes: number
   overall: number
   total: number
