@@ -33,7 +33,7 @@ No local setup is required to evaluate the system. Use the TA review accounts be
 | Role    | Email                      | Password         |
 | ------- | -------------------------- | ---------------- |
 | Trainee | `trainee.review@apex.com`  | `ApexReview123!` |
-| Admin   | `admin.review@apex.com`    | `ApexReview123!` |
+| Admin   | `admin@test.com`    | `admin123` |
 
 > The admin account has full access to all trainee features plus the admin dashboard, research analytics, and CSV export.
 
@@ -68,8 +68,8 @@ Follow these steps to experience the trainee workflow end-to-end:
 The admin account provides access to all trainee features plus additional oversight and research capabilities:
 
 1. Navigate to **[https://apexsimulator.org/](https://apexsimulator.org/)** and sign in with the admin credentials:
-   - Email: `admin.review@apex.com`
-   - Password: `ApexReview123!`
+   - Email: `admin@test.com`
+   - Password: `admin123`
 2. After signing in you will land on the **Dashboard**.
    - As an admin, the sidebar exposes additional navigation links.
 3. Navigate to **Admin** (`/admin`) to access:
