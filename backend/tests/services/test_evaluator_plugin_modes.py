@@ -34,7 +34,6 @@ def test_db():
 def test_user(test_db):
     user = User(
         email="eval_mode_tester@example.com",
-        hashed_password="x",
         role="trainee",
         full_name="Eval Mode Tester",
     )
@@ -82,6 +81,9 @@ async def test_baseline_plugin_never_calls_llm_even_when_env_on(
     fb = result["feedback"]
     assert fb.evaluator_meta is not None
     assert fb.evaluator_meta.get("phase") == "baseline_rule_v1"
+    sp = fb.evaluator_meta.get("session_plugins")
+    assert isinstance(sp, dict)
+    assert "evaluator_plugin" in sp
 
 
 @pytest.mark.asyncio
@@ -131,6 +133,7 @@ async def test_hybrid_plugin_calls_llm_when_env_on(test_db, test_user, test_case
     merged = fb.evaluator_meta.get("merged_scores") or {}
     r_emp = fb.evaluator_meta["rule_scores"]["empathy_score"]
     assert merged["empathy_score"] == pytest.approx(0.7 * r_emp + 0.3 * 50.0, rel=1e-4)
+    assert isinstance(fb.evaluator_meta.get("session_plugins"), dict)
 
 
 @pytest.mark.asyncio
@@ -156,4 +159,7 @@ async def test_hybrid_plugin_skips_llm_when_env_off(test_db, test_user, test_cas
         evaluator_plugin=ApexHybridEvaluator.name,
     )
     assert review_calls == []
-    assert result["feedback"].evaluator_meta is None
+    fb = result["feedback"]
+    assert fb.evaluator_meta is not None
+    assert fb.evaluator_meta.get("phase") is None
+    assert isinstance(fb.evaluator_meta.get("session_plugins"), dict)

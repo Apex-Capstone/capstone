@@ -19,6 +19,41 @@ from repositories.session_repo import SessionRepository
 from repositories.turn_repo import TurnRepository
 
 
+def _parse_frozen_metrics_plugin_names(raw: str | None) -> list[str]:
+    """Parse session.metrics_plugins JSON text into a list of plugin ids."""
+    if not raw or not str(raw).strip():
+        return []
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list):
+            return [str(x).strip() for x in data if str(x).strip()]
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return []
+
+
+def _instantiate_metrics_plugin(plugin_name: str) -> Any:
+    try:
+        plugin_cls = PluginRegistry.get_metrics_plugin(plugin_name)
+    except ValueError:
+        plugin_cls = _load_class_from_path(plugin_name)
+        PluginRegistry.register_metrics_plugin(plugin_name, plugin_cls)
+    return plugin_cls()
+
+
+def _session_plugin_context_for_evaluator_meta(session: Any) -> dict[str, Any]:
+    raw_m: str | None = getattr(session, "metrics_plugins", None)
+    if raw_m is not None and not isinstance(raw_m, str):
+        raw_m = str(raw_m)
+    return {
+        "patient_model_plugin": getattr(session, "patient_model_plugin", None),
+        "patient_model_version": getattr(session, "patient_model_version", None),
+        "evaluator_plugin": getattr(session, "evaluator_plugin", None),
+        "evaluator_version": getattr(session, "evaluator_version", None),
+        "metrics_plugins": _parse_frozen_metrics_plugin_names(raw_m),
+    }
+
+
 def _truncate_meta_str(value: str | None, max_len: int) -> str | None:
     if value is None:
         return None
@@ -802,7 +837,9 @@ class ScoringService:
         feedback.question_breakdown = json.dumps(state.question_breakdown) if state.question_breakdown is not None else None
 
         feedback.bias_probe_info = json.dumps(bias_probe_info) if bias_probe_info is not None else None
-        feedback.evaluator_meta = json.dumps(evaluator_meta) if evaluator_meta is not None else None
+        meta_out: dict[str, Any] = dict(evaluator_meta) if evaluator_meta else {}
+        meta_out["session_plugins"] = _session_plugin_context_for_evaluator_meta(state.session)
+        feedback.evaluator_meta = json.dumps(meta_out)
         feedback.latency_ms_avg = state.latency_ms_avg
 
         feedback.strengths = state.strengths if state.strengths and state.strengths.strip() else None
@@ -921,8 +958,28 @@ class ScoringService:
             PluginRegistry.register_evaluator(plugin_key, plugin_cls)
 
         evaluator = plugin_cls()
-        return await evaluator.evaluate(self.db, session_id)
-    
+        feedback = await evaluator.evaluate(self.db, session_id)
+        self._run_and_store_metrics_plugins(session_id)
+        return feedback
+
+    def _run_and_store_metrics_plugins(self, session_id: int) -> None:
+        """Run frozen metrics plugins after evaluator; persist results on session.metrics_json."""
+        sess = self.session_repo.get_by_id(session_id)
+        if not sess:
+            return
+        raw_plugins = getattr(sess, "metrics_plugins", None)
+        if not raw_plugins:
+            return
+        names = _parse_frozen_metrics_plugin_names(raw_plugins)
+        if not names:
+            return
+        aggregated: dict[str, Any] = {}
+        for plugin_name in names:
+            plugin = _instantiate_metrics_plugin(plugin_name)
+            aggregated[plugin_name] = plugin.compute(self.db, session_id)
+        sess.metrics_json = json.dumps(aggregated)
+        self.session_repo.update(sess)
+
     # AFCE span-based metric calculation methods
     
     def _extract_spans_from_turns(self, turns: list) -> list[dict[str, Any]]:

@@ -1,7 +1,7 @@
 /**
  * Admin modal form to create or edit a {@link Case} with plugin pickers.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -62,6 +62,13 @@ function resolveActivePluginLabel(path: string | undefined, registry: PluginInfo
  * @returns Dialog + form JSX
  */
 export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }: Props) => {
+  /** Latest `initial` from parent without listing it as an effect dependency (avoids re-seeding on every parent render). */
+  const initialRef = useRef<Partial<Case> | undefined>(undefined)
+  initialRef.current = initial
+
+  /** Last seeded dialog target so we only reset when opening or switching create / case id — not when `initial` reference changes. */
+  const lastSeededTargetRef = useRef<string | null>(null)
+
   const [values, setValues] = useState<Partial<Case>>({
     title: '',
     script: '',
@@ -80,8 +87,29 @@ export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }:
   const [activeConfig, setActiveConfig] = useState<ActivePluginConfig | null>(null)
 
   useEffect(() => {
-    if (initial) setValues((v) => ({ ...v, ...initial }))
-  }, [initial])
+    if (!open) {
+      lastSeededTargetRef.current = null
+      return
+    }
+    const snap = initialRef.current
+    const targetKey = mode === 'create' ? 'create' : `case:${typeof snap?.id === 'number' ? snap.id : '?'}`
+    if (lastSeededTargetRef.current === targetKey) return
+    lastSeededTargetRef.current = targetKey
+    setValues({
+      title: '',
+      script: '',
+      description: '',
+      objectives: '',
+      difficultyLevel: 'intermediate',
+      category: '',
+      patientBackground: '',
+      expectedSpikesFlow: '',
+      evaluatorPlugin: EVALUATOR_DEFAULT,
+      patientModelPlugin: PATIENT_MODEL_DEFAULT,
+      metricsPlugins: [],
+      ...(snap ?? {}),
+    })
+  }, [open, mode, initial?.id])
 
   useEffect(() => {
     if (!open) return
@@ -114,14 +142,22 @@ export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }:
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     const toSend = { ...values }
-    if (toSend.evaluatorPlugin === EVALUATOR_DEFAULT || toSend.evaluatorPlugin === '') {
-      toSend.evaluatorPlugin = undefined
+    if (
+      toSend.evaluatorPlugin === EVALUATOR_DEFAULT ||
+      toSend.evaluatorPlugin === '' ||
+      toSend.evaluatorPlugin == null
+    ) {
+      toSend.evaluatorPlugin = null
     }
-    if (toSend.patientModelPlugin === PATIENT_MODEL_DEFAULT || toSend.patientModelPlugin === '') {
-      toSend.patientModelPlugin = undefined
+    if (
+      toSend.patientModelPlugin === PATIENT_MODEL_DEFAULT ||
+      toSend.patientModelPlugin === '' ||
+      toSend.patientModelPlugin == null
+    ) {
+      toSend.patientModelPlugin = null
     }
-    if (toSend.metricsPlugins?.length === 0) {
-      toSend.metricsPlugins = undefined
+    if (!toSend.metricsPlugins?.length) {
+      toSend.metricsPlugins = null
     }
     await onSubmit(toSend)
   }
@@ -250,7 +286,9 @@ export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }:
                   <select
                     className="w-full border rounded-md h-10 px-3 text-sm"
                     value={values.patientModelPlugin ?? PATIENT_MODEL_DEFAULT}
-                    onChange={(e) => set('patientModelPlugin', e.target.value || undefined)}
+                    onChange={(e) =>
+                      set('patientModelPlugin', e.target.value === '' ? null : e.target.value)
+                    }
                     disabled={pluginsLoading}
                   >
                     <option value={PATIENT_MODEL_DEFAULT}>System Default</option>
@@ -276,7 +314,9 @@ export const CaseForm = ({ open, onClose, mode, initial, onSubmit, submitting }:
                   <select
                     className="w-full border rounded-md h-10 px-3 text-sm"
                     value={values.evaluatorPlugin ?? EVALUATOR_DEFAULT}
-                    onChange={(e) => set('evaluatorPlugin', e.target.value || undefined)}
+                    onChange={(e) =>
+                      set('evaluatorPlugin', e.target.value === '' ? null : e.target.value)
+                    }
                     disabled={pluginsLoading}
                   >
                     <option value={EVALUATOR_DEFAULT}>Default (use system default evaluator)</option>

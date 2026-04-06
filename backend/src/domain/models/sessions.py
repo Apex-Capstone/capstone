@@ -122,6 +122,7 @@ class SessionResponse(BaseModel):
     patient_model_plugin: Optional[str] = None
     patient_model_version: Optional[str] = None
     metrics_plugins: Optional[list] = None  # JSON array of plugin names
+    metrics_json: Optional[str] = None  # JSON: plugin_id -> compute() dict after scoring
     case_title: Optional[str] = None
     # Populated on admin session endpoints for display (not stored on session row)
     user_email: Optional[str] = None

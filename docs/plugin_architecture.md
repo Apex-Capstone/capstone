@@ -15,7 +15,7 @@ APEX (AI Patient Experience Simulator) uses a **modular plugin architecture** to
 |-------------------|--------|
 | **PatientModel**  | Generates simulated patient responses during a dialogue turn. |
 | **Evaluator**     | Evaluates a completed session and produces structured feedback (scores, strengths, areas for improvement). |
-| **MetricsPlugin** | Defines additional research-oriented metrics (`compute`); classes are registered and **session metadata** can record which metrics plugins were configured. *(Calling `compute` from the scoring pipeline is optional and only applies if that integration is implemented in your deployment.)* |
+| **MetricsPlugin** | Defines additional research-oriented metrics (`compute`); **`ScoringService.generate_feedback`** runs each frozen **`session.metrics_plugins`** entry after the evaluator and stores results on **`sessions.metrics_json`**. |
 
 ---
 
@@ -30,7 +30,8 @@ APEX (AI Patient Experience Simulator) uses a **modular plugin architecture** to
    In-memory maps: **evaluators**, **patient_models**, **metrics_plugins**. Session and case creation **resolve** plugins by these keys. Unknown keys for **case** overrides are rejected with `400`; **settings** fallbacks may use **dynamic import** (see below).
 
 3. **Dynamic import by path** (`core/plugin_manager.py`)  
-   `_load_class_from_path("module.path:ClassName")` imports the module and returns the class. **`get_patient_model`**, **`get_evaluator`**, and **`get_metrics_plugins`** use **settings** and **`lru_cache`** for process-wide singletons where those entry points are used.  
+   `_load_class_from_path("module.path:ClassName")` imports the module and returns the class. **`get_patient_model`**, **`get_evaluator`**, and **`get_metrics_plugins`** remain as **settings-based** cached singletons for code paths that still call them.  
+   **Dialogue** resolves **PatientModel** from **`session.patient_model_plugin`** (then **`settings.patient_model_plugin`**) via **`PluginRegistry`**, with the same on-demand register pattern if the key is missing from the registry.  
    **Scoring** resolves the **evaluator** from the **session’s frozen `evaluator_plugin`** (then settings) via **`PluginRegistry.get_evaluator`**, with **fallback**: if the key is not registered, **`_load_class_from_path`** loads the class and registers it—supporting older sessions or paths not pre-registered.
 
 4. **No automatic discovery**  
@@ -41,24 +42,25 @@ APEX (AI Patient Experience Simulator) uses a **modular plugin architecture** to
 ```
 HTTP controller
         ↓
-DialogueService  →  PatientModel (via configured entry point / plugin manager)
+DialogueService  →  PatientModel (session plugin id → PluginRegistry / dynamic import)
         ↓
 Turns persisted
         ↓
 Session close  →  ScoringService.generate_feedback  →  Evaluator.evaluate(db, session_id)
+                                          →  MetricsPlugin(s).compute  →  sessions.metrics_json
         ↓
 Feedback persisted / returned
 ```
 
-**Metrics plugins:** Implement `MetricsPlugin.compute`; configuration and session-frozen **`metrics_plugins`** support provenance and exports. Whether **`compute`** is invoked during feedback or export is **deployment-specific**—do not assume it runs unless that path exists in your branch.
+**Metrics plugins:** After **`evaluate`** returns, **`generate_feedback`** walks **`session.metrics_plugins`** (frozen JSON list), runs **`compute(db, session_id)`** for each id, and writes **`sessions.metrics_json`** as `{ "<plugin_id>": { ... compute result ... }, ... }`. Hybrid/rule feedback persistence also adds **`session_plugins`** (frozen patient / evaluator / metrics ids) into **`feedback.evaluator_meta`** for provenance. Metrics are **not** run when scoring bypasses **`generate_feedback`** (e.g. internal rule helpers only).
 
 ### Key components
 
 - **DialogueService**  
-  Orchestrates turns and delegates patient text generation to the **PatientModel** implementation used by the dialogue path (see codebase for the exact resolver).
+  Orchestrates turns and delegates patient text generation to **PatientModel** resolved from **`session.patient_model_plugin`** (fallback **`settings.patient_model_plugin`**).
 
 - **ScoringService**  
-  On feedback generation, loads the **Evaluator** class from **`PluginRegistry`** (and dynamic fallback) using the **session’s `evaluator_plugin`**, instantiates it, and calls **`evaluate`**.
+  **`generate_feedback`** loads the **Evaluator** from the session (and settings fallback), calls **`evaluate`**, then runs **metrics** plugins and updates **`session.metrics_json`**. Rule/hybrid paths that persist feedback merge **`session_plugins`** into **`evaluator_meta`**.
 
 - **`plugin_manager`**  
   Path parsing, **`importlib`** loading, and cached getters for **settings-based** defaults—not the only path used for evaluators at scoring time.
