@@ -1,13 +1,54 @@
 /**
  * Conversation transcript with per-turn SPIKES labels, metric badges, and empathy span highlights.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type React from 'react'
 import type { Turn } from '@/types/session'
-import type { Feedback } from '@/api/feedback.api'
+import type { Feedback, SpikesStageKey } from '@/api/feedback.api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatTimeInUserTimeZone } from '@/lib/dateTime'
+import { getLlmStageMapFromFeedback, resolveSpikesStageForTurn } from '@/lib/spikesStageFromFeedback'
 import { cn } from '@/lib/utils'
+
+/** Map legacy / alternate baseline tokens to canonical SPIKES keys for display. */
+const LEGACY_STAGE_TO_CANON: Record<string, SpikesStageKey> = {
+  s: 'setting',
+  setting: 'setting',
+  p: 'perception',
+  perception: 'perception',
+  i: 'invitation',
+  invitation: 'invitation',
+  k: 'knowledge',
+  knowledge: 'knowledge',
+  e: 'emotion',
+  emotion: 'emotion',
+  emotions: 'emotion',
+  empathy: 'emotion',
+  s2: 'strategy',
+  strategy: 'strategy',
+  summary: 'strategy',
+}
+
+const CANONICAL_STAGE_CHIP_LABEL: Record<SpikesStageKey, string> = {
+  setting: 'SETTING',
+  perception: 'PERCEPTION',
+  invitation: 'INVITATION',
+  knowledge: 'KNOWLEDGE',
+  emotion: 'EMOTION',
+  strategy: 'STRATEGY',
+}
+
+/**
+ * Formats a resolved stage token for the SPIKES chip (uppercase canonical labels).
+ * Does not mutate source data.
+ */
+function formatSpikesStageChipLabel(resolved: string): string {
+  if (resolved === '—') return '—'
+  const key = resolved.trim().toLowerCase()
+  const canon = LEGACY_STAGE_TO_CANON[key]
+  if (canon) return CANONICAL_STAGE_CHIP_LABEL[canon]
+  return resolved.toUpperCase()
+}
 
 /** Props for {@link FeedbackConversationTimeline}. */
 interface FeedbackConversationTimelineProps {
@@ -148,7 +189,7 @@ type EmpathyMarkersByTurn = Record<
   }
 >
 
-const MIN_TIMELINE_HEIGHT_PX = 320
+const MIN_TIMELINE_HEIGHT_PX = 490
 const VIEWPORT_BOTTOM_GUTTER_PX = 24
 
 /**
@@ -323,6 +364,18 @@ const buildEmpathyTimelineMarkers = (
     })
   }
 
+  // A clinician turn that contains a detected empathy response should not also be presented
+  // as a missed opportunity in the UI (empathy_response takes precedence).
+  for (const key of Object.keys(markers)) {
+    const entry = markers[Number(key)]
+    if (
+      entry?.types.includes('empathy_response') &&
+      entry.types.includes('missed_opportunity')
+    ) {
+      entry.types = entry.types.filter((t) => t !== 'missed_opportunity')
+    }
+  }
+
   return markers
 }
 
@@ -451,6 +504,7 @@ export const FeedbackConversationTimeline = ({
   const contentRef = useRef<HTMLDivElement | null>(null)
   const [timelineMaxHeight, setTimelineMaxHeight] = useState<number>(MIN_TIMELINE_HEIGHT_PX)
   const sortedTurns = [...turns].sort((a, b) => a.turnNumber - b.turnNumber)
+  const llmStageMap = useMemo(() => getLlmStageMapFromFeedback(feedback), [feedback])
   const empathyMarkers = buildEmpathyTimelineMarkers(feedback, sortedTurns)
 
   useEffect(() => {
@@ -500,7 +554,13 @@ export const FeedbackConversationTimeline = ({
             {sortedTurns.map((turn) => {
               const roleLabel = formatRoleLabel(turn.role)
               const side = mapRoleToSide(turn.role)
-              const spikesStage = turn.spikesStage ?? '—'
+              const resolvedStage = resolveSpikesStageForTurn({
+                turnNumber: turn.turnNumber,
+                baselineStage: turn.spikesStage,
+                feedback,
+                llmStageMap,
+              })
+              const spikesStage = formatSpikesStageChipLabel(resolvedStage)
               const { labels: metricBadges } = parseMetricsBadges(turn.metricsJson)
               const markersForTurn = empathyMarkers[turn.turnNumber]
 

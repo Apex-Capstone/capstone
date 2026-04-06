@@ -1,0 +1,99 @@
+{
+"meta": {
+"evaluator_family": "manual_external_llm",
+"evaluator_version": "gpt-5.3",
+"status": "completed"
+},
+"scores": {
+"empathy_score": 78.0,
+"communication_score": 82.0,
+"spikes_completion_score": 67.0,
+"overall_score": 76.0
+},
+"spikes": {
+"stages_present": [
+"perception",
+"knowledge",
+"emotion",
+"strategy"
+],
+"stage_turn_mapping": [
+{
+"turn_number": 5,
+"stage": "perception"
+},
+{
+"turn_number": 7,
+"stage": "knowledge"
+},
+{
+"turn_number": 9,
+"stage": "emotion"
+},
+{
+"turn_number": 11,
+"stage": "strategy"
+}
+],
+"missing_stages": [
+"setting",
+"invitation"
+],
+"sequencing_notes": "Reasonable flow from perception to knowledge, followed by emotional acknowledgment and next steps, but lacks explicit invitation and full setting setup."
+},
+"missed_opportunities": [
+{
+"turn_number": 1,
+"cue_text": "Hi, thanks for coming in. I know you've been waiting for these results.",
+"clinician_response_summary": "Initiates conversation without assessing readiness or ensuring privacy/support.",
+"why_missed_or_weak": "Missed opportunity to establish setting (privacy, support presence, readiness) before delivering serious news.",
+"suggested_response": "Before we begin, is this a good time to talk about your results? Would you like anyone else here with you?",
+"confidence": 0.85
+},
+{
+"turn_number": 5,
+"cue_text": "I keep thinking it might be cancer.",
+"clinician_response_summary": "Acknowledges concern but transitions quickly to concerning results.",
+"why_missed_or_weak": "Could have explored patient's understanding and expectations more fully before delivering news (invitation/perception depth).",
+"suggested_response": "Can you tell me more about what’s been worrying you and what you’ve been thinking it might be?",
+"confidence": 0.8
+},
+{
+"turn_number": 7,
+"cue_text": "What do you mean?",
+"clinician_response_summary": "Provides diagnostic information directly.",
+"why_missed_or_weak": "Did not ask how much detail the patient wants before sharing potentially distressing information (missing invitation).",
+"suggested_response": "Would you like me to go through the details of the results now?",
+"confidence": 0.78
+}
+],
+"feedback": {
+"strength_tags": [
+"validation_of_emotion",
+"clear_communication",
+"reassurance_support",
+"professionalism"
+],
+"improvement_tags": [
+"missing_invitation",
+"incomplete_spikes",
+"missed_opportunity"
+],
+"strengths_text": [
+"Consistently acknowledges and validates patient emotions.",
+"Communicates concerning information clearly and without jargon.",
+"Provides reassurance and a sense of partnership moving forward."
+],
+"areas_for_improvement_text": [
+"Did not explicitly assess patient readiness or preferences before delivering news.",
+"Limited exploration of patient’s perspective before sharing results.",
+"SPIKES framework incomplete due to missing setting and invitation stages."
+]
+},
+"confidence": {
+"empathy_confidence": 0.9,
+"communication_confidence": 0.9,
+"spikes_confidence": 0.88,
+"overall_confidence": 0.89
+}
+}

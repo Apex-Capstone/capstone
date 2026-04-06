@@ -1,0 +1,104 @@
+{
+  "meta": {
+    "evaluator_family": "manual_external_llm",
+    "evaluator_version": "claude-sonnet-4-6",
+    "status": "completed"
+  },
+  "scores": {
+    "empathy_score": 58.0,
+    "communication_score": 52.0,
+    "spikes_completion_score": 40.0,
+    "overall_score": 48.0
+  },
+  "spikes": {
+    "stages_present": ["setting", "perception", "knowledge", "emotion", "strategy"],
+    "stage_turn_mapping": [
+      {
+        "turn_number": 1,
+        "stage": "setting"
+      },
+      {
+        "turn_number": 3,
+        "stage": "perception"
+      },
+      {
+        "turn_number": 7,
+        "stage": "knowledge"
+      },
+      {
+        "turn_number": 9,
+        "stage": "emotion"
+      },
+      {
+        "turn_number": 11,
+        "stage": "strategy"
+      }
+    ],
+    "missing_stages": ["invitation"],
+    "sequencing_notes": "The clinician moves from perception directly into knowledge delivery without explicitly seeking the patient's invitation to share the results. The emotion stage response at turn 9 is present but brief. Strategy at turn 11 is thin and lacks detail."
+  },
+  "missed_opportunities": [
+    {
+      "turn_number": 3,
+      "cue_text": "Yeah… I've been really worried.",
+      "clinician_response_summary": "Clinician acknowledges stress in a generic, normalizing way.",
+      "why_missed_or_weak": "The patient expressed significant emotional distress ('really worried') but received only a surface-level normalization rather than a deeper empathic reflection or exploration of what the worry feels like for this patient specifically.",
+      "suggested_response": "It sounds like this has been really weighing on you. Can you tell me a bit more about what's been going through your mind?",
+      "confidence": 0.85
+    },
+    {
+      "turn_number": 5,
+      "cue_text": "I keep thinking it might be cancer.",
+      "clinician_response_summary": "Clinician immediately transitions into delivering the concerning result without first seeking invitation.",
+      "why_missed_or_weak": "The invitation stage was skipped entirely. The clinician did not ask the patient if they were ready to hear the results, nor did they explore how much the patient already understood or wanted to know.",
+      "suggested_response": "Before I share what we found, I want to check in — are you ready to go through the results together? Is there anyone you'd like to have with you?",
+      "confidence": 0.9
+    },
+    {
+      "turn_number": 9,
+      "cue_text": "That's really scary.",
+      "clinician_response_summary": "Clinician briefly acknowledges fear and offers partnership language, then moves quickly to logistics.",
+      "why_missed_or_weak": "The emotional acknowledgment was minimal. The patient expressed acute fear and the clinician moved rapidly into planning. A pause to sit with the emotion and allow the patient to express more would have been more therapeutically effective.",
+      "suggested_response": "That's completely understandable — hearing something like this is frightening. Take a moment. What questions or feelings are coming up for you right now?",
+      "confidence": 0.88
+    },
+    {
+      "turn_number": 11,
+      "cue_text": "Okay…",
+      "clinician_response_summary": "Clinician outlines next steps at a high level without detail.",
+      "why_missed_or_weak": "The strategy stage was vague — no specifics on what tests, what timeline, who would follow up, or what support resources are available. The patient's minimal response ('Okay…') may signal shock or disengagement that was not addressed.",
+      "suggested_response": "We'll schedule a biopsy and refer you to a specialist — that should happen within the next week or two. In the meantime, do you have family or support around you? We also have a patient navigator who can help guide you through this process.",
+      "confidence": 0.82
+    }
+  ],
+  "feedback": {
+    "strength_tags": [
+      "validation_of_emotion",
+      "partnership_language",
+      "professionalism"
+    ],
+    "improvement_tags": [
+      "missing_invitation",
+      "weak_emotional_acknowledgment",
+      "incomplete_spikes",
+      "limited_explanation_of_plan",
+      "missed_opportunity"
+    ],
+    "strengths_text": [
+      "The clinician maintained a calm, professional tone throughout and did not use jargon, keeping language accessible to the patient.",
+      "Partnership language at turn 9 ('we're going to work through this together') was appropriate and compassionate.",
+      "The clinician acknowledged the patient's emotional state at multiple points, showing basic empathic awareness."
+    ],
+    "areas_for_improvement_text": [
+      "The invitation stage was entirely absent — the clinician should explicitly ask the patient's permission and readiness before delivering distressing news.",
+      "Emotional responses were superficial and brief; the clinician moved too quickly from emotional acknowledgment to logistics without allowing adequate space for the patient to process.",
+      "The strategy/plan offered at the end was vague and lacked specifics regarding next steps, timeline, specialist involvement, or available support resources."
+    ]
+  },
+  "confidence": {
+    "empathy_confidence": 0.85,
+    "communication_confidence": 0.82,
+    "spikes_confidence": 0.9,
+    "overall_confidence": 0.84
+  }
+}

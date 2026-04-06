@@ -1,0 +1,73 @@
+{
+  "meta": {
+    "evaluator_family": "manual_external_llm",
+    "evaluator_version": "Gemini 3 Flash",
+    "status": "completed"
+  },
+  "scores": {
+    "empathy_score": 98.0,
+    "communication_score": 96.0,
+    "spikes_completion_score": 100.0,
+    "overall_score": 97.0
+  },
+  "spikes": {
+    "stages_present": [
+      "setting",
+      "perception",
+      "invitation",
+      "knowledge",
+      "emotion",
+      "strategy"
+    ],
+    "stage_turn_mapping": [
+      {
+        "turn_number": 1,
+        "stage": "setting"
+      },
+      {
+        "turn_number": 3,
+        "stage": "perception"
+      },
+      {
+        "turn_number": 5,
+        "stage": "invitation"
+      },
+      {
+        "turn_number": 7,
+        "stage": "knowledge"
+      },
+      {
+        "turn_number": 9,
+        "stage": "emotion"
+      },
+      {
+        "turn_number": 13,
+        "stage": "strategy"
+      }
+    ],
+    "missing_stages": [],
+    "sequencing_notes": "The clinician followed the SPIKES protocol in a perfect linear sequence, ensuring the patient was prepared at every step."
+  },
+  "missed_opportunities": [],
+  "feedback": {
+    "strength_tags": [
+      "validation_of_emotion",
+      "partnership_language",
+      "organized_conversation",
+      "open_ended_questions"
+    ],
+    "improvement_tags": [],
+    "strengths_text": [
+      "Highly effective use of validation and normalization to address the patient's fear of cancer.",
+      "Clear and direct delivery of concerning news without using confusing medical jargon.",
+      "Excellent use of partnership language ('together', 'step by step') to provide support."
+    ],
+    "areas_for_improvement_text": []
+  },
+  "confidence": {
+    "empathy_confidence": 1.0,
+    "communication_confidence": 1.0,
+    "spikes_confidence": 1.0,
+    "overall_confidence": 1.0
+  }
+}

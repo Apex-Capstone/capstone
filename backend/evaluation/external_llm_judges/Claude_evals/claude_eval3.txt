@@ -1,0 +1,99 @@
+{
+  "meta": {
+    "evaluator_family": "manual_external_llm",
+    "evaluator_version": "claude-sonnet-4-6",
+    "status": "completed"
+  },
+  "scores": {
+    "empathy_score": 18.0,
+    "communication_score": 32.0,
+    "spikes_completion_score": 25.0,
+    "overall_score": 24.0
+  },
+  "spikes": {
+    "stages_present": ["knowledge", "strategy"],
+    "stage_turn_mapping": [
+      {
+        "turn_number": 3,
+        "stage": "knowledge"
+      },
+      {
+        "turn_number": 7,
+        "stage": "strategy"
+      },
+      {
+        "turn_number": 9,
+        "stage": "strategy"
+      }
+    ],
+    "missing_stages": ["setting", "perception", "invitation", "emotion"],
+    "sequencing_notes": "The clinician moved directly into delivering findings without establishing setting, checking the patient's prior perception, or seeking an invitation. Emotional responses from the patient at turns 2, 6, and 10 were largely bypassed. Strategy was discussed before emotion was adequately addressed."
+  },
+  "missed_opportunities": [
+    {
+      "turn_number": 1,
+      "cue_text": "Hi, thanks for coming in today. Let's go over your results.",
+      "clinician_response_summary": "Jumped straight into results with no setup.",
+      "why_missed_or_weak": "No setting stage established — clinician did not ask if the patient brought anyone, confirm privacy, or prepare the patient emotionally for potentially serious news.",
+      "suggested_response": "Before we get into the results, I want to make sure we have some time and privacy. Is there anyone you'd like to have with you for this conversation?",
+      "confidence": 0.95
+    },
+    {
+      "turn_number": 1,
+      "cue_text": "Hi, thanks for coming in today. Let's go over your results.",
+      "clinician_response_summary": "No perception check performed.",
+      "why_missed_or_weak": "The clinician did not ask what the patient already understood or expected about their results, missing the perception stage entirely.",
+      "suggested_response": "Before I share the results, can you tell me what you've been told so far and what your understanding of the situation is?",
+      "confidence": 0.92
+    },
+    {
+      "turn_number": 3,
+      "cue_text": "I've been really nervous about this.",
+      "clinician_response_summary": "Clinician said 'Okay' and moved immediately to delivering findings.",
+      "why_missed_or_weak": "The patient's expressed anxiety was acknowledged with only a dismissive 'Okay.' No empathic acknowledgment or invitation was offered before proceeding to potentially distressing information.",
+      "suggested_response": "It's completely understandable to feel nervous. Before we go over the results, I want to check — how much detail would you like me to share today?",
+      "confidence": 0.97
+    },
+    {
+      "turn_number": 7,
+      "cue_text": "I'm really scared… I don't know what I'll do.",
+      "clinician_response_summary": "Clinician pivoted immediately to logistics about scheduling further tests.",
+      "why_missed_or_weak": "A direct expression of fear and overwhelm was completely ignored. This is a critical missed empathy opportunity — the emotion stage was bypassed entirely in favor of procedural next steps.",
+      "suggested_response": "I hear you — this is frightening news, and it makes complete sense to feel scared right now. Let's take a moment. You don't have to figure everything out today.",
+      "confidence": 0.99
+    },
+    {
+      "turn_number": 11,
+      "cue_text": "This is a lot…",
+      "clinician_response_summary": "Clinician reflected 'Yes, it is a lot of information' and asked for questions.",
+      "why_missed_or_weak": "Though the clinician briefly validated the volume of information, they did not acknowledge the emotional weight behind the patient's statement. The pivot to 'Do you have any questions?' felt procedural rather than compassionate.",
+      "suggested_response": "It really is a lot, and I want you to know it's okay to feel overwhelmed. We can go at whatever pace feels right for you. How are you doing right now?",
+      "confidence": 0.9
+    }
+  ],
+  "feedback": {
+    "strength_tags": ["clear_communication", "professionalism"],
+    "improvement_tags": [
+      "missing_invitation",
+      "weak_emotional_acknowledgment",
+      "incomplete_spikes",
+      "missed_opportunity",
+      "limited_explanation_of_plan"
+    ],
+    "strengths_text": [
+      "The clinician communicated findings clearly and without excessive jargon, making the information accessible.",
+      "The clinician maintained a professional tone throughout and did invite questions at the end of the conversation."
+    ],
+    "areas_for_improvement_text": [
+      "Multiple direct emotional expressions from the patient (turns 2, 6, 10) were either dismissed or bypassed entirely; the emotion stage of SPIKES was never meaningfully engaged.",
+      "The setting, perception, and invitation stages were absent — the clinician should prepare the patient, assess prior understanding, and seek permission before delivering difficult news.",
+      "The plan outlined was vague ('additional tests,' 'treatment options') with no specifics, leaving the patient without a clear sense of next steps or support resources."
+    ]
+  },
+  "confidence": {
+    "empathy_confidence": 0.96,
+    "communication_confidence": 0.92,
+    "spikes_confidence": 0.94,
+    "overall_confidence": 0.93
+  }
+}

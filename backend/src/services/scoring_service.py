@@ -1,6 +1,7 @@
 """Scoring service for empathy, communication, and SPIKES metrics."""
 
 import json
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -201,6 +202,90 @@ def _normalize_spikes_stage_key(raw: Any) -> str | None:
         "summary": "strategy",
     }
     return stage_map.get(value)
+
+
+def _stage_turn_mapping_rows_valid(mapping: list[Any]) -> bool:
+    """True when every row has int turn_number >= 1, unique turns, and normalizable stage."""
+    seen_turns: set[int] = set()
+    for row in mapping:
+        if not isinstance(row, dict):
+            return False
+        tn = row.get("turn_number")
+        if not isinstance(tn, int) or isinstance(tn, bool) or tn < 1:
+            return False
+        if tn in seen_turns:
+            return False
+        seen_turns.add(tn)
+        if _normalize_spikes_stage_key(row.get("stage")) is None:
+            return False
+    return True
+
+
+def _ensure_stage_turn_mapping(llm_output: dict[str, Any]) -> dict[str, Any]:
+    """Ensure `llm_output` has a canonical UI-ready `stage_turn_mapping`.
+
+    If `stage_turn_mapping` is a non-empty list and passes
+    `_stage_turn_mapping_rows_valid`, returns `llm_output` unchanged.
+    Otherwise derives one row per `turn_number` from `spikes_annotations` using
+    `_normalize_spikes_stage_key`, preferring the annotation with highest `confidence`
+    when present, else the first valid annotation per turn.
+    """
+    out = dict(llm_output)
+    existing = out.get("stage_turn_mapping")
+    if isinstance(existing, list) and len(existing) > 0 and _stage_turn_mapping_rows_valid(existing):
+        return out
+
+    annotations = out.get("spikes_annotations")
+    if not isinstance(annotations, list) or not annotations:
+        out["stage_turn_mapping"] = []
+        return out
+
+    by_turn: defaultdict[int, list[dict[str, Any]]] = defaultdict(list)
+    for a in annotations:
+        if not isinstance(a, dict):
+            continue
+        tn_raw = a.get("turn_number")
+        turn_number: int | None = None
+        if isinstance(tn_raw, int) and tn_raw >= 1:
+            turn_number = tn_raw
+        elif isinstance(tn_raw, float) and tn_raw.is_integer() and int(tn_raw) >= 1:
+            turn_number = int(tn_raw)
+        if turn_number is None:
+            continue
+        by_turn[turn_number].append(a)
+
+    mapping: list[dict[str, Any]] = []
+    for turn_number in sorted(by_turn.keys()):
+        items = by_turn[turn_number]
+        candidates_with_conf: list[tuple[float, str]] = []
+        for it in items:
+            norm = _normalize_spikes_stage_key(it.get("stage"))
+            if not norm:
+                continue
+            conf = it.get("confidence")
+            if conf is None:
+                continue
+            try:
+                cf = float(conf)
+            except (TypeError, ValueError):
+                continue
+            candidates_with_conf.append((cf, norm))
+
+        chosen: str | None = None
+        if candidates_with_conf:
+            chosen = max(candidates_with_conf, key=lambda x: x[0])[1]
+        else:
+            for it in items:
+                norm = _normalize_spikes_stage_key(it.get("stage"))
+                if norm:
+                    chosen = norm
+                    break
+
+        if chosen is not None:
+            mapping.append({"turn_number": turn_number, "stage": chosen})
+
+    out["stage_turn_mapping"] = mapping
+    return out
 
 
 def _build_spikes_coverage_payload(stage_set: set[str]) -> dict[str, Any]:
@@ -713,6 +798,7 @@ class ScoringService:
                 "spikes_completion_score": ms,
                 "overall_score": mo,
             }
+            compacted_v1 = _compact_llm_output_for_evaluator_meta(llm_output)
             evaluator_meta = {
                 "phase": "hybrid_llm_v1",
                 "status": "completed",
@@ -723,7 +809,7 @@ class ScoringService:
                 "rule_scores": rule_snapshot,
                 "llm_scores": llm_snapshot,
                 "merged_scores": merged_snapshot,
-                "llm_output": _compact_llm_output_for_evaluator_meta(llm_output),
+                "llm_output": _ensure_stage_turn_mapping(compacted_v1),
             }
             return (me, mc, ms, mo, evaluator_meta)
         except Exception as e:
@@ -842,6 +928,7 @@ class ScoringService:
             # Normalize status to completed|failed (no "partial" exposed at top-level).
             status = "completed" if agg_status == "success" else "failed"
             error = None if status == "completed" else "partial_llm_prompts_failed"
+            compacted_v2 = _compact_llm_output_for_evaluator_meta(compiled)
             evaluator_meta: dict[str, Any] = {
                 "phase": "hybrid_llm_v2",
                 "status": status,
@@ -855,7 +942,7 @@ class ScoringService:
                 "rule_scores": rule_snapshot,
                 "llm_scores": llm_scores,
                 "merged_scores": merged_snapshot,
-                "llm_output": _compact_llm_output_for_evaluator_meta(compiled),
+                "llm_output": _ensure_stage_turn_mapping(compacted_v2),
                 "llm_adapter_calls": adapter_calls,
             }
             return (me, mc, ms, mo, evaluator_meta)

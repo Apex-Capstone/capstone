@@ -1,0 +1,86 @@
+{
+"meta": {
+"evaluator_family": "manual_external_llm",
+"evaluator_version": "gpt-5.3",
+"status": "completed"
+},
+"scores": {
+"empathy_score": 25.0,
+"communication_score": 55.0,
+"spikes_completion_score": 50.0,
+"overall_score": 40.0
+},
+"spikes": {
+"stages_present": ["setting", "knowledge", "strategy"],
+"stage_turn_mapping": [
+{
+"turn_number": 1,
+"stage": "setting"
+},
+{
+"turn_number": 3,
+"stage": "knowledge"
+},
+{
+"turn_number": 5,
+"stage": "knowledge"
+},
+{
+"turn_number": 7,
+"stage": "strategy"
+},
+{
+"turn_number": 9,
+"stage": "strategy"
+}
+],
+"missing_stages": ["perception", "invitation", "emotion"],
+"sequencing_notes": "Clinician moved quickly into delivering concerning information without assessing patient's perception or readiness. Emotional responses from the patient were not adequately addressed before continuing with plan."
+},
+"missed_opportunities": [
+{
+"turn_number": 2,
+"cue_text": "I've been really nervous about this.",
+"clinician_response_summary": "Proceeded directly to giving concerning results.",
+"why_missed_or_weak": "Did not acknowledge or validate the patient's anxiety before delivering bad news.",
+"suggested_response": "I can see this has been really stressful for you. Can you tell me what you've been most worried about?",
+"confidence": 0.95
+},
+{
+"turn_number": 6,
+"cue_text": "I'm really scared… I don't know what I'll do.",
+"clinician_response_summary": "Shifted to discussing next diagnostic steps.",
+"why_missed_or_weak": "Strong emotional expression was ignored, missing an opportunity for empathy and support.",
+"suggested_response": "I'm really sorry this is so frightening. It's completely understandable to feel this way, and I'm here to support you through this.",
+"confidence": 0.98
+},
+{
+"turn_number": 10,
+"cue_text": "This is a lot…",
+"clinician_response_summary": "Brief acknowledgment without deeper emotional support.",
+"why_missed_or_weak": "Minimal validation; did not explore or support patient's overwhelm.",
+"suggested_response": "I hear that this feels overwhelming. Would it help if we slowed down and went through things step by step together?",
+"confidence": 0.9
+}
+],
+"feedback": {
+"strength_tags": ["clear_communication", "organized_conversation", "professionalism"],
+"improvement_tags": ["weak_emotional_acknowledgment", "missing_invitation", "missed_opportunity", "incomplete_spikes"],
+"strengths_text": [
+"Information was delivered clearly and without excessive jargon",
+"Conversation followed a logical structure from results to next steps",
+"Maintained a professional tone throughout"
+],
+"areas_for_improvement_text": [
+"Consistently missed opportunities to acknowledge and validate patient emotions",
+"Did not assess patient's understanding or readiness before delivering bad news",
+"Lacked an explicit invitation for how much detail the patient wanted"
+]
+},
+"confidence": {
+"empathy_confidence": 0.95,
+"communication_confidence": 0.9,
+"spikes_confidence": 0.9,
+"overall_confidence": 0.92
+}
+}

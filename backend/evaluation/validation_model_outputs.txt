@@ -1,0 +1,148 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.3, pytest-7.4.4, pluggy-1.6.0
+rootdir: /Users/aaryank/Developer/school/capstone_feedback/capstone/backend
+configfile: pyproject.toml
+plugins: anyio-4.12.1, cov-4.1.0, asyncio-0.21.2
+asyncio: mode=Mode.AUTO
+collected 3 items / 2 deselected / 1 selected
+
+tests/services/test_seeded_evaluator_validation.py 
+========================================================================
+REAL LLM MODE: ENABLED (no mocks — hybrid evaluators call OpenAI via OpenAIAdapter)
+========================================================================
+
+
+========================================================================
+FIXTURE: DIFFICULT_DIAGNOSIS_STRONG
+========================================================================
+  BASELINE (rule-only, final scores)
+    scores: emp=75.48 comm=74.25 spikes=100.00 overall=82.59
+    meta phase='baseline_rule_v1' status=None
+  --- DIFFICULT_DIAGNOSIS_STRONG HYBRID V1 (real LLM) ---
+    phase: 'hybrid_llm_v1'
+    status: 'completed'
+    llm_scores: {'empathy_score': 90.0, 'communication_score': 85.0, 'spikes_completion_score': 100.0, 'overall_score': 90.5}
+    merged_scores: {'empathy_score': 79.84, 'communication_score': 77.47, 'spikes_completion_score': 100.0, 'overall_score': 85.41}
+    missed_opportunities count: 0
+    stage_turn_mapping: [{'turn_number': 1, 'stage': 'setting'}, {'turn_number': 3, 'stage': 'perception'}, {'turn_number': 5, 'stage': 'invitation'}, {'turn_number': 7, 'stage': 'knowledge'}, {'turn_number': 9, 'stage': 'emotion'}, {'turn_number': 13, 'stage': 'strategy'}]
+    spikes_annotations count: 6
+  --- DIFFICULT_DIAGNOSIS_STRONG HYBRID V2 (real LLM) ---
+    phase: 'hybrid_llm_v2'
+    status: 'completed'
+    llm_scores: {'empathy_score': 90.0, 'communication_score': 95.0, 'spikes_completion_score': 100.0, 'overall_score': 94.0}
+    merged_scores: {'empathy_score': 79.84, 'communication_score': 80.47, 'spikes_completion_score': 100.0, 'overall_score': 86.01}
+    prompt_status: {'empathy': 'success', 'spikes': 'success', 'communication': 'success'}
+    llm_adapter_calls: 3
+    missed_opportunities count: 0
+    stage_turn_mapping: [{'turn_number': 1, 'stage': 'setting'}, {'turn_number': 3, 'stage': 'perception'}, {'turn_number': 5, 'stage': 'invitation'}, {'turn_number': 7, 'stage': 'knowledge'}, {'turn_number': 10, 'stage': 'emotion'}, {'turn_number': 13, 'stage': 'strategy'}]
+    spikes_annotations count: 6
+  [STRONG v2] missed_opportunities (informational): []
+
+========================================================================
+FIXTURE: DIFFICULT_DIAGNOSIS_DECENT
+========================================================================
+  BASELINE (rule-only, final scores)
+    scores: emp=85.00 comm=69.25 spikes=83.33 overall=81.35
+    meta phase='baseline_rule_v1' status=None
+  --- DIFFICULT_DIAGNOSIS_DECENT HYBRID V1 (real LLM) ---
+    phase: 'hybrid_llm_v1'
+    status: 'completed'
+    llm_scores: {'empathy_score': 90.0, 'communication_score': 85.0, 'spikes_completion_score': 83.3, 'overall_score': 87.3}
+    merged_scores: {'empathy_score': 86.5, 'communication_score': 73.97, 'spikes_completion_score': 83.32, 'overall_score': 83.04}
+    missed_opportunities count: 0
+    stage_turn_mapping: [{'turn_number': 1, 'stage': 'setting'}, {'turn_number': 4, 'stage': 'perception'}, {'turn_number': 5, 'stage': 'knowledge'}, {'turn_number': 8, 'stage': 'emotion'}, {'turn_number': 11, 'stage': 'strategy'}]
+    spikes_annotations count: 5
+  --- DIFFICULT_DIAGNOSIS_DECENT HYBRID V2 (real LLM) ---
+    phase: 'hybrid_llm_v2'
+    status: 'completed'
+    llm_scores: {'empathy_score': 85.0, 'communication_score': 85.0, 'spikes_completion_score': 83.3, 'overall_score': 84.49}
+    merged_scores: {'empathy_score': 85.0, 'communication_score': 73.97, 'spikes_completion_score': 83.32, 'overall_score': 82.29}
+    prompt_status: {'empathy': 'success', 'spikes': 'success', 'communication': 'success'}
+    llm_adapter_calls: 3
+    missed_opportunities count: 0
+    stage_turn_mapping: [{'turn_number': 1, 'stage': 'setting'}, {'turn_number': 2, 'stage': 'perception'}, {'turn_number': 5, 'stage': 'knowledge'}, {'turn_number': 7, 'stage': 'knowledge'}, {'turn_number': 8, 'stage': 'emotion'}, {'turn_number': 9, 'stage': 'emotion'}, {'turn_number': 11, 'stage': 'strategy'}]
+    spikes_annotations count: 7
+  [DECENT v2] SPIKES inspection (informational):
+    stage_turn_mapping: [{'turn_number': 1, 'stage': 'setting'}, {'turn_number': 2, 'stage': 'perception'}, {'turn_number': 5, 'stage': 'knowledge'}, {'turn_number': 7, 'stage': 'knowledge'}, {'turn_number': 8, 'stage': 'emotion'}, {'turn_number': 9, 'stage': 'emotion'}, {'turn_number': 11, 'stage': 'strategy'}]
+    spikes_annotations: [{'turn_number': 1, 'stage': 'setting', 'evidence_snippet': "Hi, thanks for coming in. I know you've been waiting for these results.", 'confidence': 1.0}, {'turn_number': 2, 'stage': 'perception', 'evidence_snippet': "Yeah… I've been really worried.", 'confidence': 1.0}, {'turn_number': 5, 'stage': 'knowledge', 'evidence_snippet': 'The results do show something concerning.', 'confidence': 0.9}, {'turn_number': 7, 'stage': 'knowledge', 'evidence_snippet': 'The findings suggest that this could be cancer, although we need further tests to confirm.', 'confidence': 1.0}, {'turn_number': 8, 'stage': 'emotion', 'evidence_snippet': "That's really scary.", 'confidence': 1.0}, {'turn_number': 9, 'stage': 'emotion', 'evidence_snippet': "I can see how frightening that is. We're going to work through this together.", 'confidence': 1.0}, {'turn_number': 11, 'stage': 'strategy', 'evidence_snippet': "We'll arrange further testing and then discuss treatment options once we have more clarity.", 'confidence': 1.0}]
+    spikes_sequencing_notes: The 'invitation' stage was not clearly identified in this conversation. The clinician moved from perception to knowledge without explicitly asking the patient if they were ready to hear the information.
+
+========================================================================
+FIXTURE: DIFFICULT_DIAGNOSIS_MIXED
+========================================================================
+  BASELINE (rule-only, final scores)
+    scores: emp=0.00 comm=67.31 spikes=66.67 overall=33.46
+    meta phase='baseline_rule_v1' status=None
+  --- DIFFICULT_DIAGNOSIS_MIXED HYBRID V1 (real LLM) ---
+    phase: 'hybrid_llm_v1'
+    status: 'completed'
+    llm_scores: {'empathy_score': 40.0, 'communication_score': 70.0, 'spikes_completion_score': 66.7, 'overall_score': 52.5}
+    merged_scores: {'empathy_score': 12.0, 'communication_score': 68.12, 'spikes_completion_score': 66.68, 'overall_score': 39.63}
+    missed_opportunities count: 2
+    stage_turn_mapping: [{'turn_number': 1, 'stage': 'setting'}, {'turn_number': 3, 'stage': 'knowledge'}, {'turn_number': 7, 'stage': 'strategy'}, {'turn_number': 9, 'stage': 'strategy'}]
+    spikes_annotations count: 4
+  --- DIFFICULT_DIAGNOSIS_MIXED HYBRID V2 (real LLM) ---
+    phase: 'hybrid_llm_v2'
+    status: 'completed'
+    llm_scores: {'empathy_score': 30.0, 'communication_score': 75.0, 'spikes_completion_score': 83.3, 'overall_score': 54.99}
+    merged_scores: {'empathy_score': 9.0, 'communication_score': 69.62, 'spikes_completion_score': 71.66, 'overall_score': 39.92}
+    prompt_status: {'empathy': 'success', 'spikes': 'success', 'communication': 'success'}
+    llm_adapter_calls: 3
+    missed_opportunities count: 3
+    stage_turn_mapping: [{'turn_number': 1, 'stage': 'setting'}, {'turn_number': 2, 'stage': 'perception'}, {'turn_number': 3, 'stage': 'knowledge'}, {'turn_number': 5, 'stage': 'knowledge'}, {'turn_number': 6, 'stage': 'emotion'}, {'turn_number': 7, 'stage': 'strategy'}, {'turn_number': 9, 'stage': 'strategy'}]
+    spikes_annotations count: 7
+  [MIXED v2] missed_opportunities (informational): [{'turn_number': 2, 'patient_emotional_cue': "I've been really nervous about this.", 'clinician_response_summary': 'Okay. The results show something concerning that we need to investigate further.', 'why_missed_or_weak': "The clinician failed to acknowledge the patient's expressed nervousness and instead moved directly to discussing the results.", 'suggested_response': "I understand that this can be a nerve-wracking process. Let's go through the results together, and I'll explain everything as clearly as I can.", 'confidence': 0.9}, {'turn_number': 6, 'patient_emotional_cue': "I'm really scared… I don't know what I'll do.", 'clinician_response_summary': "We'll need to schedule additional diagnostic tests to confirm the findings.", 'why_missed_or_weak': "The clinician did not address the patient's fear and uncertainty, instead focusing on the next steps in the process.", 'suggested_response': "I can see that you're really scared, and that's completely understandable. We're here to support you through this. Let's take it one step at a time.", 'confidence': 0.9}, {'turn_number': 10, 'patient_emotional_cue': 'This is a lot…', 'clinician_response_summary': 'Yes, it is a lot of information. Do you have any questions about the process?', 'why_missed_or_weak': 'The clinician acknowledged the volume of information but did not address the emotional weight of the situation for the patient.', 'suggested_response': "I know this is a lot to take in. It's okay to feel overwhelmed. We're here to help you understand and navigate this process.", 'confidence': 0.8}]
+
+========================================================================
+FIXTURE: DIFFICULT_DIAGNOSIS_WEAK
+========================================================================
+  BASELINE (rule-only, final scores)
+    scores: emp=0.00 comm=55.46 spikes=16.67 overall=16.09
+    meta phase='baseline_rule_v1' status=None
+  --- DIFFICULT_DIAGNOSIS_WEAK HYBRID V1 (real LLM) ---
+    phase: 'hybrid_llm_v1'
+    status: 'completed'
+    llm_scores: {'empathy_score': 20.0, 'communication_score': 60.0, 'spikes_completion_score': 50.0, 'overall_score': 35.0}
+    merged_scores: {'empathy_score': 6.0, 'communication_score': 56.82, 'spikes_completion_score': 26.67, 'overall_score': 22.37}
+    missed_opportunities count: 3
+    stage_turn_mapping: [{'turn_number': 1, 'stage': 'setting'}, {'turn_number': 3, 'stage': 'knowledge'}, {'turn_number': 7, 'stage': 'strategy'}]
+    spikes_annotations count: 3
+  --- DIFFICULT_DIAGNOSIS_WEAK HYBRID V2 (real LLM) ---
+    phase: 'hybrid_llm_v2'
+    status: 'completed'
+    llm_scores: {'empathy_score': 20.0, 'communication_score': 70.0, 'spikes_completion_score': 60.0, 'overall_score': 42.0}
+    merged_scores: {'empathy_score': 6.0, 'communication_score': 59.82, 'spikes_completion_score': 29.67, 'overall_score': 23.87}
+    prompt_status: {'empathy': 'success', 'spikes': 'success', 'communication': 'success'}
+    llm_adapter_calls: 3
+    missed_opportunities count: 4
+    stage_turn_mapping: [{'turn_number': 1, 'stage': 'setting'}, {'turn_number': 2, 'stage': 'perception'}, {'turn_number': 3, 'stage': 'knowledge'}, {'turn_number': 6, 'stage': 'emotion'}, {'turn_number': 7, 'stage': 'strategy'}]
+    spikes_annotations count: 5
+.
+
+=============================== warnings summary ===============================
+../../../../../Library/Caches/pypoetry/virtualenvs/capstone-backend-EtO__fRU-py3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:155: 213 warnings
+  /Users/aaryank/Library/Caches/pypoetry/virtualenvs/capstone-backend-EtO__fRU-py3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:155: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    return asyncio.iscoroutinefunction(obj)
+
+tests/services/test_seeded_evaluator_validation.py::test_seeded_difficult_diagnosis_print_and_structure
+  /Users/aaryank/Library/Caches/pypoetry/virtualenvs/capstone-backend-EtO__fRU-py3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:564: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+
+tests/services/test_seeded_evaluator_validation.py::test_seeded_difficult_diagnosis_print_and_structure
+  /Users/aaryank/Library/Caches/pypoetry/virtualenvs/capstone-backend-EtO__fRU-py3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:395: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    policy = asyncio.get_event_loop_policy()
+
+tests/services/test_seeded_evaluator_validation.py::test_seeded_difficult_diagnosis_print_and_structure
+  /Users/aaryank/Library/Caches/pypoetry/virtualenvs/capstone-backend-EtO__fRU-py3.14/lib/python3.14/site-packages/google/genai/types.py:43: DeprecationWarning: '_UnionGenericAlias' is deprecated and slated for removal in Python 3.17
+    VersionedUnionType = Union[builtin_types.UnionType, _UnionGenericAlias]
+
+tests/services/test_seeded_evaluator_validation.py::test_seeded_difficult_diagnosis_print_and_structure
+  /Users/aaryank/Library/Caches/pypoetry/virtualenvs/capstone-backend-EtO__fRU-py3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:441: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    policy = asyncio.get_event_loop_policy()
+
+tests/services/test_seeded_evaluator_validation.py::test_seeded_difficult_diagnosis_print_and_structure
+  /Users/aaryank/Library/Caches/pypoetry/virtualenvs/capstone-backend-EtO__fRU-py3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:462: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    policy = asyncio.get_event_loop_policy()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+========== 1 passed, 2 deselected, 218 warnings in 110.31s (0:01:50) ===========

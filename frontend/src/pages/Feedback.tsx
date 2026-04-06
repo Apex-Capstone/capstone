@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { fetchFeedback } from '@/api/feedback.api'
-import type { Feedback as FeedbackType } from '@/api/feedback.api'
+import type { Feedback as FeedbackType, FeedbackEvaluatorMeta } from '@/api/feedback.api'
 import { getSession } from '@/api/sessions.api'
 import type { SessionDetail } from '@/types/session'
 import { FeedbackChart } from '@/components/FeedbackChart'
@@ -55,7 +55,7 @@ function normaliseSpikesCovered(covered: string[]): Set<string> {
 }
 
 function getPreferredStrengths(
-  evaluatorMeta: Record<string, unknown> | null | undefined,
+  evaluatorMeta: FeedbackEvaluatorMeta | null | undefined,
   fallbackStrengths: string | null | undefined,
 ): string[] {
   const llmOutput =
@@ -84,7 +84,7 @@ function getPreferredStrengths(
 }
 
 function getPreferredImprovements(
-  evaluatorMeta: Record<string, unknown> | null | undefined,
+  evaluatorMeta: FeedbackEvaluatorMeta | null | undefined,
   fallbackImprovements: string | null | undefined,
 ): string[] {
   const llmOutput =

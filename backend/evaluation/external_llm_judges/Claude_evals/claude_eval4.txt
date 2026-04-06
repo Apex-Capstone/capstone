@@ -1,0 +1,83 @@
+{
+  "meta": {
+    "evaluator_family": "manual_external_llm",
+    "evaluator_version": "claude-sonnet-4-6",
+    "status": "completed"
+  },
+  "scores": {
+    "empathy_score": 8.0,
+    "communication_score": 22.0,
+    "spikes_completion_score": 18.0,
+    "overall_score": 16.0
+  },
+  "spikes": {
+    "stages_present": ["knowledge"],
+    "stage_turn_mapping": [
+      {
+        "turn_number": 3,
+        "stage": "knowledge"
+      }
+    ],
+    "missing_stages": ["setting", "perception", "invitation", "emotion", "strategy"],
+    "sequencing_notes": "Only the knowledge stage is partially represented, and it is delivered abruptly without any prior SPIKES scaffolding. No warning shot was given before delivering the potentially malignant finding. Emotion and strategy stages are entirely absent despite clear emotional cues from the patient."
+  },
+  "missed_opportunities": [
+    {
+      "turn_number": 1,
+      "cue_text": "Hi. I have your results.",
+      "clinician_response_summary": "Clinician opens by immediately stating results are available without any setting preparation.",
+      "why_missed_or_weak": "No effort to establish a private, comfortable setting, check who is present, or prepare the patient emotionally. No warning shot or transition phrase used.",
+      "suggested_response": "Before we go over your results, I want to make sure we have some time and privacy. Is now a good time, and is there anyone you'd like to have with you?",
+      "confidence": 0.97
+    },
+    {
+      "turn_number": 3,
+      "cue_text": "Okay… I've been worried.",
+      "clinician_response_summary": "Clinician ignores the patient's expressed anxiety and immediately delivers the news of possible malignancy.",
+      "why_missed_or_weak": "The patient's worry is entirely unacknowledged. No perception check was performed, no invitation to share results was sought, and no warning shot was given before disclosing a potentially cancer-related finding.",
+      "suggested_response": "I can hear you've been anxious about this. Before I share what we found, can you tell me what you've been thinking or expecting? And would it be okay if I walked you through the results now?",
+      "confidence": 0.97
+    },
+    {
+      "turn_number": 7,
+      "cue_text": "That's terrifying…",
+      "clinician_response_summary": "Clinician responds to the patient's explicit expression of fear by immediately pivoting to next clinical steps.",
+      "why_missed_or_weak": "A direct emotional disclosure ('that's terrifying') is completely unacknowledged. This is a critical missed opportunity for empathy, normalization, and validation. The patient is left emotionally unsupported.",
+      "suggested_response": "That's completely understandable — hearing something like this is frightening. I want you to know you don't have to process this alone. Can you tell me what's going through your mind right now?",
+      "confidence": 0.98
+    },
+    {
+      "turn_number": 9,
+      "cue_text": "I don't even know what to say…",
+      "clinician_response_summary": "Clinician again bypasses the patient's emotional expression and delivers a logistical plan (oncology referral).",
+      "why_missed_or_weak": "The patient signals shock and emotional overwhelm. The clinician offers no empathy, no pause, no acknowledgment of the patient's state. The strategy (oncology referral) is presented without context, explanation, or partnership language.",
+      "suggested_response": "That makes complete sense — this is a lot to take in. It's okay to just sit with it for a moment. When you're ready, I'd like to talk through what the next steps look like and answer any questions you have.",
+      "confidence": 0.97
+    }
+  ],
+  "feedback": {
+    "strength_tags": ["professionalism"],
+    "improvement_tags": [
+      "missing_invitation",
+      "weak_emotional_acknowledgment",
+      "incomplete_spikes",
+      "missed_opportunity",
+      "limited_explanation_of_plan"
+    ],
+    "strengths_text": [
+      "The clinician communicated that a diagnosis was not yet confirmed and that further testing was needed, which is clinically accurate and avoids premature certainty.",
+      "A next step (oncology referral) was mentioned, indicating some forward planning, even if poorly delivered."
+    ],
+    "areas_for_improvement_text": [
+      "The clinician failed to acknowledge or respond to any of the patient's emotional disclosures — including expressed worry, fear, and shock — across the entire conversation. Empathic acknowledgment is foundational in breaking bad news.",
+      "Five of six SPIKES stages (setting, perception, invitation, emotion, strategy) were absent. The conversation lacked preparation, a warning shot, patient invitation, and any meaningful emotional or strategic closure.",
+      "The plan communicated to the patient was vague and unexplained. The oncology referral was stated without context, rationale, or reassurance, leaving the patient without adequate understanding or support."
+    ]
+  },
+  "confidence": {
+    "empathy_confidence": 0.97,
+    "communication_confidence": 0.95,
+    "spikes_confidence": 0.96,
+    "overall_confidence": 0.96
+  }
+}
