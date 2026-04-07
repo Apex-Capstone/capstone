@@ -18,6 +18,74 @@ Role-based access currently supports:
 - **Trainee**: practice conversations, view feedback.
 - **Admin**: manage cases, configure plugins, access analytics and research exports.
 
+---
+
+## Accessing the Hosted Version
+
+The application is fully deployed and accessible at:
+
+**[https://apexsimulator.org/](https://apexsimulator.org/)**
+
+No local setup is required to evaluate the system. Use the TA review accounts below to access all features.
+
+### TA Review Credentials
+
+| Role    | Email                      | Password         |
+| ------- | -------------------------- | ---------------- |
+| Trainee | `trainee.review@apex.com`  | `ApexReview123!` |
+| Admin   | `admin.review@apex.com`    | `ApexReview123!` |
+
+> The admin account has full access to all trainee features plus the admin dashboard, research analytics, and CSV export.
+
+---
+
+## Trainee Demo Walkthrough
+
+Follow these steps to experience the trainee workflow end-to-end:
+
+1. Navigate to **[https://apexsimulator.org/](https://apexsimulator.org/)**.
+2. Click **"Start a simulated session"** on the landing page.
+3. On the sign-in screen, enter the trainee credentials:
+   - Email: `trainee.review@apex.com`
+   - Password: `ApexReview123!`
+4. After signing in you will land on the **Dashboard** (`/dashboard`).
+   - The dashboard lists all available virtual patient cases.
+5. Click on a case card to open the case detail view.
+6. Click **Start Session** to enter the chat interface (`/case/:caseId`).
+7. Type your messages in the input box to converse with the simulated patient.
+   - Aim for at least 2–3 turns to generate meaningful feedback.
+8. When finished, click **End Session**.
+9. You will be redirected to the **Feedback** page (`/feedback/:sessionId`), which shows:
+   - Overall empathy score and AFCE-aligned breakdown
+   - SPIKES stage progression and coverage
+   - Specific strengths and missed empathy opportunities from the conversation
+10. Navigate to **Sessions** (`/sessions`) in the sidebar to review all past sessions and their feedback.
+
+---
+
+## Admin Demo Walkthrough
+
+The admin account provides access to all trainee features plus additional oversight and research capabilities:
+
+1. Navigate to **[https://apexsimulator.org/](https://apexsimulator.org/)** and sign in with the admin credentials:
+   - Email: `admin.review@apex.com`
+   - Password: `ApexReview123!`
+2. After signing in you will land on the **Dashboard**.
+   - As an admin, the sidebar exposes additional navigation links.
+3. Navigate to **Admin** (`/admin`) to access:
+   - Session oversight (all user sessions across the platform)
+   - Case management (view and inspect configured virtual patient cases)
+   - User and plugin configuration details
+4. Navigate to **Research** (`/research`) to access:
+   - Aggregated session metrics and fairness analytics
+   - Bias and demographic parity visualizations
+   - **CSV export** – click the export button to download anonymized session data for offline analysis
+5. Navigate to **Research Sessions** (`/research/sessions`) to:
+   - Inspect individual session records with full transcripts and per-turn metrics
+   - Click into any session to view a detailed breakdown at `/admin/sessions/:sessionId`
+
+---
+
 ## Repository Structure
 
 ```
@@ -125,64 +193,60 @@ Plugins are **registered in code** (on import) and **selected** via configuratio
 
 ---
 
-## Running the Project Locally
+## Running Locally (Optional)
 
----
+> The hosted version at **[https://apexsimulator.org/](https://apexsimulator.org/)** is already fully deployed with all services configured. The steps below are only needed if you want to run APEX on your own machine.
+>
+> **You will need your own OpenAI and/or Gemini API keys** for the LLM-powered patient dialogue. All other configuration (Supabase, database) can be copied from the `.env.example` files in this repository.
 
-## 🚀 Getting Started
+### Prerequisites
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/AsherHaroon/capstone.git
-   cd capstone
-   ```
+- Python 3.11+ and [Poetry](https://python-poetry.org/)
+- Node.js 18+ and npm
+- A Supabase project (or use the shared project — see `.env.example`)
 
-### 1. Backend Setup
+### 1. Clone the repository
 
-Navigate to the backend directory:
+```bash
+git clone https://github.com/AsherHaroon/capstone.git
+cd capstone
+```
+
+### 2. Backend Setup
+
+Navigate to the backend directory and install dependencies:
 
 ```bash
 cd backend
 poetry install
 ```
 
-Create a `.env` file in `/backend` (see `.env.example` for reference):
-
-```
-# Database
-database_url=postgresql+psycopg2://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require
-
-# LLM keys
-openai_api_key=your-openai-key
-gemini_api_key=your-gemini-key
-
-# Supabase storage (for assistant audio)
-supabase_url=https://your-project.supabase.co
-supabase_service_role_key=your-service-role-key
-supabase_storage_bucket="patient audio files"
-
-# Supabase Auth JWT verification
-SUPABASE_JWT_SECRET=your-supabase-jwt-secret
-
-# Local paths
-local_storage_path=./storage
-public_base_url=http://localhost:8000
-```
-
-The `SUPABASE_JWT_SECRET` is found in your Supabase dashboard under **Project Settings > API > JWT Settings > Legacy JWT Secret**.
-
-Set `PYTHONPATH` so the backend imports resolve before running:
-
-PowerShell:
-
-```powershell
-$env:PYTHONPATH = "$PWD\src"
-```
-
-macOS / Linux:
+Copy the example environment file and fill in your API keys:
 
 ```bash
+cp .env.example .env
+```
+
+Open `backend/.env` and set at minimum:
+
+```
+openai_api_key=your-openai-api-key-here
+# or
+gemini_api_key=your-gemini-api-key-here
+```
+
+All other values (database URL, Supabase URL, JWT secret, etc.) are pre-filled in `.env.example` and point to the shared project — you can use them as-is for local testing.
+
+Set `PYTHONPATH` so backend imports resolve correctly:
+
+macOS / Linux:
+```bash
 export PYTHONPATH="$PWD/src"
+```
+
+PowerShell:
+```powershell
+$env:PYTHONPATH = "$PWD\src"
 ```
 
 Run the FastAPI server:
@@ -191,27 +255,25 @@ Run the FastAPI server:
 poetry run uvicorn src.app:app --reload
 ```
 
-Access the API at `http://localhost:8000/v1`
-OpenAPI documentation is available at `http://localhost:8000/docs`.
+The API will be available at `http://localhost:8000/v1`.
+OpenAPI documentation is at `http://localhost:8000/docs`.
 
-### 2. Frontend Setup
+### 3. Frontend Setup
 
-Navigate to the frontend directory:
+Open a new terminal, navigate to the frontend directory, and install dependencies:
 
 ```bash
 cd frontend
 npm install
 ```
 
-Create a `.env` file in `/frontend`:
+Copy the example environment file:
 
-```
-VITE_API_URL=http://localhost:8000
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+```bash
+cp .env.example .env
 ```
 
-The `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are found in your Supabase dashboard under **Project Settings > API**. The anon key is safe for frontend use.
+The `.env.example` already contains the correct Supabase URL and anon key for the shared project. The only value you may need to change is `VITE_API_URL` if your backend runs on a different port.
 
 Run the development server:
 
@@ -223,14 +285,14 @@ The interface will be available at `http://localhost:5173`.
 
 ---
 
-## Creating Users
+## Creating Users (Local / Development)
 
 Authentication is handled by **Supabase Auth**. Users sign up through the frontend at `/signup` with email verification.
 
 To create an admin user:
 
 1. Create the user through the `/signup` page or the Supabase dashboard (**Authentication > Users > Add user**).
-2. Set their role to admin MANUALLY in the database:
+2. Set their role to admin in the database:
 
 ```sql
 UPDATE core.users SET role = 'admin' WHERE email = 'admin@example.com';
@@ -244,20 +306,6 @@ UPDATE core.users SET role = 'admin' WHERE email = 'admin@example.com';
 | ----------- | ----------------------------------------------------------------------- |
 | **Trainee** | Access to virtual cases, simulated patient chat, and feedback views     |
 | **Admin**   | Full CRUD on cases, user/session oversight, analytics, and research API |
-
----
-
-## Development Workflow
-
-1. Start backend (`poetry run uvicorn src.app:app --reload`)
-2. Start frontend (`npm run dev`)
-3. Sign up at `/signup` or log in with an existing account
-4. Navigate through:
-   - `/dashboard` → trainee dashboard
-   - `/case/:id` → chat interface
-   - `/feedback/:sessionId` → feedback summary
-   - `/admin` → admin analytics and case management
-   - `/research` → research analytics view
 
 ---
 
