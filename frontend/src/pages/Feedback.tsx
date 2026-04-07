@@ -13,6 +13,7 @@ import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { formatDateTimeInUserTimeZone } from '@/lib/dateTime'
 import { formatPluginName, formatMetricsPluginsDisplay } from '@/lib/formatPluginName'
+import { getHybridCoveredStages, shouldUseHybridStageTurnMapping } from '@/lib/spikesStageFromFeedback'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -230,10 +231,18 @@ export const Feedback = () => {
 
   const overallPercent = scoreToPercent(feedback.overallScore)
   const empathyPercent = scoreToPercent(feedback.empathyScore)
-  const coveredStages = normaliseSpikesCovered(feedback.spikesCoverage?.covered ?? [])
-  const coveragePercent = feedback.spikesCoverage
-    ? Math.round(feedback.spikesCoverage.percent * 100)
-    : 0
+  const isHybrid = shouldUseHybridStageTurnMapping(feedback)
+  const hybridCoveredSet = isHybrid ? getHybridCoveredStages(feedback) : null
+  const coveredStages =
+    hybridCoveredSet != null ? hybridCoveredSet : normaliseSpikesCovered(feedback.spikesCoverage?.covered ?? [])
+  const coveragePercent =
+    isHybrid && hybridCoveredSet != null
+      ? Math.round((hybridCoveredSet.size / 6) * 100)
+      : feedback.spikesCoverage
+        ? Math.round(feedback.spikesCoverage.percent * 100)
+        : 0
+  const spikesCoverageCardApplicable = isHybrid || !!feedback.spikesCoverage
+  const hybridCoveredCount = hybridCoveredSet != null ? hybridCoveredSet.size : null
   const strengthsList = getPreferredStrengths(feedback.evaluatorMeta, feedback.strengths)
   const improvementsList = getPreferredImprovements(
     feedback.evaluatorMeta,
@@ -319,12 +328,16 @@ export const Feedback = () => {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      {feedback.spikesCoverage && (
+                      {spikesCoverageCardApplicable && (
                         <div className="space-y-4">
                           <div className="pt-1 text-sm font-medium text-gray-800">
                             Overall Coverage:{' '}
                             <span className="font-semibold text-purple-700">
-                              {feedback.spikesCoverage.coveredCount} / {feedback.spikesCoverage.total}{' '}
+                              {isHybrid && hybridCoveredCount != null
+                                ? `${hybridCoveredCount} / 6`
+                                : feedback.spikesCoverage != null
+                                  ? `${feedback.spikesCoverage.coveredCount} / ${feedback.spikesCoverage.total}`
+                                  : '0 / 6'}{' '}
                               stages
                             </span>
                             <span className="ml-2 text-gray-500">({coveragePercent}%)</span>

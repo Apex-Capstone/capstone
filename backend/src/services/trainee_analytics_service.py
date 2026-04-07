@@ -32,7 +32,10 @@ class TraineeAnalyticsService:
             return None
 
     def get_user_session_analytics(self, user_id: int) -> list[TraineeSessionAnalytics]:
-        """Return completed sessions plus feedback metrics for one user."""
+        """Return completed sessions plus feedback metrics for one user.
+
+        Newest sessions first (``created_at`` / feedback time descending, then ``session_id`` descending).
+        """
         rows = (
             self.db.query(SessionEntity, Feedback)
             .join(Feedback, Feedback.session_id == SessionEntity.id)
@@ -80,6 +83,6 @@ class TraineeAnalyticsService:
                 )
             )
 
-        out.sort(key=lambda row: row.created_at)
+        out.sort(key=lambda row: (row.created_at or row.session_id, row.session_id), reverse=True)
         return out
 

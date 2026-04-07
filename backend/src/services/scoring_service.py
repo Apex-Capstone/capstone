@@ -176,6 +176,13 @@ _SPIKES_CANONICAL_ORDER = [
     "strategy",
 ]
 _SPIKES_LLM_CONFIDENCE_THRESHOLD = 0.6
+_HYBRID_EVALUATOR_PLUGIN_KEYS = frozenset(
+    {
+        "plugins.evaluators.apex_hybrid_evaluator:ApexHybridEvaluator",
+        "plugins.evaluators.apex_hybrid_v2_evaluator:ApexHybridV2Evaluator",
+    }
+)
+_HYBRID_EVALUATOR_CLASS_NAMES = frozenset({"ApexHybridEvaluator", "ApexHybridV2Evaluator"})
 
 
 def _normalize_spikes_stage_key(raw: Any) -> str | None:
@@ -200,6 +207,7 @@ def _normalize_spikes_stage_key(raw: Any) -> str | None:
         "s2": "strategy",
         "strategy": "strategy",
         "summary": "strategy",
+        "strategy_and_summary": "strategy",
     }
     return stage_map.get(value)
 
@@ -364,15 +372,95 @@ def _extract_llm_spikes_stage_set(evaluator_meta: dict[str, Any] | None) -> set[
 def _compute_spikes_coverage_merge(
     rule_spikes_coverage: dict[str, Any] | None,
     evaluator_meta: dict[str, Any] | None,
+    *,
+    valid_session_turn_numbers: frozenset[int] | None = None,
 ) -> dict[str, Any]:
+    """Build canonical ``spikes_coverage`` for persistence.
+
+    * **Hybrid evaluators** — only distinct stages from ``evaluator_meta.llm_output.stage_turn_mapping``
+      (valid turn rows + normalizable stage). Rule coverage, annotations, and turn.spikesStage
+      are not merged in.
+    * **Otherwise** — rule ``spikes_coverage`` merged with high-confidence ``spikes_annotations`` when present.
+    """
     rule_stages = _extract_rule_spikes_stage_set(rule_spikes_coverage)
     rule_payload = _build_spikes_coverage_payload(rule_stages)
+
+    if _is_hybrid_evaluator_context(evaluator_meta):
+        mapped_only = _extract_mapped_spikes_stage_set_from_stage_turn_mapping(
+            evaluator_meta,
+            valid_session_turn_numbers=valid_session_turn_numbers,
+        )
+        return _build_spikes_coverage_payload(mapped_only)
+
     if not _should_apply_llm_spikes_merge(evaluator_meta):
         return rule_payload
 
     llm_stages = _extract_llm_spikes_stage_set(evaluator_meta)
     merged_stages = rule_stages | llm_stages
     return _build_spikes_coverage_payload(merged_stages)
+
+
+def _is_hybrid_evaluator_context(evaluator_meta: dict[str, Any] | None) -> bool:
+    if not isinstance(evaluator_meta, dict):
+        return False
+    session_plugins = evaluator_meta.get("session_plugins")
+    if not isinstance(session_plugins, dict):
+        return False
+    plugin_key = session_plugins.get("evaluator_plugin")
+    if not isinstance(plugin_key, str):
+        return False
+    normalized = plugin_key.strip()
+    if not normalized:
+        return False
+    if normalized in _HYBRID_EVALUATOR_PLUGIN_KEYS:
+        return True
+    cls = normalized.split(":")[-1].strip()
+    return cls in _HYBRID_EVALUATOR_CLASS_NAMES
+
+
+def _extract_mapped_spikes_stage_set_from_stage_turn_mapping(
+    evaluator_meta: dict[str, Any] | None,
+    *,
+    valid_session_turn_numbers: frozenset[int] | None = None,
+) -> set[str]:
+    """Distinct canonical SPIKES stages from ``llm_output.stage_turn_mapping`` rows only.
+
+    Rows must have int ``turn_number`` ≥ 1, optional filter to real session turns, and a
+    normalizable ``stage`` string. Used as the sole persistence source for hybrid SPIKES coverage.
+    """
+    if not isinstance(evaluator_meta, dict):
+        return set()
+    llm_output = evaluator_meta.get("llm_output")
+    if not isinstance(llm_output, dict):
+        return set()
+    mapping = llm_output.get("stage_turn_mapping")
+    if not isinstance(mapping, list):
+        return set()
+    stages: set[str] = set()
+    for row in mapping:
+        if not isinstance(row, dict):
+            continue
+        turn_number = row.get("turn_number")
+        if not isinstance(turn_number, int) or isinstance(turn_number, bool) or turn_number < 1:
+            continue
+        if valid_session_turn_numbers is not None and turn_number not in valid_session_turn_numbers:
+            continue
+        normalized = _normalize_spikes_stage_key(row.get("stage"))
+        if normalized:
+            stages.add(normalized)
+    return stages
+
+
+def _extract_mapped_spikes_stage_set(
+    evaluator_meta: dict[str, Any] | None,
+    *,
+    valid_session_turn_numbers: frozenset[int] | None = None,
+) -> set[str]:
+    """Alias for :func:`_extract_mapped_spikes_stage_set_from_stage_turn_mapping`."""
+    return _extract_mapped_spikes_stage_set_from_stage_turn_mapping(
+        evaluator_meta,
+        valid_session_turn_numbers=valid_session_turn_numbers,
+    )
 
 
 @dataclass
@@ -997,9 +1085,23 @@ class ScoringService:
         feedback.eo_to_elicitation_links = state.eo_to_elicitation_links
         feedback.eo_to_response_links = state.eo_to_response_links
         feedback.missed_opportunities = state.missed_opportunities
+        meta_out: dict[str, Any] = dict(evaluator_meta) if evaluator_meta else {}
+        meta_out["session_plugins"] = _session_plugin_context_for_evaluator_meta(state.session)
+
         # Single source of truth: persisted SPIKES coverage and persisted SPIKES score are
         # both derived from this same final canonical merged payload.
-        feedback.spikes_coverage = _compute_spikes_coverage_merge(state.spikes_coverage, evaluator_meta)
+        valid_session_turn_numbers = frozenset(
+            int(t.turn_number)
+            for t in state.turns
+            if getattr(t, "turn_number", None) is not None
+            and isinstance(t.turn_number, int)
+            and not isinstance(t.turn_number, bool)
+        )
+        feedback.spikes_coverage = _compute_spikes_coverage_merge(
+            state.spikes_coverage,
+            meta_out,
+            valid_session_turn_numbers=valid_session_turn_numbers,
+        )
         feedback.spikes_completion_score = _calculate_spikes_completion_from_coverage(feedback.spikes_coverage)
         feedback.overall_score = self._clamp_score(
             round(
@@ -1013,8 +1115,6 @@ class ScoringService:
         feedback.spikes_strategies = state.spikes_strategies
         feedback.question_breakdown = state.question_breakdown
         feedback.bias_probe_info = bias_probe_info
-        meta_out: dict[str, Any] = dict(evaluator_meta) if evaluator_meta else {}
-        meta_out["session_plugins"] = _session_plugin_context_for_evaluator_meta(state.session)
         feedback.evaluator_meta = meta_out
         feedback.latency_ms_avg = state.latency_ms_avg
 
