@@ -514,9 +514,6 @@ export const Research = () => {
 
   /**
    * Fetches anonymized session metrics as CSV (Bearer auth) and triggers download.
-   *
-   * @remarks
-   * No-op when `getToken()` returns null.
    */
   const handleDownloadMetricsCsv = async () => {
     setExportingMetrics(true)

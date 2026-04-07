@@ -2,22 +2,12 @@
  * Admin-only research endpoints: anonymized sessions and export download.
  */
 import api from '@/api/client'
+import { useAuthStore } from '@/store/authStore'
 import type { AxiosError } from 'axios'
 
 const BASE = '/v1/research'
 
 const API_ORIGIN = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-
-function readAuthTokenFromStorage(): string | null {
-  try {
-    const raw = localStorage.getItem('auth-storage')
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as { state?: { token?: string }; token?: string }
-    return parsed?.state?.token ?? parsed?.token ?? null
-  } catch {
-    return null
-  }
-}
 
 function triggerBlobDownload(blob: Blob, filename: string): void {
   const url = window.URL.createObjectURL(blob)
@@ -29,14 +19,15 @@ function triggerBlobDownload(blob: Blob, filename: string): void {
 }
 
 /**
- * Downloads session metrics as CSV (`session_metrics.csv`) using Bearer auth from `auth-storage`.
+ * Downloads session metrics as CSV (`session_metrics.csv`) with the same Bearer token as the axios client.
  *
- * @remarks
- * No-op when no token is present. Throws if the HTTP response is not OK.
+ * @throws Error when not signed in or when the HTTP response is not OK.
  */
 export async function downloadMetricsCSV(): Promise<void> {
-  const token = readAuthTokenFromStorage()
-  if (!token) return
+  const token = useAuthStore.getState().token
+  if (!token) {
+    throw new Error('No auth token available')
+  }
   const response = await fetch(`${API_ORIGIN}/v1/research/export/metrics.csv`, {
     headers: { Authorization: `Bearer ${token}` },
   })
@@ -46,14 +37,15 @@ export async function downloadMetricsCSV(): Promise<void> {
 }
 
 /**
- * Downloads all transcripts as CSV (`all_transcripts.csv`) using Bearer auth from `auth-storage`.
+ * Downloads all transcripts as CSV (`all_transcripts.csv`) with the same Bearer token as the axios client.
  *
- * @remarks
- * No-op when no token is present. Throws if the HTTP response is not OK.
+ * @throws Error when not signed in or when the HTTP response is not OK.
  */
 export async function downloadTranscriptsCSV(): Promise<void> {
-  const token = readAuthTokenFromStorage()
-  if (!token) return
+  const token = useAuthStore.getState().token
+  if (!token) {
+    throw new Error('No auth token available')
+  }
   const response = await fetch(`${API_ORIGIN}/v1/research/export/transcripts.csv`, {
     headers: { Authorization: `Bearer ${token}` },
   })
@@ -124,7 +116,9 @@ export interface ResearchData {
  * @returns Whether `err` represents HTTP 403
  */
 function isForbidden(err: unknown): boolean {
-  return (err as AxiosError)?.response?.status === 403
+  const ax = err as AxiosError
+  const status = ax.response?.status ?? ax.status
+  return Number(status) === 403
 }
 
 /**

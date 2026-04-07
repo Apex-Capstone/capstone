@@ -3,8 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import type { ResearchData } from '@/api/research.api'
 import { formatDateTimeInUserTimeZone, utcTimestampMs } from '@/lib/dateTime'
-import { formatPluginName as formatPluginNameFromLib } from '@/lib/formatPluginName'
+import {
+  formatPluginName as formatPluginNameFromLib,
+  formatMetricsPluginsDisplay,
+} from '@/lib/formatPluginName'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/store/authStore'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -99,17 +103,6 @@ export function ResearchSessionsTable({
   const tableColumnCount =
     5 + (showExperimentMetadata ? 7 : 0) + (showActions ? 1 : 0)
 
-  const getToken = (): string | null => {
-    try {
-      const raw = localStorage.getItem('auth-storage')
-      if (!raw) return null
-      const parsed = JSON.parse(raw)
-      return parsed?.state?.token ?? parsed?.token ?? null
-    } catch {
-      return null
-    }
-  }
-
   const downloadBlob = (blob: Blob, filename: string) => {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -124,10 +117,12 @@ export function ResearchSessionsTable({
     anonSessionId: string
   ) => {
     event.stopPropagation()
-    const token = getToken()
-    if (!token) return
     setExportingSessionId(anonSessionId)
     try {
+      const token = useAuthStore.getState().token
+      if (!token) {
+        throw new Error('No auth token available')
+      }
       const response = await fetch(
         `${API_URL}/v1/research/export/session/${encodeURIComponent(anonSessionId)}.csv`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -228,26 +223,8 @@ export function ResearchSessionsTable({
     })
   }, [caseFilter, dateFilter, empathyFilter, searchText, safeSessions, spikesFilter])
 
-  const formatMetricsPlugins = (value: string | null | undefined) => {
-    if (!value) return '—'
-    const trimmed = value.trim()
-    if (!trimmed) return '—'
-
-    try {
-      const parsed = JSON.parse(trimmed)
-      if (Array.isArray(parsed)) {
-        if (!parsed.length) return '—'
-        return parsed
-          .map((entry) => String(entry))
-          .map((entry) => formatPluginName(entry))
-          .join(', ')
-      }
-    } catch {
-      // Keep raw fallback below for non-JSON values.
-    }
-
-    return formatPluginName(trimmed)
-  }
+  const formatMetricsPlugins = (value: string | null | undefined) =>
+    formatMetricsPluginsDisplay(value) || '—'
 
   useEffect(() => {
     setCurrentPage(1)

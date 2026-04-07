@@ -1,0 +1,70 @@
+{
+  "meta": {
+    "evaluator_family": "manual_external_llm",
+    "evaluator_version": "gpt-4",
+    "status": "completed"
+  },
+  "scores": {
+    "empathy_score": 15.0,
+    "communication_score": 35.0,
+    "spikes_completion_score": 20.0,
+    "overall_score": 25.0
+  },
+  "spikes": {
+    "stages_present": ["knowledge", "strategy"],
+    "stage_turn_mapping": [
+      {
+        "turn_number": 3,
+        "stage": "knowledge"
+      },
+      {
+        "turn_number": 5,
+        "stage": "knowledge"
+      },
+      {
+        "turn_number": 7,
+        "stage": "strategy"
+      },
+      {
+        "turn_number": 9,
+        "stage": "strategy"
+      }
+    ],
+    "missing_stages": ["setting", "perception", "invitation", "emotion"],
+    "sequencing_notes": "Clinician skipped setting, perception, and invitation stages, and did not address the patient's emotional responses at any point."
+  },
+  "missed_opportunities": [
+    {
+      "turn_number": 2,
+      "cue_text": "Okay… I've been worried.",
+      "clinician_response_summary": "Clinician responded with test results (Turn 3) without acknowledging the worry.",
+      "why_missed_or_weak": "Failed to validate or explore the patient's expressed worry, missing a chance to build rapport and assess perception.",
+      "suggested_response": "I hear that you've been worried. That's completely understandable given we were waiting for results. Before I share them, can you tell me what you've been worried about?",
+      "confidence": 0.95
+    },
+    {
+      "turn_number": 6,
+      "cue_text": "That's terrifying…",
+      "clinician_response_summary": "Clinician moved directly to next steps (Turn 7: 'We'll proceed with additional tests.') without responding to the emotion.",
+      "why_missed_or_weak": "Emotion cue explicitly stated but ignored; no empathy, pause, or validation.",
+      "suggested_response": "I know this is terrifying news. It's okay to feel that way. We're going to take this step by step, and I'll be here with you. Can you tell me what's most frightening right now?",
+      "confidence": 0.95
+    }
+  ],
+  "feedback": {
+    "strength_tags": [],
+    "improvement_tags": ["missing_invitation", "weak_emotional_acknowledgment", "incomplete_spikes"],
+    "strengths_text": [],
+    "areas_for_improvement_text": [
+      "Establish a private, seated setting and ask about patient's current understanding before delivering news.",
+      "Explicitly ask for permission to share results (invitation) and pause to check for readiness.",
+      "Acknowledge and respond to emotional cues with empathy and validation before moving to the plan."
+    ]
+  },
+  "confidence": {
+    "empathy_confidence": 0.9,
+    "communication_confidence": 0.85,
+    "spikes_confidence": 0.95,
+    "overall_confidence": 0.9
+  }
+}

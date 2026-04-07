@@ -5,10 +5,29 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { getCase } from '@/api/cases.api'
-import { createSession, transcribeAudioTurn, submitTurn, closeSession, getSession, fetchAssistantAudioObjectUrl } from '@/api/sessions.api'
+import {
+  createSession,
+  transcribeAudioTurn,
+  submitTurn,
+  submitAudioTurn,
+  closeSession,
+  getSession,
+  fetchAssistantAudioObjectUrl,
+} from '@/api/sessions.api'
 import type { Case as CaseType } from '@/types/case'
 import type { AudioToneAnalysis, Message } from '@/types/session'
 import { parseUtcDateTime } from '@/lib/dateTime'
+import { useAuthStore } from '@/store/authStore'
+import { useRealtimeSession } from '@/hooks/useRealtimeSession'
+import {
+  evaluateVoiceCaptureForUpload,
+  getPreferredRecordingMimeType,
+  getRecordingFileExtension,
+  isBrowserVoiceRecordingSupported,
+  MIN_VOICE_ACTIVE_FRAMES,
+  VOICE_ACTIVITY_RMS_THRESHOLD,
+} from '@/lib/voiceMedia'
+import { playAssistantAudioTrack, revokeAssistantAudioSession } from '@/lib/assistantAudioPlayback'
 
 import { ChatBubble } from '@/components/ChatBubble'
 import { Navbar } from '@/components/Navbar'
@@ -19,29 +38,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Mic, Send, Clock, PhoneOff, ChevronDown, ChevronUp } from 'lucide-react'
 import { SpikesProgressBar } from '@/components/SpikesProgressBar'
 
-const audioExtensionByMimeType: Record<string, string> = {
-  'audio/webm;codecs=opus': 'webm',
-  'audio/webm': 'webm',
-  'audio/ogg;codecs=opus': 'ogg',
-  'audio/ogg': 'ogg',
-  'audio/mp4': 'm4a',
-  'audio/x-m4a': 'm4a',
-  'audio/mpeg': 'mp3',
-  'audio/mp3': 'mp3',
-  'audio/wav': 'wav',
-  'audio/x-wav': 'wav',
-}
-
-const preferredMimeTypes = [
-  'audio/webm;codecs=opus',
-  'audio/webm',
-  'audio/ogg;codecs=opus',
-  'audio/ogg',
-  'audio/mp4',
-]
-
-const VOICE_ACTIVITY_RMS_THRESHOLD = 0.02
-const MIN_VOICE_ACTIVE_FRAMES = 5
+const CONVERSATION_AUTO_STOP_SILENCE_MS = 2200
+const CONVERSATION_AUTO_RESUME_DELAY_MS = 350
 
 /** Narrow axios-style error shape for user-facing messages. */
 type ApiErrorShape = {
@@ -117,6 +115,8 @@ export const CaseDetail = () => {
   const [isRecording, setIsRecording] = useState(false)
   const [voiceStatus, setVoiceStatus] = useState<string | null>(null)
   const [audioResponsesEnabled, setAudioResponsesEnabled] = useState(false)
+  const [conversationModeEnabled, setConversationModeEnabled] = useState(false)
+  const authToken = useAuthStore((state) => state.token)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
@@ -129,6 +129,11 @@ export const CaseDetail = () => {
   const recordingStartedAtRef = useRef<number | null>(null)
   const activeAssistantAudioRef = useRef<HTMLAudioElement | null>(null)
   const activeAssistantAudioObjectUrlRef = useRef<string | null>(null)
+  const silenceStartedAtRef = useRef<number | null>(null)
+  const autoStopTriggeredRef = useRef(false)
+  const conversationLoopArmedRef = useRef(false)
+  const pendingConversationResumeTimeoutRef = useRef<number | null>(null)
+  const requestConversationResumeRef = useRef<() => void>(() => {})
 
   // --- Load case and create or resume session ---
   useEffect(() => {
@@ -254,11 +259,13 @@ export const CaseDetail = () => {
     e.preventDefault()
     if (!inputValue.trim() || sending || isRecording || !sessionId) return
 
+    conversationLoopArmedRef.current = false
     const userMessageContent = inputValue
     setInputValue('')
     setSending(true)
     setError(null)
     setVoiceStatus(null)
+    stopAssistantAudioPlayback()
 
     // Add user message to UI immediately
     const userMessage: Message = {
@@ -269,26 +276,21 @@ export const CaseDetail = () => {
     }
     setMessages((prev) => [...prev, userMessage])
 
+    if (conversationModeEnabled && sendTextTurn(userMessageContent, audioResponsesEnabled)) {
+      return
+    }
+
     try {
       // Submit turn to backend and get patient response
       const response = await submitTurn(sessionId, userMessageContent, undefined, audioResponsesEnabled)
-      
-      // Update SPIKES stage if changed
-      if (response.spikesStage) {
-        setCurrentSpikesStage(response.spikesStage)
-      }
 
-      // Add assistant (patient) response to UI
-      const assistantMessage: Message = {
-        id: `assistant-${response.turn.id}`,
-        role: 'assistant',
+      appendAssistantMessage({
         content: response.patientReply,
         timestamp: response.turn.timestamp,
-        source: 'text',
-        status: 'sent',
+        turnId: response.turn.id,
+        spikesStage: response.spikesStage,
         assistantAudioUrl: response.assistantAudioUrl,
-      }
-      setMessages((prev) => [...prev, assistantMessage])
+      })
       if (response.assistantAudioUrl) {
         void playAssistantAudio(response.assistantAudioUrl)
       }
@@ -380,28 +382,56 @@ export const CaseDetail = () => {
       }
       if (rms >= VOICE_ACTIVITY_RMS_THRESHOLD) {
         voiceActivityRef.current.activeFrames += 1
+        silenceStartedAtRef.current = null
+      } else if (
+        conversationModeEnabled &&
+        !autoStopTriggeredRef.current &&
+        voiceActivityRef.current.activeFrames >= MIN_VOICE_ACTIVE_FRAMES &&
+        mediaRecorderRef.current?.state === 'recording'
+      ) {
+        const now = Date.now()
+        silenceStartedAtRef.current ??= now
+
+        if (now - silenceStartedAtRef.current >= CONVERSATION_AUTO_STOP_SILENCE_MS) {
+          autoStopTriggeredRef.current = true
+          setVoiceStatus('Speech paused. Preparing your message...')
+          mediaRecorderRef.current.stop()
+          return
+        }
       }
 
       audioMonitorFrameRef.current = requestAnimationFrame(monitor)
     }
 
     monitor()
-  }, [])
+  }, [conversationModeEnabled])
 
   useEffect(() => {
     return () => {
-      activeAssistantAudioRef.current?.pause()
-      activeAssistantAudioRef.current = null
-      if (activeAssistantAudioObjectUrlRef.current) {
-        URL.revokeObjectURL(activeAssistantAudioObjectUrlRef.current)
-        activeAssistantAudioObjectUrlRef.current = null
+      if (pendingConversationResumeTimeoutRef.current !== null) {
+        window.clearTimeout(pendingConversationResumeTimeoutRef.current)
+        pendingConversationResumeTimeoutRef.current = null
       }
+      revokeAssistantAudioSession(activeAssistantAudioRef, activeAssistantAudioObjectUrlRef)
       mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop())
       mediaRecorderRef.current = null
       stopMediaStream()
       audioChunksRef.current = []
     }
   }, [stopMediaStream])
+
+  const stopAssistantAudioPlayback = useCallback(() => {
+    if (pendingConversationResumeTimeoutRef.current !== null) {
+      window.clearTimeout(pendingConversationResumeTimeoutRef.current)
+      pendingConversationResumeTimeoutRef.current = null
+    }
+    activeAssistantAudioRef.current?.pause()
+    activeAssistantAudioRef.current = null
+    if (activeAssistantAudioObjectUrlRef.current) {
+      URL.revokeObjectURL(activeAssistantAudioObjectUrlRef.current)
+      activeAssistantAudioObjectUrlRef.current = null
+    }
+  }, [])
 
   /**
    * Fetches assistant audio as a blob URL and plays it, revoking previous object URLs.
@@ -410,29 +440,15 @@ export const CaseDetail = () => {
    */
   const playAssistantAudio = useCallback(async (audioUrl: string) => {
     try {
-      activeAssistantAudioRef.current?.pause()
-      if (activeAssistantAudioObjectUrlRef.current) {
-        URL.revokeObjectURL(activeAssistantAudioObjectUrlRef.current)
-        activeAssistantAudioObjectUrlRef.current = null
-      }
-
-      const objectUrl = await fetchAssistantAudioObjectUrl(audioUrl)
-      activeAssistantAudioObjectUrlRef.current = objectUrl
-
-      const audio = new Audio(objectUrl)
-      activeAssistantAudioRef.current = audio
-      audio.onended = () => {
-        if (activeAssistantAudioRef.current === audio) {
-          activeAssistantAudioRef.current = null
-        }
-        if (activeAssistantAudioObjectUrlRef.current === objectUrl) {
-          URL.revokeObjectURL(objectUrl)
-          activeAssistantAudioObjectUrlRef.current = null
-        }
-      }
-      await audio.play()
+      await playAssistantAudioTrack(audioUrl, {
+        activeAudioRef: activeAssistantAudioRef,
+        activeObjectUrlRef: activeAssistantAudioObjectUrlRef,
+        fetchObjectUrl: fetchAssistantAudioObjectUrl,
+        onPlaybackEnded: () => requestConversationResumeRef.current(),
+      })
     } catch (playbackError) {
       console.warn('Assistant audio playback failed:', playbackError)
+      requestConversationResumeRef.current()
     }
   }, [])
 
@@ -448,26 +464,99 @@ export const CaseDetail = () => {
     )
   }
 
-  /**
-   * Picks the first supported MIME type from {@link preferredMimeTypes}.
-   *
-   * @returns MIME type string or undefined
-   */
-  const getPreferredAudioMimeType = () => {
-    if (typeof MediaRecorder === 'undefined') return ''
+  const appendAssistantMessage = useCallback(
+    ({
+      content,
+      timestamp,
+      turnId,
+      spikesStage,
+      assistantAudioUrl,
+    }: {
+      content: string
+      timestamp?: string
+      turnId?: number
+      spikesStage?: string
+      assistantAudioUrl?: string
+    }) => {
+      if (spikesStage) {
+        setCurrentSpikesStage(spikesStage)
+      }
 
-    return preferredMimeTypes.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? ''
-  }
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `assistant-${turnId ?? Date.now()}`,
+          role: 'assistant',
+          content,
+          timestamp: timestamp ?? new Date().toISOString(),
+          source: 'text',
+          status: 'sent',
+          assistantAudioUrl,
+        },
+      ])
+    },
+    []
+  )
 
-  /**
-   * Maps a recorder MIME type to a file extension for `File` construction.
-   *
-   * @param mimeType - MIME type string
-   * @returns File extension without dot
-   */
-  const getAudioExtension = (mimeType: string) => {
-    return audioExtensionByMimeType[mimeType.toLowerCase()] ?? 'webm'
-  }
+  const handleConversationError = useCallback((message: string) => {
+    setSending(false)
+    setError(message)
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: message,
+        timestamp: new Date().toISOString(),
+      },
+    ])
+  }, [])
+
+  const handleConversationAssistantMessage = useCallback(
+    ({
+      content,
+      turnId,
+      spikesStage,
+      assistantAudioUrl,
+    }: {
+      content: string
+      turnId?: number
+      spikesStage?: string
+      assistantAudioUrl?: string
+    }) => {
+      setSending(false)
+      appendAssistantMessage({
+        content,
+        turnId,
+        spikesStage,
+        assistantAudioUrl,
+      })
+      if (assistantAudioUrl) {
+        void playAssistantAudio(assistantAudioUrl)
+      } else {
+        requestConversationResumeRef.current()
+      }
+    },
+    [appendAssistantMessage, playAssistantAudio]
+  )
+
+  const handleConversationStageUpdate = useCallback((stage: string) => {
+    setCurrentSpikesStage(stage)
+  }, [])
+
+  const {
+    connectionStatus: conversationConnectionStatus,
+    isConnected: isConversationConnected,
+    isPatientResponding: isConversationPatientResponding,
+    sendTextTurn,
+  } = useRealtimeSession({
+    enabled: conversationModeEnabled,
+    sessionId,
+    token: authToken,
+    onAssistantMessage: handleConversationAssistantMessage,
+    onStageUpdate: handleConversationStageUpdate,
+    onError: handleConversationError,
+  })
 
   /**
    * Extracts API error detail/message for toast-style display.
@@ -491,9 +580,37 @@ export const CaseDetail = () => {
     if (!sessionId) return
 
     setSending(true)
-    setVoiceStatus('Transcribing voice message...')
+    setVoiceStatus(
+      conversationModeEnabled
+        ? 'Sending voice turn in conversation mode...'
+        : 'Transcribing voice message...'
+    )
 
     try {
+      if (conversationModeEnabled) {
+        const response = await submitAudioTurn(sessionId, audioFile, audioResponsesEnabled)
+
+        updateMessage(pendingMessageId, {
+          content: response.transcript || 'Voice message sent.',
+          status: 'sent',
+          voiceTone: response.audioTone,
+        })
+
+        appendAssistantMessage({
+          content: response.patientReply,
+          timestamp: response.turn.timestamp,
+          turnId: response.turn.id,
+          spikesStage: response.spikesStage,
+          assistantAudioUrl: response.assistantAudioUrl,
+        })
+        if (response.assistantAudioUrl) {
+          void playAssistantAudio(response.assistantAudioUrl)
+        } else {
+          requestConversationResumeRef.current()
+        }
+        return
+      }
+
       const transcription = await transcribeAudioTurn(sessionId, audioFile)
 
       updateMessage(pendingMessageId, {
@@ -512,22 +629,17 @@ export const CaseDetail = () => {
         transcription.audioTone,
       )
 
-      if (response.spikesStage) {
-        setCurrentSpikesStage(response.spikesStage)
-      }
-
-      const assistantMessage: Message = {
-        id: `assistant-${response.turn.id}`,
-        role: 'assistant',
+      appendAssistantMessage({
         content: response.patientReply,
         timestamp: response.turn.timestamp,
-        source: 'text',
-        status: 'sent',
+        turnId: response.turn.id,
+        spikesStage: response.spikesStage,
         assistantAudioUrl: response.assistantAudioUrl,
-      }
-      setMessages((prev) => [...prev, assistantMessage])
+      })
       if (response.assistantAudioUrl) {
         void playAssistantAudio(response.assistantAudioUrl)
+      } else {
+        requestConversationResumeRef.current()
       }
     } catch (uploadError: unknown) {
       console.error('Failed to submit audio turn:', uploadError)
@@ -548,21 +660,23 @@ export const CaseDetail = () => {
   const startVoiceRecording = async () => {
     if (!sessionId || sending || closing) return
 
-    if (
-      typeof navigator === 'undefined' ||
-      !navigator.mediaDevices?.getUserMedia ||
-      typeof MediaRecorder === 'undefined'
-    ) {
+    if (!isBrowserVoiceRecordingSupported()) {
       setError('Voice input is not supported in this browser.')
       return
     }
 
     setError(null)
     setVoiceStatus('Requesting microphone access...')
+    stopAssistantAudioPlayback()
+    silenceStartedAtRef.current = null
+    autoStopTriggeredRef.current = false
+    if (conversationModeEnabled) {
+      conversationLoopArmedRef.current = true
+    }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mimeType = getPreferredAudioMimeType()
+      const mimeType = getPreferredRecordingMimeType((m) => MediaRecorder.isTypeSupported(m))
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
 
       audioChunksRef.current = []
@@ -592,25 +706,27 @@ export const CaseDetail = () => {
           ? Date.now() - recordingStartedAtRef.current
           : 0
         recordingStartedAtRef.current = null
+        silenceStartedAtRef.current = null
+        autoStopTriggeredRef.current = false
         const recordedMimeType = recorder.mimeType || audioChunksRef.current[0]?.type || 'audio/webm'
         const audioBlob = new Blob(audioChunksRef.current, { type: recordedMimeType })
         audioChunksRef.current = []
         stopMediaStream()
 
-        if (audioBlob.size === 0) {
-          setVoiceStatus(null)
-          setError('No audio was captured. Please try again.')
-          return
-        }
+        const captureDecision = evaluateVoiceCaptureForUpload({
+          blobByteSize: audioBlob.size,
+          maxRms,
+          activeFrames,
+          recordingDurationMs,
+        })
 
-        const detectedSpeech =
-          maxRms >= VOICE_ACTIVITY_RMS_THRESHOLD &&
-          activeFrames >= MIN_VOICE_ACTIVE_FRAMES &&
-          recordingDurationMs > 0
-
-        if (!detectedSpeech) {
+        if (!captureDecision.upload) {
           setVoiceStatus(null)
-          setError('No speech was detected. Please try again and speak before stopping the microphone.')
+          if (captureDecision.reason === 'empty_blob') {
+            setError('No audio was captured. Please try again.')
+          } else {
+            setError('No speech was detected. Please try again and speak before stopping the microphone.')
+          }
           return
         }
 
@@ -618,14 +734,14 @@ export const CaseDetail = () => {
         const pendingMessage: Message = {
           id: pendingMessageId,
           role: 'user',
-          content: 'Transcribing voice message...',
+          content: conversationModeEnabled ? 'Processing voice message...' : 'Transcribing voice message...',
           timestamp: new Date().toISOString(),
           source: 'audio',
           status: 'pending',
         }
         setMessages((prev) => [...prev, pendingMessage])
 
-        const extension = getAudioExtension(recordedMimeType)
+        const extension = getRecordingFileExtension(recordedMimeType)
         const audioFile = new File([audioBlob], `voice-message-${Date.now()}.${extension}`, {
           type: recordedMimeType,
         })
@@ -634,7 +750,11 @@ export const CaseDetail = () => {
 
       recorder.start()
       setIsRecording(true)
-      setVoiceStatus('Listening... Start speaking, then tap the microphone again to stop.')
+      setVoiceStatus(
+        conversationModeEnabled
+          ? 'Listening... I will stop when you pause.'
+          : 'Listening... Start speaking, then tap the microphone again to stop.'
+      )
     } catch (recordError) {
       console.error('Failed to start recording:', recordError)
       setError('Microphone access was denied or is unavailable.')
@@ -644,11 +764,37 @@ export const CaseDetail = () => {
     }
   }
 
+  requestConversationResumeRef.current = () => {
+    if (!conversationLoopArmedRef.current || !conversationModeEnabled || closing || !sessionId) {
+      return
+    }
+
+    if (pendingConversationResumeTimeoutRef.current !== null) {
+      window.clearTimeout(pendingConversationResumeTimeoutRef.current)
+    }
+
+    pendingConversationResumeTimeoutRef.current = window.setTimeout(() => {
+      pendingConversationResumeTimeoutRef.current = null
+
+      if (
+        !conversationLoopArmedRef.current ||
+        !conversationModeEnabled ||
+        closing ||
+        mediaRecorderRef.current?.state === 'recording'
+      ) {
+        return
+      }
+
+      void startVoiceRecording()
+    }, CONVERSATION_AUTO_RESUME_DELAY_MS)
+  }
+
   /**
    * Toggles recording: starts when idle, stops and uploads when active.
    */
   const handleVoiceInput = () => {
     if (isRecording) {
+      autoStopTriggeredRef.current = true
       mediaRecorderRef.current?.stop()
       setVoiceStatus('Preparing voice message...')
       return
@@ -656,6 +802,19 @@ export const CaseDetail = () => {
 
     void startVoiceRecording()
   }
+
+  useEffect(() => {
+    if (!conversationModeEnabled) {
+      conversationLoopArmedRef.current = false
+      if (pendingConversationResumeTimeoutRef.current !== null) {
+        window.clearTimeout(pendingConversationResumeTimeoutRef.current)
+        pendingConversationResumeTimeoutRef.current = null
+      }
+      return
+    }
+
+    setAudioResponsesEnabled(true)
+  }, [conversationModeEnabled])
 
   /**
    * Closes the session server-side and navigates to feedback when successful.
@@ -689,8 +848,17 @@ export const CaseDetail = () => {
 
   const showVoiceIndicator = isRecording
   const showPatientRespondingIndicator =
-    sending && !voiceStatus
+    (sending && !voiceStatus) || isConversationPatientResponding
   const listeningBarHeights = ['38%', '72%', '54%', '80%', '46%']
+  const conversationStatusLabel = !conversationModeEnabled
+    ? 'Off'
+    : conversationConnectionStatus === 'connected'
+      ? 'Connected'
+      : conversationConnectionStatus === 'connecting'
+        ? 'Connecting...'
+        : conversationConnectionStatus === 'error'
+          ? 'Connection error'
+          : 'Disconnected'
 
   if (loading) {
     return (
@@ -1033,6 +1201,38 @@ export const CaseDetail = () => {
                           />
                           <span>Enable spoken replies</span>
                         </label>
+                      </div>
+                      <div className="col-span-2 rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                              Conversation mode
+                            </div>
+                            <p className="mt-2 text-sm text-slate-900">
+                              Turn on the live conversation channel while keeping the default flow available.
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              Status: {conversationStatusLabel}
+                              {conversationModeEnabled && isConversationConnected ? ' • Live' : ''}
+                            </p>
+                          </div>
+                          <label className="inline-flex items-center gap-2 text-sm text-slate-900">
+                            <input
+                              type="checkbox"
+                              checked={conversationModeEnabled}
+                              onChange={(e) => {
+                                const enabled = e.target.checked
+                                setConversationModeEnabled(enabled)
+                                if (enabled) {
+                                  setAudioResponsesEnabled(true)
+                                }
+                              }}
+                              disabled={sending || closing || isRecording || !sessionId}
+                              className="h-4 w-4 rounded border-gray-300 text-apex-600 focus:ring-apex-500"
+                            />
+                            <span>Enable</span>
+                          </label>
+                        </div>
                       </div>
                     </div>
                   </CardContent>

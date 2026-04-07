@@ -348,11 +348,11 @@ Example generated response:
 
 ### Note on PatientModel Plugin Architecture
 
-In the current implementation, the patient response is generated through a provider-specific LLM adapter (for example, `OpenAIAdapter` or `GeminiAdapter`). As the system evolves, this adapter will be accessed through a **`PatientModel` plugin** interface rather than being called directly from `DialogueService`.
+`DialogueService` resolves a **`PatientModel`** implementation from the **session’s frozen** `patient_model_plugin` id (with fallback to **`settings.patient_model_plugin`**), instantiates it via **`PluginRegistry`** (or dynamic import + register), and calls **`generate_response`**. The default implementation may still use provider-specific LLM adapters (for example, `OpenAIAdapter` or `GeminiAdapter`) internally.
 
-The plugin will receive the same structured context that the dialogue engine already prepares (case background, conversation history, current SPIKES stage, and patient prompt) and will return only the generated patient text. **The public contract of `DialogueService` does not change**: it will continue to return a `TurnResponse` object, and the controller layer and frontend will see the same response shape.
+The plugin receives the same structured context the dialogue engine already prepares (case background, conversation history, current SPIKES stage, and patient prompt) and returns the generated patient text. **The public contract of `DialogueService` does not change**: it still returns a `TurnResponse`, and the controller layer and frontend see the same response shape.
 
-In other words, the plugin architecture affects *how* the patient utterance is produced, not *what* the `DialogueService → TurnResponse` contract looks like.
+The plugin architecture affects *which* implementation runs per session and *how* the utterance is produced, not *what* the `DialogueService → TurnResponse` contract looks like.
 
 ---
 

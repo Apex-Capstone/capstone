@@ -1,0 +1,81 @@
+Collecting external judge files from: capstone/backend/evaluation/external_llm_judges
+
+Reading APEX scores: capstone/backend/print_and_structure.txt
+
+Wrote JSON report: capstone/backend/evaluation/panel_comparison_report.json
+
+=== External panel (mean ± std by case) ===
+
+-- strong --
+  empathy_score: mean=92.0 std=3.7417
+  communication_score: mean=92.75 std=2.7726
+  spikes_completion_score: mean=96.75 std=3.4187
+  overall_score: mean=93.5 std=2.6926
+
+-- decent --
+  empathy_score: mean=71.5 std=10.5948
+  communication_score: mean=68.5 std=11.2805
+  spikes_completion_score: mean=60.175 std=11.6487
+  overall_score: mean=66.25 std=11.2333
+
+-- mixed --
+  empathy_score: mean=24.5 std=4.272
+  communication_score: mean=44.25 std=8.1662
+  spikes_completion_score: mean=43.5825 std=15.7651
+  overall_score: mean=35.5 std=6.6895
+
+-- weak --
+  empathy_score: mean=10.75 std=4.3804
+  communication_score: mean=30.5 std=5.3151
+  spikes_completion_score: mean=30.25 std=12.7745
+  overall_score: mean=21.5 std=3.7749
+
+=== APEX scores from snapshot ===
+  (baseline = rule-only ``scores:`` line; hybrid v1/v2 = raw ``llm_scores`` vs panel LLM means)
+
+-- baseline --
+  strong: emp=75.48 comm=74.25 spikes=100.00 overall=82.59
+  decent: emp=85.00 comm=69.25 spikes=83.33 overall=81.35
+  mixed: emp=0.00 comm=67.31 spikes=66.67 overall=33.46
+  weak: emp=0.00 comm=55.46 spikes=16.67 overall=16.09
+
+-- hybrid_v1 --
+  strong: emp=90.00 comm=85.00 spikes=100.00 overall=90.50
+  decent: emp=90.00 comm=85.00 spikes=83.30 overall=87.30
+  mixed: emp=40.00 comm=70.00 spikes=66.70 overall=52.50
+  weak: emp=20.00 comm=60.00 spikes=50.00 overall=35.00
+
+-- hybrid_v2 --
+  strong: emp=90.00 comm=95.00 spikes=100.00 overall=94.00
+  decent: emp=85.00 comm=85.00 spikes=83.30 overall=84.49
+  mixed: emp=30.00 comm=75.00 spikes=83.30 overall=54.99
+  weak: emp=20.00 comm=70.00 spikes=60.00 overall=42.00
+
+=== Absolute error vs external panel mean (LLM judge average) ===
+
+-- baseline --
+  strong: empathy_score=16.52 | communication_score=18.5 | spikes_completion_score=3.25 | overall_score=10.91
+  decent: empathy_score=13.5 | communication_score=0.75 | spikes_completion_score=23.155 | overall_score=15.1
+  mixed: empathy_score=24.5 | communication_score=23.06 | spikes_completion_score=23.0875 | overall_score=2.04
+  weak: empathy_score=10.75 | communication_score=24.96 | spikes_completion_score=13.58 | overall_score=5.41
+
+-- hybrid_v1 --
+  strong: empathy_score=2.0 | communication_score=7.75 | spikes_completion_score=3.25 | overall_score=3.0
+  decent: empathy_score=18.5 | communication_score=16.5 | spikes_completion_score=23.125 | overall_score=21.05
+  mixed: empathy_score=15.5 | communication_score=25.75 | spikes_completion_score=23.1175 | overall_score=17.0
+  weak: empathy_score=9.25 | communication_score=29.5 | spikes_completion_score=19.75 | overall_score=13.5
+
+-- hybrid_v2 --
+  strong: empathy_score=2.0 | communication_score=2.25 | spikes_completion_score=3.25 | overall_score=0.5
+  decent: empathy_score=13.5 | communication_score=16.5 | spikes_completion_score=23.125 | overall_score=18.24
+  mixed: empathy_score=5.5 | communication_score=30.75 | spikes_completion_score=39.7175 | overall_score=19.49
+  weak: empathy_score=9.25 | communication_score=39.5 | spikes_completion_score=29.75 | overall_score=20.5
+
+=== Summary (mean absolute error vs panel mean, all cases × metrics) ===
+  baseline is rule-only (not LLM); prefer hybrid rows for LLM-vs-panel alignment.
+  baseline:   14.3170
+  hybrid_v1:  15.5339
+  hybrid_v2:  17.1139
+
+Closest hybrid LLM scores to external panel mean (lowest MAE): hybrid_v1 (MAE=15.5339)
+  (baseline MAE for reference: 14.3170)

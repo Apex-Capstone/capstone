@@ -65,6 +65,8 @@ export interface SessionDTO {
   patient_model_plugin?: string | null
   /** JSON-serialized array of metrics plugin names frozen at session creation. */
   metrics_plugins?: string | string[] | null
+  /** After scoring: JSON string mapping metrics plugin id → compute() result dict. */
+  metrics_json?: string | null
 }
 
 /** Wire shape for one turn in a session. */
@@ -129,6 +131,14 @@ export interface Session {
   userFullName?: string
   /** From API: "active" | "closed" */
   status: 'active' | 'closed'
+  /** Evaluator plugin id frozen at session creation */
+  evaluatorPlugin?: string | null
+  /** Patient model plugin id frozen at session creation */
+  patientModelPlugin?: string | null
+  /** Metrics plugin ids frozen at session creation */
+  metricsPlugins?: string[] | null
+  /** Session-level metrics plugin outputs (JSON string) after feedback runs */
+  metricsJson?: string | null
 }
 
 /** One conversational turn in the UI domain model. */
@@ -171,4 +181,31 @@ export interface SessionListResponseDTO {
 export interface SessionListResponse {
   sessions: Session[]
   total: number
+}
+
+export type ConversationConnectionStatus =
+  | 'disabled'
+  | 'connecting'
+  | 'connected'
+  | 'disconnected'
+  | 'error'
+
+export interface RealtimeClientMessage {
+  type: 'user_message'
+  content: string
+  meta?: {
+    enable_tts?: boolean
+  }
+}
+
+export interface RealtimeServerMessage {
+  type: 'connected' | 'assistant_message' | 'stage_update' | 'error'
+  content: string
+  meta?: {
+    session_id?: number
+    user_id?: number
+    turn_id?: number
+    spikes_stage?: string
+    assistant_audio_url?: string | null
+  }
 }

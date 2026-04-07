@@ -6,7 +6,6 @@
 export type AnalyticsMetricId =
   | 'empathy'
   | 'communication'
-  | 'clinicalReasoning'
   | 'spikes'
   | 'overall'
 
@@ -23,7 +22,7 @@ export type AnalyticsMetricConfig = {
   /** Stroke color for line/bar series in Recharts */
   chartColor: string
   /** `dataKey` on session / chart data (omit for overall-only) */
-  dataKey?: 'empathy' | 'communication' | 'clinical' | 'spikes'
+  dataKey?: 'empathy' | 'communication' | 'spikes'
 }
 
 export const ANALYTICS_METRICS: Record<AnalyticsMetricId, AnalyticsMetricConfig> = {
@@ -44,15 +43,6 @@ export const ANALYTICS_METRICS: Record<AnalyticsMetricId, AnalyticsMetricConfig>
     valueColorClass: 'text-purple-500',
     chartColor: '#a855f7',
     dataKey: 'communication',
-  },
-  clinicalReasoning: {
-    id: 'clinicalReasoning',
-    label: 'Clinical Reasoning',
-    shortLabel: 'Clinical reasoning',
-    description: 'How well your questions and responses reflected sound clinical thinking.',
-    valueColorClass: 'text-apex-700',
-    chartColor: '#3fa488',
-    dataKey: 'clinical',
   },
   spikes: {
     id: 'spikes',
@@ -78,21 +68,8 @@ export const ANALYTICS_METRICS: Record<AnalyticsMetricId, AnalyticsMetricConfig>
 export const ANALYTICS_TREND_METRIC_ORDER: AnalyticsMetricId[] = [
   'empathy',
   'communication',
-  'clinicalReasoning',
   'spikes',
 ]
-
-export function metricLabelForInsightKey(
-  key: 'empathy' | 'communication' | 'clinical' | 'spikes'
-): string {
-  const map: Record<typeof key, AnalyticsMetricId> = {
-    empathy: 'empathy',
-    communication: 'communication',
-    clinical: 'clinicalReasoning',
-    spikes: 'spikes',
-  }
-  return ANALYTICS_METRICS[map[key]].label
-}
 
 /** Resolve chart `dataKey` (e.g. from Recharts legend payload) to metric config. */
 export function getMetricByDataKey(dataKey: string): AnalyticsMetricConfig | undefined {

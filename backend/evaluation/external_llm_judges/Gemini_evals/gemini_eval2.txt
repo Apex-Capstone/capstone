@@ -1,0 +1,99 @@
+{
+  "meta": {
+    "evaluator_family": "manual_external_llm",
+    "evaluator_version": "gemini-3-flash",
+    "status": "completed"
+  },
+  "scores": {
+    "empathy_score": 85.0,
+    "communication_score": 75.0,
+    "spikes_completion_score": 66.7,
+    "overall_score": 75.0
+  },
+  "spikes": {
+    "stages_present": [
+      "setting",
+      "emotion",
+      "knowledge",
+      "strategy"
+    ],
+    "stage_turn_mapping": [
+      {
+        "turn_number": 1,
+        "stage": "setting"
+      },
+      {
+        "turn_number": 3,
+        "stage": "emotion"
+      },
+      {
+        "turn_number": 5,
+        "stage": "knowledge"
+      },
+      {
+        "turn_number": 7,
+        "stage": "knowledge"
+      },
+      {
+        "turn_number": 9,
+        "stage": "emotion"
+      },
+      {
+        "turn_number": 11,
+        "stage": "strategy"
+      }
+    ],
+    "missing_stages": [
+      "perception",
+      "invitation"
+    ],
+    "sequencing_notes": "The clinician effectively opened the session and validated emotions early, but bypassed the Perception and Invitation stages, moving directly to delivering concerning news after the patient volunteered their own fears."
+  },
+  "missed_opportunities": [
+    {
+      "turn_number": 3,
+      "cue_text": "Yeah… I've been really worried.",
+      "clinician_response_summary": "The clinician validates the stress but does not ask what the patient already knows or suspects.",
+      "why_missed_or_weak": "Missed the 'Perception' stage of SPIKES, which helps gauge the patient's baseline understanding.",
+      "suggested_response": "That's understandable. Before we go over the results, what is your understanding of why we did these tests?",
+      "confidence": 0.9
+    },
+    {
+      "turn_number": 5,
+      "cue_text": "I keep thinking it might be cancer.",
+      "clinician_response_summary": "The clinician acknowledges the fear and immediately proceeds to confirm the findings are concerning.",
+      "why_missed_or_weak": "Missed the 'Invitation' stage. The clinician should ask how the patient would like to receive the information.",
+      "suggested_response": "I understand why you'd be thinking that. Would you like me to give you all the details now, or would you prefer a summary of the main findings?",
+      "confidence": 0.95
+    }
+  ],
+  "feedback": {
+    "strength_tags": [
+      "validation_of_emotion",
+      "clear_communication",
+      "partnership_language",
+      "reassurance_support"
+    ],
+    "improvement_tags": [
+      "missing_invitation",
+      "incomplete_spikes",
+      "missed_opportunity"
+    ],
+    "strengths_text": [
+      "Strong emotional validation in response to the patient's expressed fear.",
+      "Clear and direct language when delivering the diagnostic suspicion.",
+      "Effective use of partnership language ('work through this together')."
+    ],
+    "areas_for_improvement_text": [
+      "Explicitly ask for the patient's permission/preference on how to receive the news (Invitation).",
+      "Formally assess the patient's current understanding or expectations before delivering results (Perception).",
+      "Include a brief pause after the delivery of the word 'cancer' to allow the patient to process."
+    ]
+  },
+  "confidence": {
+    "empathy_confidence": 0.95,
+    "communication_confidence": 0.9,
+    "spikes_confidence": 1.0,
+    "overall_confidence": 0.9
+  }
+}

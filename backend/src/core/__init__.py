@@ -1,13 +1,15 @@
-"""Core module for security, errors, dependencies, and events."""
+"""Core module for security, errors, dependencies, and events.
 
-from core.deps import (
-    get_current_user,
-    get_db,
-    require_role,
-    require_trainee,
-    require_admin,
-    verify_session_access,
-)
+FastAPI dependencies live in ``core.deps`` but are *not* imported eagerly here.
+That avoids a circular import when ORM entities (e.g. ``domain.entities.case``)
+import ``core.time``: loading ``core`` must not pull in ``repositories`` before
+``Case`` is fully defined.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
 from core.errors import (
     AppError,
     AuthenticationError,
@@ -26,8 +28,28 @@ from core.security import (
     decode_supabase_token,
 )
 
+_DEP_NAMES = frozenset(
+    {
+        "get_current_user",
+        "get_db",
+        "require_role",
+        "require_trainee",
+        "require_admin",
+        "verify_session_access",
+    }
+)
+
+
+def __getattr__(name: str) -> Any:
+    if name in _DEP_NAMES:
+        import core.deps as _deps
+
+        return getattr(_deps, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = [
-    # Dependencies
+    # Dependencies (lazy-loaded via __getattr__)
     "get_db",
     "get_current_user",
     "require_trainee",
@@ -52,4 +74,3 @@ __all__ = [
     "create_start_app_handler",
     "create_stop_app_handler",
 ]
-

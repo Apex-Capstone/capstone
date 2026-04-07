@@ -14,7 +14,9 @@ from config.logging import get_logger
 from config.settings import get_settings
 from core.errors import NotFoundError
 from core.time import utc_now
-from core.plugin_manager import get_patient_model
+from core.plugin_manager import _load_class_from_path
+from interfaces.patient_model import PatientModel
+from plugins.registry import PluginRegistry
 from domain.entities.turn import Turn
 from domain.models.sessions import TurnCreate, TurnResponse
 from repositories.case_repo import CaseRepository
@@ -128,7 +130,7 @@ class DialogueService:
         state.session = session
         state.conversation_history = conversation_history
 
-        patient_model = get_patient_model()
+        patient_model = self._instantiate_patient_model(session)
 
         # Track latency for patient model call
         start_time = time.time()
@@ -171,7 +173,24 @@ class DialogueService:
         created_turn = self.turn_repo.create(assistant_turn)
         
         return TurnResponse.model_validate(created_turn)
-    
+
+    def _instantiate_patient_model(self, session) -> PatientModel:
+        """Resolve PatientModel from session freeze, then settings; register on demand."""
+        plugin_key: str | None = getattr(session, "patient_model_plugin", None)
+        if not plugin_key:
+            plugin_key = getattr(self.settings, "patient_model_plugin", None)
+        if not plugin_key:
+            raise RuntimeError(
+                "No patient model plugin configured (session.patient_model_plugin and "
+                "settings.patient_model_plugin are both empty)."
+            )
+        try:
+            plugin_cls = PluginRegistry.get_patient_model(plugin_key)
+        except ValueError:
+            plugin_cls = _load_class_from_path(plugin_key)
+            PluginRegistry.register_patient_model(plugin_key, plugin_cls)
+        return plugin_cls()  # type: ignore[return-value]
+
     def _get_conversation_history(self, session_id: int) -> list[dict[str, str]]:
         """Get conversation history for context."""
         turns = self.turn_repo.get_by_session(session_id)

@@ -1,6 +1,7 @@
 """User repository for database operations."""
 
 from typing import Any, Optional
+from uuid import UUID
 
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
@@ -21,8 +22,12 @@ class UserRepository:
         return self.db.query(User).filter(User.id == user_id).first()
     
     def get_by_supabase_id(self, supabase_auth_id: str) -> Optional[User]:
-        """Get user by Supabase Auth UUID."""
-        return self.db.query(User).filter(User.supabase_auth_id == supabase_auth_id).first()
+        """Get user by Supabase Auth UUID (JWT `sub` is a string; coerce for DB bind)."""
+        try:
+            uid = UUID(supabase_auth_id) if isinstance(supabase_auth_id, str) else supabase_auth_id
+        except (ValueError, TypeError):
+            return None
+        return self.db.query(User).filter(User.supabase_auth_id == uid).first()
 
     def get_by_email(self, email: str) -> Optional[User]:
         """Get user by email."""

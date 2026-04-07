@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import type { TraineeSessionAnalytics } from '@/types/analytics'
 import { formatPercentWhole } from '@/utils/format'
-import { ANALYTICS_METRICS } from '@/components/analytics/analyticsMetricConfig'
 import { AnalyticsSessionPreview } from '@/components/analytics/AnalyticsSessionPreview'
 import { formatDateTimeInUserTimeZone, utcTimestampMs } from '@/lib/dateTime'
 import { cn } from '@/lib/utils'
@@ -12,7 +11,6 @@ type SortKey =
   | 'caseTitle'
   | 'empathyScore'
   | 'communicationScore'
-  | 'clinicalScore'
   | 'spikesCoveragePercent'
   | 'createdAt'
 
@@ -103,10 +101,6 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
         case 'communicationScore':
           left = a.communicationScore
           right = b.communicationScore
-          break
-        case 'clinicalScore':
-          left = a.clinicalScore
-          right = b.clinicalScore
           break
         case 'spikesCoveragePercent':
           left = a.spikesCoveragePercent
@@ -225,7 +219,7 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
       </div>
 
       <div className="overflow-x-auto rounded-lg border">
-        <table className="min-w-[1180px] w-full text-sm">
+        <table className="min-w-[1020px] w-full text-sm">
             <thead className="sticky top-0 z-10 bg-gray-50">
               <tr className="border-b text-gray-600">
                 <th className="w-10 px-2 py-3 text-left align-middle" scope="col">
@@ -248,11 +242,6 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
                   </button>
                 </th>
                 <th className="w-[148px] px-3 py-3 text-left align-middle">
-                  <button type="button" onClick={() => onSort('clinicalScore')} className="font-semibold">
-                    {ANALYTICS_METRICS.clinicalReasoning.shortLabel} % {sortArrow('clinicalScore')}
-                  </button>
-                </th>
-                <th className="w-[148px] px-3 py-3 text-left align-middle">
                   <button type="button" onClick={() => onSort('spikesCoveragePercent')} className="font-semibold">
                     SPIKES % {sortArrow('spikesCoveragePercent')}
                   </button>
@@ -268,7 +257,7 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
             <tbody>
               {paginatedSessions.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
                     No sessions match your filters.
                   </td>
                 </tr>
@@ -315,7 +304,6 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
                         </td>
                         <td className="px-3 py-3 align-middle">{metricBar(s.empathyScore, 'bg-apex-500')}</td>
                         <td className="px-3 py-3 align-middle">{metricBar(s.communicationScore, 'bg-purple-500')}</td>
-                        <td className="px-3 py-3 align-middle">{metricBar(s.clinicalScore, 'bg-apex-700')}</td>
                         <td className="px-3 py-3 align-middle">{metricBar(s.spikesCoveragePercent, 'bg-orange-500')}</td>
                         <td className="whitespace-nowrap px-4 py-3 align-middle text-gray-600">
                           {formatDateTimeInUserTimeZone(s.createdAt)}
@@ -338,7 +326,7 @@ export const AnalyticsSessionsTable = ({ sessions }: { sessions: TraineeSessionA
                           className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}
                           aria-live="polite"
                         >
-                          <td colSpan={9} className="border-b px-4 py-0">
+                          <td colSpan={8} className="border-b px-4 py-0">
                             <div
                               id={previewId}
                               role="region"

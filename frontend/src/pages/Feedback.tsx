@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { fetchFeedback } from '@/api/feedback.api'
-import type { Feedback as FeedbackType } from '@/api/feedback.api'
+import type { Feedback as FeedbackType, FeedbackEvaluatorMeta } from '@/api/feedback.api'
 import { getSession } from '@/api/sessions.api'
 import type { SessionDetail } from '@/types/session'
 import { FeedbackChart } from '@/components/FeedbackChart'
@@ -12,6 +12,8 @@ import { FeedbackConversationTimeline } from '@/components/FeedbackConversationT
 import { Navbar } from '@/components/Navbar'
 import { Sidebar } from '@/components/Sidebar'
 import { formatDateTimeInUserTimeZone } from '@/lib/dateTime'
+import { formatPluginName, formatMetricsPluginsDisplay } from '@/lib/formatPluginName'
+import { getHybridCoveredStages, shouldUseHybridStageTurnMapping } from '@/lib/spikesStageFromFeedback'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -54,7 +56,7 @@ function normaliseSpikesCovered(covered: string[]): Set<string> {
 }
 
 function getPreferredStrengths(
-  evaluatorMeta: Record<string, unknown> | null | undefined,
+  evaluatorMeta: FeedbackEvaluatorMeta | null | undefined,
   fallbackStrengths: string | null | undefined,
 ): string[] {
   const llmOutput =
@@ -83,7 +85,7 @@ function getPreferredStrengths(
 }
 
 function getPreferredImprovements(
-  evaluatorMeta: Record<string, unknown> | null | undefined,
+  evaluatorMeta: FeedbackEvaluatorMeta | null | undefined,
   fallbackImprovements: string | null | undefined,
 ): string[] {
   const llmOutput =
@@ -130,19 +132,6 @@ function splitLines(text: string | null | undefined): string[] {
  */
 function scoreToPercent(score: number): number {
   return Math.min(100, Math.max(0, Math.round(score)))
-}
-
-const getEvaluatorLabel = (phase?: string) => {
-  switch (phase) {
-    case 'baseline_rule_v1':
-      return 'APEX Baseline Evaluator'
-    case 'hybrid_llm_v1':
-      return 'APEX Hybrid Evaluator'
-    case 'hybrid_llm_v2':
-      return 'APEX Hybrid v2 Evaluator'
-    default:
-      return 'APEX Hybrid Evaluator'
-  }
 }
 
 /**
@@ -241,16 +230,26 @@ export const Feedback = () => {
   }
 
   const overallPercent = scoreToPercent(feedback.overallScore)
-  const communicationPercent = scoreToPercent(feedback.communicationScore)
-  const coveredStages = normaliseSpikesCovered(feedback.spikesCoverage?.covered ?? [])
-  const coveragePercent = feedback.spikesCoverage
-    ? Math.round(feedback.spikesCoverage.percent * 100)
-    : 0
+  const empathyPercent = scoreToPercent(feedback.empathyScore)
+  const isHybrid = shouldUseHybridStageTurnMapping(feedback)
+  const hybridCoveredSet = isHybrid ? getHybridCoveredStages(feedback) : null
+  const coveredStages =
+    hybridCoveredSet != null ? hybridCoveredSet : normaliseSpikesCovered(feedback.spikesCoverage?.covered ?? [])
+  const coveragePercent =
+    isHybrid && hybridCoveredSet != null
+      ? Math.round((hybridCoveredSet.size / 6) * 100)
+      : feedback.spikesCoverage
+        ? Math.round(feedback.spikesCoverage.percent * 100)
+        : 0
+  const spikesCoverageCardApplicable = isHybrid || !!feedback.spikesCoverage
+  const hybridCoveredCount = hybridCoveredSet != null ? hybridCoveredSet.size : null
   const strengthsList = getPreferredStrengths(feedback.evaluatorMeta, feedback.strengths)
   const improvementsList = getPreferredImprovements(
     feedback.evaluatorMeta,
     feedback.areasForImprovement,
   )
+  const sessionMetricsDisplay =
+    sessionDetail != null ? formatMetricsPluginsDisplay(sessionDetail.metricsPlugins) : null
 
   return (
     <div className="h-screen flex flex-col">
@@ -289,8 +288,8 @@ export const Feedback = () => {
                 </div>
               </div>
 
-              {/* Hero: SPIKES Coverage, Empathy Score */}
-              <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {/* Hero: SPIKES Coverage, Empathy Score, Communication Score */}
+              <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-6 text-center">
                   <div className="text-sm font-medium text-purple-800 uppercase tracking-wide">SPIKES Coverage</div>
                   <div className="text-4xl font-bold text-purple-600 mt-1">
@@ -307,6 +306,13 @@ export const Feedback = () => {
                   </div>
                   <p className="mt-1 text-xs text-apex-700">Session empathy recognition</p>
                 </div>
+                <div className="rounded-xl border-2 border-orange-200 bg-orange-50 p-6 text-center">
+                  <div className="text-sm font-medium uppercase tracking-wide text-orange-800">Communication Score</div>
+                  <div className="mt-1 text-4xl font-bold text-orange-600">
+                    {feedback.communicationScore.toFixed(1)}<span className="text-xl font-semibold text-orange-500">/100</span>
+                  </div>
+                  <p className="mt-1 text-xs text-orange-700">Session communication clarity</p>
+                </div>
               </div>
             </div>
 
@@ -322,12 +328,16 @@ export const Feedback = () => {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      {feedback.spikesCoverage && (
+                      {spikesCoverageCardApplicable && (
                         <div className="space-y-4">
                           <div className="pt-1 text-sm font-medium text-gray-800">
                             Overall Coverage:{' '}
                             <span className="font-semibold text-purple-700">
-                              {feedback.spikesCoverage.coveredCount} / {feedback.spikesCoverage.total}{' '}
+                              {isHybrid && hybridCoveredCount != null
+                                ? `${hybridCoveredCount} / 6`
+                                : feedback.spikesCoverage != null
+                                  ? `${feedback.spikesCoverage.coveredCount} / ${feedback.spikesCoverage.total}`
+                                  : '0 / 6'}{' '}
                               stages
                             </span>
                             <span className="ml-2 text-gray-500">({coveragePercent}%)</span>
@@ -365,15 +375,15 @@ export const Feedback = () => {
                       <div className="space-y-4">
                         <div className="rounded-lg bg-apex-50 p-4">
                           <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Communication Score</span>
+                            <span className="text-sm font-medium">Empathy Score</span>
                             <span className="text-xl font-bold text-apex-600">
-                              {feedback.communicationScore.toFixed(1)}/100
+                              {feedback.empathyScore.toFixed(1)}/100
                             </span>
                           </div>
                           <div className="w-full h-4 bg-gray-200 rounded-full mt-2 overflow-hidden">
                             <div
                               className="h-full rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-apex-500 transition-[width]"
-                              style={{ width: `${communicationPercent}%` }}
+                              style={{ width: `${empathyPercent}%` }}
                             />
                           </div>
                           <p className="text-xs text-gray-500 mt-1">Band: red (low) → yellow → green (high)</p>
@@ -489,13 +499,56 @@ export const Feedback = () => {
                 </Card>
               )}
 
- 
- 
- 
- 
-              {/* AFCE Breakdown (if data available) */}
+              {/* Row 1: Performance Metrics + Session Details */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <FeedbackChart feedback={feedback} />
+
+                <Card className="overflow-hidden border-gray-200">
+                  <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-5 py-4">
+                    <CardTitle className="text-lg">Session Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4 px-5 pb-5 pt-5">
+                    <div className="grid gap-2.5 sm:grid-cols-2">
+                      <div className="rounded-lg border border-gray-100 bg-gray-50/80 p-3">
+                        <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Session ID</div>
+                        <div className="mt-1 text-sm font-semibold text-gray-900">{feedback.sessionId}</div>
+                      </div>
+                      <div className="rounded-lg border border-gray-100 bg-gray-50/80 p-3">
+                        <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Date</div>
+                        <div className="mt-1 text-sm text-gray-900">
+                          {formatDateTimeInUserTimeZone(feedback.createdAt)}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
+                        <div className="text-xs font-medium uppercase tracking-wide text-emerald-700">Overall Score</div>
+                        <div className="mt-1 text-sm font-bold text-emerald-700">
+                          {feedback.overallScore.toFixed(1)}/100
+                        </div>
+                      </div>
+                      {feedback.latencyMsAvg > 0 && (
+                        <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
+                          <div className="text-xs font-medium uppercase tracking-wide text-amber-700">
+                            Avg Response Latency
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-amber-700">
+                            {Math.round(feedback.latencyMsAvg)}ms
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {feedback.detailedFeedback && (
+                      <div className="rounded-lg border border-gray-100 bg-white p-3 shadow-sm">
+                        <span className="text-sm font-medium text-gray-700">Summary</span>
+                        <p className="mt-1.5 text-sm leading-6 text-gray-600">{feedback.detailedFeedback}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Empathic opportunities & response types (above evaluation framework) */}
               {(feedback.eoCountsByDimension || feedback.responseCountsByType) && (
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {feedback.eoCountsByDimension && (
                     <Card className="overflow-hidden border-gray-200">
                       <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-apex-50 to-white px-5 py-4">
@@ -553,80 +606,44 @@ export const Feedback = () => {
                 </div>
               )}
 
-              {/* Original metrics chart */}
-              <div className="grid gap-4 lg:grid-cols-2">
-                <FeedbackChart feedback={feedback} />
-
-                <Card className="overflow-hidden border-gray-200">
-                  <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-5 py-4">
-                    <CardTitle className="text-lg">Session Details</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4 px-5 pb-5 pt-5">
-                    <div className="grid gap-2.5 sm:grid-cols-2">
-                      <div className="rounded-lg border border-gray-100 bg-gray-50/80 p-3">
-                        <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Session ID</div>
-                        <div className="mt-1 text-sm font-semibold text-gray-900">{feedback.sessionId}</div>
-                      </div>
-                      <div className="rounded-lg border border-gray-100 bg-gray-50/80 p-3">
-                        <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Date</div>
-                        <div className="mt-1 text-sm text-gray-900">
-                          {formatDateTimeInUserTimeZone(feedback.createdAt)}
-                        </div>
-                      </div>
-                      <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
-                        <div className="text-xs font-medium uppercase tracking-wide text-emerald-700">Overall Score</div>
-                        <div className="mt-1 text-sm font-bold text-emerald-700">
-                          {feedback.overallScore.toFixed(1)}/100
-                        </div>
-                      </div>
-                      {feedback.latencyMsAvg > 0 && (
-                        <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
-                          <div className="text-xs font-medium uppercase tracking-wide text-amber-700">
-                            Avg Response Latency
-                          </div>
-                          <div className="mt-1 text-sm font-semibold text-amber-700">
-                            {Math.round(feedback.latencyMsAvg)}ms
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    {feedback.detailedFeedback && (
-                      <div className="rounded-lg border border-gray-100 bg-white p-3 shadow-sm">
-                        <span className="text-sm font-medium text-gray-700">Summary</span>
-                        <p className="mt-1.5 text-sm leading-6 text-gray-600">{feedback.detailedFeedback}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-              </div>
-
- 
-              {/* Row 2: Evaluation Framework (full width) */}
+              {/* Evaluation Framework: evaluator + patient model + metrics plugins */}
               <Card className="overflow-hidden border-gray-200">
                 <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white px-5 py-4">
                   <CardTitle className="text-lg">Evaluation Framework</CardTitle>
+                  <p className="text-sm font-normal text-gray-500 mt-1">
+                    Plugins recorded for this session and how scores were produced.
+                  </p>
                 </CardHeader>
                 <CardContent className="px-5 pb-5 pt-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
                       <div className="text-xs font-medium uppercase tracking-wide text-indigo-600">Evaluator</div>
                       <div className="mt-1 text-sm font-semibold text-gray-900">
-                        {getEvaluatorLabel(feedback.evaluatorMeta?.phase as string | undefined)}
+                        {sessionDetail?.evaluatorPlugin
+                          ? formatPluginName(sessionDetail.evaluatorPlugin)
+                          : feedback.evaluatorMeta?.name
+                            ? String(feedback.evaluatorMeta.name)
+                            : feedback.evaluatorMeta?.evaluator
+                              ? String(feedback.evaluatorMeta.evaluator)
+                              : 'Apex Hybrid Evaluator'}
                       </div>
                     </div>
                     <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
-                      <div className="text-xs font-medium uppercase tracking-wide text-indigo-600">Framework</div>
+                      <div className="text-xs font-medium uppercase tracking-wide text-indigo-600">
+                        Patient model
+                      </div>
                       <div className="mt-1 text-sm font-semibold text-gray-900">
-                        {feedback.evaluatorMeta?.framework
-                          ? String(feedback.evaluatorMeta.framework)
-                          : 'SPIKES + Clinical Empathy Analysis'}
+                        {sessionDetail?.patientModelPlugin
+                          ? formatPluginName(sessionDetail.patientModelPlugin)
+                          : 'Server default'}
                       </div>
                     </div>
                     <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3 sm:col-span-2 lg:col-span-1">
-                      <div className="text-xs font-medium uppercase tracking-wide text-indigo-600">About</div>
-                      <div className="mt-1 text-xs text-gray-500">
-                        Scores and feedback were generated by the evaluation plugin configured for this session.
+                      <div className="text-xs font-medium uppercase tracking-wide text-indigo-600">
+                        Metrics plugins
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        {sessionMetricsDisplay || 'Server default'}
                       </div>
                     </div>
                   </div>

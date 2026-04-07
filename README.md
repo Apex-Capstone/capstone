@@ -144,9 +144,17 @@ Internally, the backend follows a layered structure:
 - **Services** (`services/`) – business logic for dialogue, scoring, case management, sessions, and research/export flows.
 - **Repositories** (`repositories/`) – database access using SQLAlchemy models.
 - **Domain entities/models** (`domain/`) – core domain types and invariants.
-- **Plugins** (`plugins/`) – dynamically loaded patient models, evaluators, and metrics providers.
+- **Plugins** (`plugins/`) – patient models, evaluators, and metrics providers loaded through explicit imports and a small **registry**.
 
-The plugin manager dynamically discovers and loads plugin implementations at startup, so new research models can be added without changing the core services.
+At startup, the app imports a fixed list of plugin modules (`PLUGIN_MODULES` in `backend/src/plugins/load_plugins.py`). Each module registers its classes with **`PluginRegistry`**. There is **no filesystem discovery**—add your module to that list (or ensure it is imported by a module already in the list) so registration runs.
+
+**Registering a new plugin (short version):**
+
+1. Add a Python module under `backend/src/plugins/` (e.g. `plugins/evaluators/my_evaluator.py`) implementing the right **Protocol** (`interfaces/`).
+2. At module bottom, call `PluginRegistry.register_evaluator(MyEvaluator.name, MyEvaluator)` (or the matching register helper for patient/metrics). Set class attribute **`name`** to your stable registry key (typically `module.path:ClassName`).
+3. Append your module path to **`PLUGIN_MODULES`** in `load_plugins.py`.
+4. Point **settings** (or case/session overrides where supported) at that **`name`** string.
+5. Run **`pytest`** under `backend/tests/plugins/` and add tests for your plugin.
 
 ---
 
@@ -157,9 +165,9 @@ There are three main plugin types (see `backend/src/plugins` and `backend/src/in
 
 - **PatientModel** – defines how the virtual patient responds to clinician turns (e.g., default LLM-based patient model).
 - **Evaluator** – computes overall feedback for a session, combining SPIKES coverage, AFCE-style empathy analysis, and other scores.
-- **MetricsPlugin** – produces additional per-turn or per-session metrics (e.g., question breakdowns, latency metrics, SPIKES strategy coverage).
+- **MetricsPlugin** – optional research metrics via a `compute` method; session metadata can record which metrics plugins were selected for a run.
 
-Plugins are registered via configuration and loaded by the backend plugin manager. New implementations can be shipped as separate modules and enabled by updating configuration, without altering controller or service code.
+Plugins are **registered in code** (on import) and **selected** via configuration and the **PluginRegistry**. Paths use the form `module.path:ClassName`. The **plugin manager** (`core/plugin_manager.py`) can also load classes from those path strings for settings-based defaults and tests.
 
 ---
 

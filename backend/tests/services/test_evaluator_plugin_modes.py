@@ -80,6 +80,9 @@ async def test_baseline_plugin_never_calls_llm_even_when_env_on(
     fb = result["feedback"]
     assert fb.evaluator_meta is not None
     assert fb.evaluator_meta.get("phase") == "baseline_rule_v1"
+    sp = fb.evaluator_meta.get("session_plugins")
+    assert isinstance(sp, dict)
+    assert "evaluator_plugin" in sp
 
 
 @pytest.mark.asyncio
@@ -128,10 +131,13 @@ async def test_hybrid_plugin_calls_llm_when_env_on(test_db, test_user, test_case
     merged = fb.evaluator_meta.get("merged_scores") or {}
     r_emp = fb.evaluator_meta["rule_scores"]["empathy_score"]
     assert merged["empathy_score"] == pytest.approx(0.7 * r_emp + 0.3 * 50.0, rel=1e-4)
+    assert isinstance(fb.evaluator_meta.get("session_plugins"), dict)
 
 
 @pytest.mark.asyncio
-async def test_hybrid_plugin_skips_llm_when_env_off(test_db, test_user, test_case, monkeypatch):
+async def test_hybrid_plugin_records_failed_meta_when_llm_returns_none(
+    test_db, test_user, test_case, monkeypatch
+):
     review_calls: list = []
 
     class _MockLLM:
@@ -157,3 +163,4 @@ async def test_hybrid_plugin_skips_llm_when_env_off(test_db, test_user, test_cas
     assert meta.get("phase") == "hybrid_llm_v1"
     assert meta.get("status") == "failed"
     assert meta.get("error") == "llm_reviewer_returned_none"
+    assert isinstance(meta.get("session_plugins"), dict)

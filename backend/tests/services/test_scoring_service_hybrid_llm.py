@@ -10,12 +10,14 @@ from schemas.llm_reviewer import (
     HybridV2CompiledLLMReview,
     LLMMissedOpportunityItem,
     LLMReviewerOutput,
+    LLMSpikesAnnotationItem,
 )
 from services.scoring_service import (
     ScoringService,
     _calculate_spikes_completion_from_coverage,
     _compact_llm_output_for_evaluator_meta,
     _compute_spikes_coverage_merge,
+    _ensure_stage_turn_mapping,
 )
 from tests.utils.transcript_runner import create_all_for_test_engine
 
@@ -70,6 +72,100 @@ def test_compact_llm_output_for_evaluator_meta_caps_list_length() -> None:
     d = _compact_llm_output_for_evaluator_meta(out)
     assert len(d["missed_opportunities"]) == 40
     assert d.get("_meta_truncated") is True
+
+
+def test_ensure_stage_turn_mapping_keeps_valid_nonempty_as_is() -> None:
+    d = {
+        "spikes_annotations": [{"turn_number": 9, "stage": "knowledge", "evidence_snippet": "x", "confidence": 0.9}],
+        "stage_turn_mapping": [{"turn_number": 1, "stage": "setting"}],
+    }
+    out = _ensure_stage_turn_mapping(d)
+    assert out["stage_turn_mapping"] == [{"turn_number": 1, "stage": "setting"}]
+
+
+def test_ensure_stage_turn_mapping_rebuilds_when_duplicate_turn_numbers() -> None:
+    d = {
+        "spikes_annotations": [
+            {"turn_number": 1, "stage": "setting", "evidence_snippet": "a", "confidence": 0.9},
+        ],
+        "stage_turn_mapping": [
+            {"turn_number": 1, "stage": "setting"},
+            {"turn_number": 1, "stage": "knowledge"},
+        ],
+    }
+    out = _ensure_stage_turn_mapping(d)
+    assert out["stage_turn_mapping"] == [{"turn_number": 1, "stage": "setting"}]
+
+
+def test_ensure_stage_turn_mapping_rebuilds_when_stage_invalid() -> None:
+    d = {
+        "spikes_annotations": [
+            {"turn_number": 2, "stage": "perception", "evidence_snippet": "x", "confidence": 0.8},
+        ],
+        "stage_turn_mapping": [{"turn_number": 1, "stage": "not_a_real_stage"}],
+    }
+    out = _ensure_stage_turn_mapping(d)
+    assert out["stage_turn_mapping"] == [{"turn_number": 2, "stage": "perception"}]
+
+
+def test_ensure_stage_turn_mapping_rebuilds_when_turn_number_not_int() -> None:
+    d = {
+        "spikes_annotations": [
+            {"turn_number": 1, "stage": "emotion", "evidence_snippet": "x"},
+        ],
+        "stage_turn_mapping": [{"turn_number": 1.0, "stage": "emotion"}],
+    }
+    out = _ensure_stage_turn_mapping(d)
+    assert out["stage_turn_mapping"] == [{"turn_number": 1, "stage": "emotion"}]
+
+
+def test_ensure_stage_turn_mapping_derives_from_annotations_confidence_then_first() -> None:
+    d = {
+        "spikes_annotations": [
+            {"turn_number": 1, "stage": "P", "evidence_snippet": "a", "confidence": 0.5},
+            {"turn_number": 1, "stage": "knowledge", "evidence_snippet": "b", "confidence": 0.9},
+            {"turn_number": 2, "stage": "S2", "evidence_snippet": "c"},
+        ]
+    }
+    out = _ensure_stage_turn_mapping(d)
+    assert out["stage_turn_mapping"] == [
+        {"turn_number": 1, "stage": "knowledge"},
+        {"turn_number": 2, "stage": "strategy"},
+    ]
+    turn_numbers = [r["turn_number"] for r in out["stage_turn_mapping"]]
+    assert len(turn_numbers) == len(set(turn_numbers))
+
+
+def test_ensure_stage_turn_mapping_empty_annotations() -> None:
+    out = _ensure_stage_turn_mapping({"spikes_annotations": []})
+    assert out["stage_turn_mapping"] == []
+
+
+def test_compact_then_ensure_v1_has_stage_turn_mapping() -> None:
+    lo = LLMReviewerOutput(
+        empathy_score=50.0,
+        communication_score=50.0,
+        spikes_completion_score=50.0,
+        overall_score=50.0,
+        missed_opportunities=[],
+        spikes_annotations=[
+            LLMSpikesAnnotationItem(
+                turn_number=1, stage="setting", evidence_snippet="hi", confidence=0.8
+            ),
+            LLMSpikesAnnotationItem(
+                turn_number=3, stage="emotion", evidence_snippet="ok", confidence=None
+            ),
+        ],
+        strengths=[],
+        areas_for_improvement=[],
+    )
+    compacted = _compact_llm_output_for_evaluator_meta(lo)
+    normalized = _ensure_stage_turn_mapping(compacted)
+    assert "stage_turn_mapping" in normalized
+    assert normalized["stage_turn_mapping"] == [
+        {"turn_number": 1, "stage": "setting"},
+        {"turn_number": 3, "stage": "emotion"},
+    ]
 
 
 def test_compact_hybrid_v2_compiled_includes_v2_fields() -> None:

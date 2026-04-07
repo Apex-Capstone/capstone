@@ -1,0 +1,82 @@
+{
+  "meta": {
+    "evaluator_family": "manual_external_llm",
+    "evaluator_version": "gpt-4",
+    "status": "completed"
+  },
+  "scores": {
+    "empathy_score": 65.0,
+    "communication_score": 65.0,
+    "spikes_completion_score": 67.0,
+    "overall_score": 66.0
+  },
+  "spikes": {
+    "stages_present": ["setting", "knowledge", "emotion", "strategy"],
+    "stage_turn_mapping": [
+      {
+        "turn_number": 1,
+        "stage": "setting"
+      },
+      {
+        "turn_number": 3,
+        "stage": "emotion"
+      },
+      {
+        "turn_number": 5,
+        "stage": "knowledge"
+      },
+      {
+        "turn_number": 7,
+        "stage": "knowledge"
+      },
+      {
+        "turn_number": 9,
+        "stage": "emotion"
+      },
+      {
+        "turn_number": 11,
+        "stage": "strategy"
+      }
+    ],
+    "missing_stages": ["perception", "invitation"],
+    "sequencing_notes": "Clinician did not assess patient's baseline knowledge or ask permission before delivering bad news, but covered setting, knowledge, emotion, and strategy."
+  },
+  "missed_opportunities": [
+    {
+      "turn_number": 3,
+      "cue_text": "Yeah… I've been really worried.",
+      "clinician_response_summary": "Clinician said 'That's understandable' instead of exploring what the patient already knows or thinks might be happening.",
+      "why_missed_or_weak": "Missed the perception stage: clinician did not ask about patient's understanding or beliefs before sharing results.",
+      "suggested_response": "What have you been thinking might be causing your symptoms? or What do you understand about these tests so far?",
+      "confidence": 0.9
+    },
+    {
+      "turn_number": 5,
+      "cue_text": "I keep thinking it might be cancer.",
+      "clinician_response_summary": "Clinician acknowledged the thought but immediately delivered bad news without checking if the patient wants to hear details.",
+      "why_missed_or_weak": "Missed the invitation stage: no explicit permission sought before sharing concerning findings.",
+      "suggested_response": "Would you like me to explain what the results show? or Is it okay if I go over the findings with you now?",
+      "confidence": 0.9
+    }
+  ],
+  "feedback": {
+    "strength_tags": ["validation_of_emotion", "clear_communication", "professionalism", "organized_conversation", "reassurance_support"],
+    "improvement_tags": ["missing_invitation", "incomplete_spikes", "missed_opportunity"],
+    "strengths_text": [
+      "Validated patient's emotions multiple times (e.g., 'That's understandable', 'I can see how frightening that is').",
+      "Used clear, lay language without jargon, making the information accessible.",
+      "Provided a clear plan for next steps (further testing, then discussing treatment options)."
+    ],
+    "areas_for_improvement_text": [
+      "Did not assess patient's baseline understanding (perception stage) before delivering news.",
+      "Did not ask for permission before sharing bad news (invitation stage).",
+      "Could have paused more to allow patient to express and process emotions before moving to strategy."
+    ]
+  },
+  "confidence": {
+    "empathy_confidence": 0.9,
+    "communication_confidence": 0.9,
+    "spikes_confidence": 0.9,
+    "overall_confidence": 0.9
+  }
+}

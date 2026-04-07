@@ -1,0 +1,99 @@
+{
+  "case_id": 1,
+  "mappings": [
+    {
+      "fixture_name": "bad_missed_empathy_sparse_spikes",
+      "supabase_auth_id": "db417464-9c29-426d-a664-ab09722c0496",
+      "email": "admin.review@apex.com",
+      "seed_key": "admin_review_bad_v1"
+    },
+    {
+      "fixture_name": "medium_partial_empathy_partial_spikes",
+      "supabase_auth_id": "db417464-9c29-426d-a664-ab09722c0496",
+      "email": "admin.review@apex.com",
+      "seed_key": "admin_review_medium_v1"
+    },
+    {
+      "fixture_name": "good_strong_empathy_complete_spikes",
+      "supabase_auth_id": "db417464-9c29-426d-a664-ab09722c0496",
+      "email": "admin.review@apex.com",
+      "seed_key": "admin_review_good_v1"
+    },
+
+    {
+      "fixture_name": "bad_missed_empathy_sparse_spikes",
+      "supabase_auth_id": "800c01b0-6fd4-4dbf-a544-c1c2a0dae04a",
+      "email": "trainee.review@apex.com",
+      "seed_key": "trainee_review_bad_v1"
+    },
+    {
+      "fixture_name": "medium_partial_empathy_partial_spikes",
+      "supabase_auth_id": "800c01b0-6fd4-4dbf-a544-c1c2a0dae04a",
+      "email": "trainee.review@apex.com",
+      "seed_key": "trainee_review_medium_v1"
+    },
+    {
+      "fixture_name": "good_strong_empathy_complete_spikes",
+      "supabase_auth_id": "800c01b0-6fd4-4dbf-a544-c1c2a0dae04a",
+      "email": "trainee.review@apex.com",
+      "seed_key": "trainee_review_good_v1"
+    },
+
+    {
+      "fixture_name": "bad_missed_empathy_sparse_spikes",
+      "supabase_auth_id": "20f69eaa-9113-44b0-a6be-a70c555d1ff6",
+      "email": "admin.demo@apex.com",
+      "seed_key": "admin_demo_bad_v1"
+    },
+    {
+      "fixture_name": "medium_partial_empathy_partial_spikes",
+      "supabase_auth_id": "20f69eaa-9113-44b0-a6be-a70c555d1ff6",
+      "email": "admin.demo@apex.com",
+      "seed_key": "admin_demo_medium_v1"
+    },
+    {
+      "fixture_name": "good_strong_empathy_complete_spikes",
+      "supabase_auth_id": "20f69eaa-9113-44b0-a6be-a70c555d1ff6",
+      "email": "admin.demo@apex.com",
+      "seed_key": "admin_demo_good_v1"
+    },
+
+    {
+      "fixture_name": "bad_missed_empathy_sparse_spikes",
+      "supabase_auth_id": "e7ed2603-79b3-4af0-8763-1c9362d23e67",
+      "email": "trainee.demo@apex.com",
+      "seed_key": "trainee_demo_bad_v1"
+    },
+    {
+      "fixture_name": "medium_partial_empathy_partial_spikes",
+      "supabase_auth_id": "e7ed2603-79b3-4af0-8763-1c9362d23e67",
+      "email": "trainee.demo@apex.com",
+      "seed_key": "trainee_demo_medium_v1"
+    },
+    {
+      "fixture_name": "good_strong_empathy_complete_spikes",
+      "supabase_auth_id": "e7ed2603-79b3-4af0-8763-1c9362d23e67",
+      "email": "trainee.demo@apex.com",
+      "seed_key": "trainee_demo_good_v1"
+    },
+
+    {
+      "fixture_name": "bad_missed_empathy_sparse_spikes",
+      "supabase_auth_id": "fe18e5f1-07ac-481b-8f67-622a8c782c4b",
+      "email": "trainee2.demo@apex.com",
+      "seed_key": "trainee2_demo_bad_v1"
+    },
+    {
+      "fixture_name": "medium_partial_empathy_partial_spikes",
+      "supabase_auth_id": "fe18e5f1-07ac-481b-8f67-622a8c782c4b",
+      "email": "trainee2.demo@apex.com",
+      "seed_key": "trainee2_demo_medium_v1"
+    },
+    {
+      "fixture_name": "good_strong_empathy_complete_spikes",
+      "supabase_auth_id": "fe18e5f1-07ac-481b-8f67-622a8c782c4b",
+      "email": "trainee2.demo@apex.com",
+      "seed_key": "trainee2_demo_good_v1"
+    }
+  ]
+}

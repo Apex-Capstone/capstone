@@ -38,7 +38,6 @@ def test_db():
 def test_user(test_db):
     user = User(
         email="req_eval_tester@example.com",
-        hashed_password="not_used_in_tests",
         role="trainee",
         full_name="Request Eval Tester",
     )

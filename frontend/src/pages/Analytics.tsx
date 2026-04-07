@@ -46,7 +46,6 @@ type AnalyticsSummary =
       empty: false
       empathy: number
       communication: number
-      clinical: number
       spikes: number
       overall: number
       total: number
@@ -121,7 +120,6 @@ export const Analytics = () => {
     }
     const empathy = average(filteredSessions.map((s) => s.empathyScore))
     const communication = average(filteredSessions.map((s) => s.communicationScore))
-    const clinical = average(filteredSessions.map((s) => s.clinicalScore))
     const spikes = average(filteredSessions.map((s) => s.spikesCompletionScore))
     const backendOveralls = filteredSessions
       .map((s) => s.overallScore)
@@ -129,12 +127,11 @@ export const Analytics = () => {
     const overall =
       backendOveralls.length === filteredSessions.length
         ? average(backendOveralls)
-        : (empathy + communication + clinical + spikes) / 4
+        : (empathy + communication + spikes) / 3
     return {
       empty: false,
       empathy,
       communication,
-      clinical,
       spikes,
       overall,
       total: filteredSessions.length,
@@ -148,8 +145,6 @@ export const Analytics = () => {
         return formatPercentWhole(summary.empathy)
       case 'communication':
         return formatPercentWhole(summary.communication)
-      case 'clinicalReasoning':
-        return formatPercentWhole(summary.clinical)
       case 'spikes':
         return formatPercentWhole(summary.spikes)
       case 'overall':
@@ -164,7 +159,6 @@ export const Analytics = () => {
         date: formatDateInUserTimeZone(s.createdAt),
         empathy: s.empathyScore,
         communication: s.communicationScore,
-        clinical: s.clinicalScore,
         spikes: s.spikesCoveragePercent,
       })),
     [filteredSessions]
@@ -232,7 +226,7 @@ export const Analytics = () => {
             ) : (
               <div className="space-y-6">
                 <AnalyticsLowDataHint sessionCount={sessions.length} />
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                   {SUMMARY_METRIC_IDS.map((id) => {
                     const m = ANALYTICS_METRICS[id]
                     const labelText = id === 'overall' ? m.label : `Average ${m.label}`
@@ -297,12 +291,6 @@ export const Analytics = () => {
                               dataKey="communication"
                               stroke={ANALYTICS_METRICS.communication.chartColor}
                               name={ANALYTICS_METRICS.communication.label}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="clinical"
-                              stroke={ANALYTICS_METRICS.clinicalReasoning.chartColor}
-                              name={ANALYTICS_METRICS.clinicalReasoning.label}
                             />
                           </LineChart>
                         </ResponsiveContainer>

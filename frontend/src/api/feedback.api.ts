@@ -25,6 +25,51 @@ export interface EmpathyLink {
   confidence: number
 }
 
+/** Canonical SPIKES stage keys aligned with backend / LLM output. */
+export type SpikesStageKey =
+  | 'setting'
+  | 'perception'
+  | 'invitation'
+  | 'knowledge'
+  | 'emotion'
+  | 'strategy'
+
+/** One row from `evaluator_meta.llm_output.stage_turn_mapping`. */
+export interface LlmStageTurnRow {
+  turn_number: number
+  stage: SpikesStageKey
+}
+
+/** Narrow subset of hybrid LLM `llm_output` used by the Feedback UI. */
+export interface FeedbackEvaluatorLlmOutput {
+  stage_turn_mapping?: LlmStageTurnRow[]
+  /** Present on hybrid evaluators; used for strengths / improvement cards on Feedback page. */
+  strengths?: string[]
+  areas_for_improvement?: string[]
+}
+
+/** Frozen session plugins echoed on feedback (mirrors backend `evaluator_meta.session_plugins`). */
+export interface FeedbackSessionPlugins {
+  evaluator_plugin?: string | null
+  evaluator_version?: string | null
+  patient_model_plugin?: string | null
+  patient_model_version?: string | null
+  metrics_plugins?: string[]
+}
+
+/** Narrow subset of `evaluator_meta` for typing without full pipeline schema. */
+export interface FeedbackEvaluatorMeta {
+  llm_output?: FeedbackEvaluatorLlmOutput
+  /** Present on stored feedback; used to detect hybrid vs baseline SPIKES UI. */
+  session_plugins?: FeedbackSessionPlugins
+  phase?: string
+  status?: string
+  framework?: string
+  /** Display labels when present on stored metadata */
+  name?: string
+  evaluator?: string
+}
+
 /**
  * Rich feedback record for the Feedback page (scores, SPIKES, EO stats, optional raw snake_case passthrough).
  */
@@ -78,8 +123,8 @@ export interface Feedback {
 
   latencyMsAvg: number
 
-  /** Raw JSON from the scoring pipeline (phase, hybrid LLM merge, rule scores, etc.). */
-  evaluatorMeta?: Record<string, unknown> | null
+  /** Evaluator pipeline metadata (phase, LLM merge, optional `llm_output`, etc.). */
+  evaluatorMeta?: FeedbackEvaluatorMeta | null
 
   strengths?: string | null
   areasForImprovement?: string | null
@@ -174,7 +219,7 @@ export const fetchFeedback = async (sessionId: string): Promise<Feedback> => {
     latencyMsAvg: data.latency_ms_avg ?? 0,
     evaluatorMeta:
       data.evaluator_meta != null && typeof data.evaluator_meta === 'object'
-        ? (data.evaluator_meta as Record<string, unknown>)
+        ? (data.evaluator_meta as FeedbackEvaluatorMeta)
         : null,
     strengths: data.strengths ?? null,
     areasForImprovement: data.areas_for_improvement ?? null,

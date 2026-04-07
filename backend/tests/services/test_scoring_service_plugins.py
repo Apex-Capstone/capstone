@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import sys
 from datetime import datetime
 from types import SimpleNamespace
@@ -10,13 +11,27 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session as OrmSession, sessionmaker
 
-from db.base import Base
 from domain.entities.case import Case
 from domain.entities.session import Session
 from domain.entities.user import User
 from domain.models.sessions import FeedbackResponse
 from plugins.registry import PluginRegistry
 from services.scoring_service import ScoringService
+from tests.utils.transcript_runner import create_all_for_test_engine
+
+
+def _metrics_plugin_results_from_session(session: Session) -> dict[str, Any] | None:
+    raw = getattr(session, "metrics_json", None)
+    if not raw:
+        return None
+    return json.loads(raw)
+
+
+class _DummyMetrics:
+    name = "tests.dummy:_DummyMetrics"
+
+    def compute(self, db: OrmSession, session_id: int) -> dict[str, Any]:
+        return {"metric_a": 1, "metric_b": "x"}
 
 
 class _DummyEvaluator:
@@ -70,7 +85,7 @@ def clear_registry():
 @pytest.fixture
 def test_db():
     engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
+    create_all_for_test_engine(engine)
     TestingSessionLocal = sessionmaker(bind=engine)
     db = TestingSessionLocal()
     try:
@@ -140,4 +155,99 @@ async def test_scoring_service_uses_session_evaluator(test_db, test_user, test_c
     assert isinstance(feedback, FeedbackResponse)
     assert len(_DummyEvaluator.invocations) == 1
     assert _DummyEvaluator.invocations[0][1] == session.id
+
+
+@pytest.mark.asyncio
+async def test_scoring_service_runs_metrics_plugins_after_evaluator(test_db, test_user, test_case, monkeypatch):
+    _DummyEvaluator.invocations.clear()
+
+    session = Session(
+        user_id=test_user.id,
+        case_id=test_case.id,
+        state="active",
+        current_spikes_stage="setting",
+    )
+    session.evaluator_plugin = _DummyEvaluator.name
+    session.evaluator_version = _DummyEvaluator.version
+    session.metrics_plugins = json.dumps([_DummyMetrics.name])
+    test_db.add(session)
+    test_db.commit()
+    test_db.refresh(session)
+
+    PluginRegistry.register_evaluator(_DummyEvaluator.name, _DummyEvaluator)
+    PluginRegistry.register_metrics_plugin(_DummyMetrics.name, _DummyMetrics)
+
+    monkeypatch.setattr(
+        "services.scoring_service.get_settings",
+        lambda: SimpleNamespace(evaluator_plugin=_DummyEvaluator.name),
+    )
+
+    service = ScoringService(test_db)
+    await service.generate_feedback(session.id)
+
+    test_db.refresh(session)
+    stored = _metrics_plugin_results_from_session(session)
+    assert stored is not None
+    assert _DummyMetrics.name in stored
+    assert stored[_DummyMetrics.name] == {"metric_a": 1, "metric_b": "x"}
+
+
+@pytest.mark.asyncio
+async def test_scoring_service_skips_metrics_when_session_has_no_metrics_plugins(
+    test_db, test_user, test_case, monkeypatch
+):
+    _DummyEvaluator.invocations.clear()
+
+    session = Session(
+        user_id=test_user.id,
+        case_id=test_case.id,
+        state="active",
+        current_spikes_stage="setting",
+    )
+    session.evaluator_plugin = _DummyEvaluator.name
+    session.evaluator_version = _DummyEvaluator.version
+    session.metrics_plugins = None
+    test_db.add(session)
+    test_db.commit()
+    test_db.refresh(session)
+
+    PluginRegistry.register_evaluator(_DummyEvaluator.name, _DummyEvaluator)
+
+    monkeypatch.setattr(
+        "services.scoring_service.get_settings",
+        lambda: SimpleNamespace(evaluator_plugin=_DummyEvaluator.name),
+    )
+
+    service = ScoringService(test_db)
+    await service.generate_feedback(session.id)
+
+    test_db.refresh(session)
+    assert _metrics_plugin_results_from_session(session) is None
+
+
+@pytest.mark.asyncio
+async def test_scoring_service_invalid_metrics_plugin_raises(test_db, test_user, test_case, monkeypatch):
+    session = Session(
+        user_id=test_user.id,
+        case_id=test_case.id,
+        state="active",
+        current_spikes_stage="setting",
+    )
+    session.evaluator_plugin = _DummyEvaluator.name
+    session.evaluator_version = _DummyEvaluator.version
+    session.metrics_plugins = json.dumps(["nonexistent.module.path:NoSuchMetrics"])
+    test_db.add(session)
+    test_db.commit()
+    test_db.refresh(session)
+
+    PluginRegistry.register_evaluator(_DummyEvaluator.name, _DummyEvaluator)
+
+    monkeypatch.setattr(
+        "services.scoring_service.get_settings",
+        lambda: SimpleNamespace(evaluator_plugin=_DummyEvaluator.name),
+    )
+
+    service = ScoringService(test_db)
+    with pytest.raises((ImportError, ValueError)):
+        await service.generate_feedback(session.id)
 

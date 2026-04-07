@@ -1,6 +1,7 @@
 """Scoring service for empathy, communication, and SPIKES metrics."""
 
 import json
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -16,6 +17,41 @@ from plugins.registry import PluginRegistry
 from repositories.feedback_repo import FeedbackRepository
 from repositories.session_repo import SessionRepository
 from repositories.turn_repo import TurnRepository
+
+
+def _parse_frozen_metrics_plugin_names(raw: str | None) -> list[str]:
+    """Parse session.metrics_plugins JSON text into a list of plugin ids."""
+    if not raw or not str(raw).strip():
+        return []
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list):
+            return [str(x).strip() for x in data if str(x).strip()]
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return []
+
+
+def _instantiate_metrics_plugin(plugin_name: str) -> Any:
+    try:
+        plugin_cls = PluginRegistry.get_metrics_plugin(plugin_name)
+    except ValueError:
+        plugin_cls = _load_class_from_path(plugin_name)
+        PluginRegistry.register_metrics_plugin(plugin_name, plugin_cls)
+    return plugin_cls()
+
+
+def _session_plugin_context_for_evaluator_meta(session: Any) -> dict[str, Any]:
+    raw_m: str | None = getattr(session, "metrics_plugins", None)
+    if raw_m is not None and not isinstance(raw_m, str):
+        raw_m = str(raw_m)
+    return {
+        "patient_model_plugin": getattr(session, "patient_model_plugin", None),
+        "patient_model_version": getattr(session, "patient_model_version", None),
+        "evaluator_plugin": getattr(session, "evaluator_plugin", None),
+        "evaluator_version": getattr(session, "evaluator_version", None),
+        "metrics_plugins": _parse_frozen_metrics_plugin_names(raw_m),
+    }
 
 
 def _truncate_meta_str(value: str | None, max_len: int) -> str | None:
@@ -140,6 +176,13 @@ _SPIKES_CANONICAL_ORDER = [
     "strategy",
 ]
 _SPIKES_LLM_CONFIDENCE_THRESHOLD = 0.6
+_HYBRID_EVALUATOR_PLUGIN_KEYS = frozenset(
+    {
+        "plugins.evaluators.apex_hybrid_evaluator:ApexHybridEvaluator",
+        "plugins.evaluators.apex_hybrid_v2_evaluator:ApexHybridV2Evaluator",
+    }
+)
+_HYBRID_EVALUATOR_CLASS_NAMES = frozenset({"ApexHybridEvaluator", "ApexHybridV2Evaluator"})
 
 
 def _normalize_spikes_stage_key(raw: Any) -> str | None:
@@ -164,8 +207,93 @@ def _normalize_spikes_stage_key(raw: Any) -> str | None:
         "s2": "strategy",
         "strategy": "strategy",
         "summary": "strategy",
+        "strategy_and_summary": "strategy",
     }
     return stage_map.get(value)
+
+
+def _stage_turn_mapping_rows_valid(mapping: list[Any]) -> bool:
+    """True when every row has int turn_number >= 1, unique turns, and normalizable stage."""
+    seen_turns: set[int] = set()
+    for row in mapping:
+        if not isinstance(row, dict):
+            return False
+        tn = row.get("turn_number")
+        if not isinstance(tn, int) or isinstance(tn, bool) or tn < 1:
+            return False
+        if tn in seen_turns:
+            return False
+        seen_turns.add(tn)
+        if _normalize_spikes_stage_key(row.get("stage")) is None:
+            return False
+    return True
+
+
+def _ensure_stage_turn_mapping(llm_output: dict[str, Any]) -> dict[str, Any]:
+    """Ensure `llm_output` has a canonical UI-ready `stage_turn_mapping`.
+
+    If `stage_turn_mapping` is a non-empty list and passes
+    `_stage_turn_mapping_rows_valid`, returns `llm_output` unchanged.
+    Otherwise derives one row per `turn_number` from `spikes_annotations` using
+    `_normalize_spikes_stage_key`, preferring the annotation with highest `confidence`
+    when present, else the first valid annotation per turn.
+    """
+    out = dict(llm_output)
+    existing = out.get("stage_turn_mapping")
+    if isinstance(existing, list) and len(existing) > 0 and _stage_turn_mapping_rows_valid(existing):
+        return out
+
+    annotations = out.get("spikes_annotations")
+    if not isinstance(annotations, list) or not annotations:
+        out["stage_turn_mapping"] = []
+        return out
+
+    by_turn: defaultdict[int, list[dict[str, Any]]] = defaultdict(list)
+    for a in annotations:
+        if not isinstance(a, dict):
+            continue
+        tn_raw = a.get("turn_number")
+        turn_number: int | None = None
+        if isinstance(tn_raw, int) and tn_raw >= 1:
+            turn_number = tn_raw
+        elif isinstance(tn_raw, float) and tn_raw.is_integer() and int(tn_raw) >= 1:
+            turn_number = int(tn_raw)
+        if turn_number is None:
+            continue
+        by_turn[turn_number].append(a)
+
+    mapping: list[dict[str, Any]] = []
+    for turn_number in sorted(by_turn.keys()):
+        items = by_turn[turn_number]
+        candidates_with_conf: list[tuple[float, str]] = []
+        for it in items:
+            norm = _normalize_spikes_stage_key(it.get("stage"))
+            if not norm:
+                continue
+            conf = it.get("confidence")
+            if conf is None:
+                continue
+            try:
+                cf = float(conf)
+            except (TypeError, ValueError):
+                continue
+            candidates_with_conf.append((cf, norm))
+
+        chosen: str | None = None
+        if candidates_with_conf:
+            chosen = max(candidates_with_conf, key=lambda x: x[0])[1]
+        else:
+            for it in items:
+                norm = _normalize_spikes_stage_key(it.get("stage"))
+                if norm:
+                    chosen = norm
+                    break
+
+        if chosen is not None:
+            mapping.append({"turn_number": turn_number, "stage": chosen})
+
+    out["stage_turn_mapping"] = mapping
+    return out
 
 
 def _build_spikes_coverage_payload(stage_set: set[str]) -> dict[str, Any]:
@@ -244,15 +372,95 @@ def _extract_llm_spikes_stage_set(evaluator_meta: dict[str, Any] | None) -> set[
 def _compute_spikes_coverage_merge(
     rule_spikes_coverage: dict[str, Any] | None,
     evaluator_meta: dict[str, Any] | None,
+    *,
+    valid_session_turn_numbers: frozenset[int] | None = None,
 ) -> dict[str, Any]:
+    """Build canonical ``spikes_coverage`` for persistence.
+
+    * **Hybrid evaluators** — only distinct stages from ``evaluator_meta.llm_output.stage_turn_mapping``
+      (valid turn rows + normalizable stage). Rule coverage, annotations, and turn.spikesStage
+      are not merged in.
+    * **Otherwise** — rule ``spikes_coverage`` merged with high-confidence ``spikes_annotations`` when present.
+    """
     rule_stages = _extract_rule_spikes_stage_set(rule_spikes_coverage)
     rule_payload = _build_spikes_coverage_payload(rule_stages)
+
+    if _is_hybrid_evaluator_context(evaluator_meta):
+        mapped_only = _extract_mapped_spikes_stage_set_from_stage_turn_mapping(
+            evaluator_meta,
+            valid_session_turn_numbers=valid_session_turn_numbers,
+        )
+        return _build_spikes_coverage_payload(mapped_only)
+
     if not _should_apply_llm_spikes_merge(evaluator_meta):
         return rule_payload
 
     llm_stages = _extract_llm_spikes_stage_set(evaluator_meta)
     merged_stages = rule_stages | llm_stages
     return _build_spikes_coverage_payload(merged_stages)
+
+
+def _is_hybrid_evaluator_context(evaluator_meta: dict[str, Any] | None) -> bool:
+    if not isinstance(evaluator_meta, dict):
+        return False
+    session_plugins = evaluator_meta.get("session_plugins")
+    if not isinstance(session_plugins, dict):
+        return False
+    plugin_key = session_plugins.get("evaluator_plugin")
+    if not isinstance(plugin_key, str):
+        return False
+    normalized = plugin_key.strip()
+    if not normalized:
+        return False
+    if normalized in _HYBRID_EVALUATOR_PLUGIN_KEYS:
+        return True
+    cls = normalized.split(":")[-1].strip()
+    return cls in _HYBRID_EVALUATOR_CLASS_NAMES
+
+
+def _extract_mapped_spikes_stage_set_from_stage_turn_mapping(
+    evaluator_meta: dict[str, Any] | None,
+    *,
+    valid_session_turn_numbers: frozenset[int] | None = None,
+) -> set[str]:
+    """Distinct canonical SPIKES stages from ``llm_output.stage_turn_mapping`` rows only.
+
+    Rows must have int ``turn_number`` ≥ 1, optional filter to real session turns, and a
+    normalizable ``stage`` string. Used as the sole persistence source for hybrid SPIKES coverage.
+    """
+    if not isinstance(evaluator_meta, dict):
+        return set()
+    llm_output = evaluator_meta.get("llm_output")
+    if not isinstance(llm_output, dict):
+        return set()
+    mapping = llm_output.get("stage_turn_mapping")
+    if not isinstance(mapping, list):
+        return set()
+    stages: set[str] = set()
+    for row in mapping:
+        if not isinstance(row, dict):
+            continue
+        turn_number = row.get("turn_number")
+        if not isinstance(turn_number, int) or isinstance(turn_number, bool) or turn_number < 1:
+            continue
+        if valid_session_turn_numbers is not None and turn_number not in valid_session_turn_numbers:
+            continue
+        normalized = _normalize_spikes_stage_key(row.get("stage"))
+        if normalized:
+            stages.add(normalized)
+    return stages
+
+
+def _extract_mapped_spikes_stage_set(
+    evaluator_meta: dict[str, Any] | None,
+    *,
+    valid_session_turn_numbers: frozenset[int] | None = None,
+) -> set[str]:
+    """Alias for :func:`_extract_mapped_spikes_stage_set_from_stage_turn_mapping`."""
+    return _extract_mapped_spikes_stage_set_from_stage_turn_mapping(
+        evaluator_meta,
+        valid_session_turn_numbers=valid_session_turn_numbers,
+    )
 
 
 @dataclass
@@ -678,6 +886,7 @@ class ScoringService:
                 "spikes_completion_score": ms,
                 "overall_score": mo,
             }
+            compacted_v1 = _compact_llm_output_for_evaluator_meta(llm_output)
             evaluator_meta = {
                 "phase": "hybrid_llm_v1",
                 "status": "completed",
@@ -688,7 +897,7 @@ class ScoringService:
                 "rule_scores": rule_snapshot,
                 "llm_scores": llm_snapshot,
                 "merged_scores": merged_snapshot,
-                "llm_output": _compact_llm_output_for_evaluator_meta(llm_output),
+                "llm_output": _ensure_stage_turn_mapping(compacted_v1),
             }
             return (me, mc, ms, mo, evaluator_meta)
         except Exception as e:
@@ -807,6 +1016,7 @@ class ScoringService:
             # Normalize status to completed|failed (no "partial" exposed at top-level).
             status = "completed" if agg_status == "success" else "failed"
             error = None if status == "completed" else "partial_llm_prompts_failed"
+            compacted_v2 = _compact_llm_output_for_evaluator_meta(compiled)
             evaluator_meta: dict[str, Any] = {
                 "phase": "hybrid_llm_v2",
                 "status": status,
@@ -820,7 +1030,7 @@ class ScoringService:
                 "rule_scores": rule_snapshot,
                 "llm_scores": llm_scores,
                 "merged_scores": merged_snapshot,
-                "llm_output": _compact_llm_output_for_evaluator_meta(compiled),
+                "llm_output": _ensure_stage_turn_mapping(compacted_v2),
                 "llm_adapter_calls": adapter_calls,
             }
             return (me, mc, ms, mo, evaluator_meta)
@@ -866,8 +1076,7 @@ class ScoringService:
         feedback.clinical_reasoning_score = None
         feedback.professionalism_score = None
 
-        # Keep structured fields as native Python objects in the service layer.
-        # FeedbackRepository is the single serialization boundary before commit.
+        # Native Python objects here; FeedbackRepository serializes before commit (SQLite-safe).
         feedback.eo_counts_by_dimension = state.eo_counts_by_dimension
         feedback.elicitation_counts_by_type = state.elicitation_counts_by_type
         feedback.response_counts_by_type = state.response_counts_by_type
@@ -876,9 +1085,23 @@ class ScoringService:
         feedback.eo_to_elicitation_links = state.eo_to_elicitation_links
         feedback.eo_to_response_links = state.eo_to_response_links
         feedback.missed_opportunities = state.missed_opportunities
+        meta_out: dict[str, Any] = dict(evaluator_meta) if evaluator_meta else {}
+        meta_out["session_plugins"] = _session_plugin_context_for_evaluator_meta(state.session)
+
         # Single source of truth: persisted SPIKES coverage and persisted SPIKES score are
         # both derived from this same final canonical merged payload.
-        feedback.spikes_coverage = _compute_spikes_coverage_merge(state.spikes_coverage, evaluator_meta)
+        valid_session_turn_numbers = frozenset(
+            int(t.turn_number)
+            for t in state.turns
+            if getattr(t, "turn_number", None) is not None
+            and isinstance(t.turn_number, int)
+            and not isinstance(t.turn_number, bool)
+        )
+        feedback.spikes_coverage = _compute_spikes_coverage_merge(
+            state.spikes_coverage,
+            meta_out,
+            valid_session_turn_numbers=valid_session_turn_numbers,
+        )
         feedback.spikes_completion_score = _calculate_spikes_completion_from_coverage(feedback.spikes_coverage)
         feedback.overall_score = self._clamp_score(
             round(
@@ -892,7 +1115,7 @@ class ScoringService:
         feedback.spikes_strategies = state.spikes_strategies
         feedback.question_breakdown = state.question_breakdown
         feedback.bias_probe_info = bias_probe_info
-        feedback.evaluator_meta = evaluator_meta
+        feedback.evaluator_meta = meta_out
         feedback.latency_ms_avg = state.latency_ms_avg
 
         feedback.strengths = state.strengths if state.strengths and state.strengths.strip() else None
@@ -1013,8 +1236,28 @@ class ScoringService:
             PluginRegistry.register_evaluator(plugin_key, plugin_cls)
 
         evaluator = plugin_cls()
-        return await evaluator.evaluate(self.db, session_id)
-    
+        feedback = await evaluator.evaluate(self.db, session_id)
+        self._run_and_store_metrics_plugins(session_id)
+        return feedback
+
+    def _run_and_store_metrics_plugins(self, session_id: int) -> None:
+        """Run frozen metrics plugins after evaluator; persist results on session.metrics_json."""
+        sess = self.session_repo.get_by_id(session_id)
+        if not sess:
+            return
+        raw_plugins = getattr(sess, "metrics_plugins", None)
+        if not raw_plugins:
+            return
+        names = _parse_frozen_metrics_plugin_names(raw_plugins)
+        if not names:
+            return
+        aggregated: dict[str, Any] = {}
+        for plugin_name in names:
+            plugin = _instantiate_metrics_plugin(plugin_name)
+            aggregated[plugin_name] = plugin.compute(self.db, session_id)
+        sess.metrics_json = json.dumps(aggregated)
+        self.session_repo.update(sess)
+
     # AFCE span-based metric calculation methods
     
     def _extract_spans_from_turns(self, turns: list) -> list[dict[str, Any]]:
