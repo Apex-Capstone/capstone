@@ -7,7 +7,12 @@ import type { Turn } from '@/types/session'
 import type { Feedback, SpikesStageKey } from '@/api/feedback.api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatTimeInUserTimeZone } from '@/lib/dateTime'
-import { getLlmStageMapFromFeedback, resolveSpikesStageForTurn } from '@/lib/spikesStageFromFeedback'
+import {
+  getDisplayedSpikesStageForTurn,
+  getHybridStageTurnMap,
+  normalizeTurnNumberForLookup,
+  shouldUseHybridStageTurnMapping,
+} from '@/lib/spikesStageFromFeedback'
 import { cn } from '@/lib/utils'
 
 /** Map legacy / alternate baseline tokens to canonical SPIKES keys for display. */
@@ -27,6 +32,7 @@ const LEGACY_STAGE_TO_CANON: Record<string, SpikesStageKey> = {
   s2: 'strategy',
   strategy: 'strategy',
   summary: 'strategy',
+  strategy_and_summary: 'strategy',
 }
 
 const CANONICAL_STAGE_CHIP_LABEL: Record<SpikesStageKey, string> = {
@@ -504,7 +510,8 @@ export const FeedbackConversationTimeline = ({
   const contentRef = useRef<HTMLDivElement | null>(null)
   const [timelineMaxHeight, setTimelineMaxHeight] = useState<number>(MIN_TIMELINE_HEIGHT_PX)
   const sortedTurns = [...turns].sort((a, b) => a.turnNumber - b.turnNumber)
-  const llmStageMap = useMemo(() => getLlmStageMapFromFeedback(feedback), [feedback])
+  const isHybrid = useMemo(() => shouldUseHybridStageTurnMapping(feedback), [feedback])
+  const hybridStageMap = useMemo(() => getHybridStageTurnMap(feedback), [feedback])
   const empathyMarkers = buildEmpathyTimelineMarkers(feedback, sortedTurns)
 
   useEffect(() => {
@@ -554,15 +561,23 @@ export const FeedbackConversationTimeline = ({
             {sortedTurns.map((turn) => {
               const roleLabel = formatRoleLabel(turn.role)
               const side = mapRoleToSide(turn.role)
-              const resolvedStage = resolveSpikesStageForTurn({
+              const stageDisplay = getDisplayedSpikesStageForTurn({
                 turnNumber: turn.turnNumber,
                 baselineStage: turn.spikesStage,
                 feedback,
-                llmStageMap,
+                isHybrid,
+                hybridMap: hybridStageMap,
               })
-              const spikesStage = formatSpikesStageChipLabel(resolvedStage)
+              const spikesStageLabel =
+                stageDisplay.mode === 'hybrid' && stageDisplay.showBadge
+                  ? formatSpikesStageChipLabel(stageDisplay.stage)
+                  : stageDisplay.mode === 'baseline'
+                    ? formatSpikesStageChipLabel(stageDisplay.label)
+                    : null
               const { labels: metricBadges } = parseMetricsBadges(turn.metricsJson)
-              const markersForTurn = empathyMarkers[turn.turnNumber]
+              const turnKeyForMarkers = normalizeTurnNumberForLookup(turn.turnNumber)
+              const markersForTurn =
+                turnKeyForMarkers != null ? empathyMarkers[turnKeyForMarkers] : undefined
 
               return (
                 <div
@@ -595,9 +610,9 @@ export const FeedbackConversationTimeline = ({
                       >
                         {roleLabel}
                       </span>
-                      {side === 'right' && (
+                      {side === 'right' && spikesStageLabel != null && (
                         <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-700">
-                          {spikesStage}
+                          {spikesStageLabel}
                         </span>
                       )}
                       <span

@@ -48,9 +48,20 @@ export interface FeedbackEvaluatorLlmOutput {
   areas_for_improvement?: string[]
 }
 
+/** Frozen session plugins echoed on feedback (mirrors backend `evaluator_meta.session_plugins`). */
+export interface FeedbackSessionPlugins {
+  evaluator_plugin?: string | null
+  evaluator_version?: string | null
+  patient_model_plugin?: string | null
+  patient_model_version?: string | null
+  metrics_plugins?: string[]
+}
+
 /** Narrow subset of `evaluator_meta` for typing without full pipeline schema. */
 export interface FeedbackEvaluatorMeta {
   llm_output?: FeedbackEvaluatorLlmOutput
+  /** Present on stored feedback; used to detect hybrid vs baseline SPIKES UI. */
+  session_plugins?: FeedbackSessionPlugins
   phase?: string
   status?: string
   framework?: string

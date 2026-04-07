@@ -398,8 +398,8 @@ def test_case_title_fallback_when_title_is_empty(test_db, test_user):
     assert result.case_title == f"Case #{case.id}"
 
 
-def test_multiple_sessions_sorted_by_created_at(test_db, test_user, test_case):
-    """Results are sorted by created_at ascending."""
+def test_multiple_sessions_sorted_by_created_at_desc(test_db, test_user, test_case):
+    """Results are sorted by created_at descending (newest first), then session_id desc."""
     earlier = datetime(2024, 1, 1, tzinfo=timezone.utc)
     later = datetime(2024, 6, 1, tzinfo=timezone.utc)
 
@@ -418,10 +418,10 @@ def test_multiple_sessions_sorted_by_created_at(test_db, test_user, test_case):
     svc = TraineeAnalyticsService(test_db)
     results = svc.get_user_session_analytics(test_user.id)
     assert len(results) == 2
-    assert results[0].created_at <= results[1].created_at
-    # The session with earlier feedback comes first
-    assert results[0].session_id == s2.id
-    assert results[1].session_id == s1.id
+    assert results[0].created_at >= results[1].created_at
+    # Newest feedback first
+    assert results[0].session_id == s1.id
+    assert results[1].session_id == s2.id
 
 
 def test_only_own_sessions_returned(test_db, test_case):
