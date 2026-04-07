@@ -1,0 +1,86 @@
+{
+  "meta": {
+    "evaluator_family": "manual_external_llm",
+    "evaluator_version": "claude-sonnet-4-6",
+    "status": "completed"
+  },
+  "scores": {
+    "empathy_score": 88.0,
+    "communication_score": 90.0,
+    "spikes_completion_score": 92.0,
+    "overall_score": 90.0
+  },
+  "spikes": {
+    "stages_present": ["setting", "perception", "invitation", "knowledge", "emotion", "strategy"],
+    "stage_turn_mapping": [
+      {
+        "turn_number": 1,
+        "stage": "setting"
+      },
+      {
+        "turn_number": 3,
+        "stage": "perception"
+      },
+      {
+        "turn_number": 5,
+        "stage": "invitation"
+      },
+      {
+        "turn_number": 7,
+        "stage": "knowledge"
+      },
+      {
+        "turn_number": 9,
+        "stage": "emotion"
+      },
+      {
+        "turn_number": 11,
+        "stage": "emotion"
+      },
+      {
+        "turn_number": 13,
+        "stage": "strategy"
+      }
+    ],
+    "missing_stages": [],
+    "sequencing_notes": "All six SPIKES stages were addressed in correct sequence. Emotion was revisited appropriately across turns 9 and 11, demonstrating sustained attentiveness to the patient's affective state."
+  },
+  "missed_opportunities": [
+    {
+      "turn_number": 12,
+      "cue_text": "Okay…",
+      "clinician_response_summary": "Clinician moved directly into the next-steps strategy without pausing to explore the patient's minimal acknowledgment.",
+      "why_missed_or_weak": "The patient's 'Okay…' is ambiguous and may signal emotional shutdown or overwhelm. The clinician did not probe this before transitioning to the plan, missing a chance to ensure the patient was emotionally ready to receive further information.",
+      "suggested_response": "Take a moment here — 'That was a lot to take in. How are you feeling right now? Is it okay if we talk about what comes next, or do you need a moment?'",
+      "confidence": 0.75
+    }
+  ],
+  "feedback": {
+    "strength_tags": [
+      "validation_of_emotion",
+      "open_ended_questions",
+      "partnership_language",
+      "organized_conversation",
+      "reassurance_support"
+    ],
+    "improvement_tags": [
+      "missed_opportunity",
+      "weak_emotional_acknowledgment"
+    ],
+    "strengths_text": [
+      "The clinician demonstrated consistent emotional validation throughout, acknowledging the patient's fear as understandable and normalizing it without minimizing the gravity of the situation.",
+      "Partnership language ('we're going to take this step by step together', 'we'll go over all your options together') was used effectively to reduce the patient's sense of isolation.",
+      "The SPIKES framework was followed in correct sequence with natural transitions, and the use of a warning shot in turn 7 before delivering the news was appropriate and well-executed."
+    ],
+    "areas_for_improvement_text": [
+      "The brief 'Okay…' response from the patient in turn 12 warranted a pause and check-in before moving to logistics; the clinician transitioned to the strategy phase too quickly without ensuring emotional readiness.",
+      "While empathy was consistently present, some responses (e.g., turn 11) relied on somewhat formulaic normalizing phrases; more individualized reflection of the patient's specific stated fear about the future would have deepened the connection."
+    ]
+  },
+  "confidence": {
+    "empathy_confidence": 0.88,
+    "communication_confidence": 0.9,
+    "spikes_confidence": 0.92,
+    "overall_confidence": 0.89
+  }
+}

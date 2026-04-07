@@ -1,0 +1,101 @@
+{
+  "meta": {
+    "evaluator_family": "manual_external_llm",
+    "evaluator_version": "Gemini 3 Flash",
+    "status": "completed"
+  },
+  "scores": {
+    "empathy_score": 25.0,
+    "communication_score": 45.0,
+    "spikes_completion_score": 66.0,
+    "overall_score": 40.0
+  },
+  "spikes": {
+    "stages_present": [
+      "setting",
+      "knowledge",
+      "emotion",
+      "strategy"
+    ],
+    "stage_turn_mapping": [
+      {
+        "turn_number": 1,
+        "stage": "setting"
+      },
+      {
+        "turn_number": 3,
+        "stage": "knowledge"
+      },
+      {
+        "turn_number": 5,
+        "stage": "knowledge"
+      },
+      {
+        "turn_number": 7,
+        "stage": "strategy"
+      },
+      {
+        "turn_number": 9,
+        "stage": "strategy"
+      },
+      {
+        "turn_number": 11,
+        "stage": "emotion"
+      },
+      {
+        "turn_number": 11,
+        "stage": "strategy"
+      }
+    ],
+    "missing_stages": [
+      "perception",
+      "invitation"
+    ],
+    "sequencing_notes": "The clinician jumped directly to sharing results without assessing the patient's current understanding or asking how they would like to receive the information."
+  },
+  "missed_opportunities": [
+    {
+      "turn_number": 3,
+      "cue_text": "I've been really nervous about this.",
+      "clinician_response_summary": "The clinician acknowledged the concern with 'Okay' but immediately moved to the clinical results.",
+      "why_missed_or_weak": "The clinician prioritized information delivery over the patient's explicit emotional state, failing to validate the anxiety.",
+      "suggested_response": "I can understand why you feel nervous; waiting for these results is very difficult. Are you ready for us to go through them now?",
+      "confidence": 0.95
+    },
+    {
+      "turn_number": 7,
+      "cue_text": "I'm really scared… I don't know what I'll do.",
+      "clinician_response_summary": "The clinician responded with logistical information about diagnostic tests.",
+      "why_missed_or_weak": "Completely bypassed a strong emotional cue of fear to focus on next steps, which can make the patient feel unheard.",
+      "suggested_response": "I'm so sorry to hear you're feeling this way. It is a frightening possibility to face. We are going to take this step by step together.",
+      "confidence": 0.98
+    }
+  ],
+  "feedback": {
+    "strength_tags": [
+      "clear_communication",
+      "professionalism"
+    ],
+    "improvement_tags": [
+      "weak_emotional_acknowledgment",
+      "incomplete_spikes",
+      "missed_opportunity",
+      "missing_invitation"
+    ],
+    "strengths_text": [
+      "Information was delivered clearly without overly complex jargon.",
+      "Maintained a professional tone throughout the interaction."
+    ],
+    "areas_for_improvement_text": [
+      "Address emotional cues immediately rather than moving straight to logistics.",
+      "Incorporate the 'Perception' stage to understand what the patient already suspects.",
+      "Obtain an 'Invitation' to ensure the patient is ready for the level of detail provided."
+    ]
+  },
+  "confidence": {
+    "empathy_confidence": 0.95,
+    "communication_confidence": 0.9,
+    "spikes_confidence": 0.9,
+    "overall_confidence": 0.92
+  }
+}

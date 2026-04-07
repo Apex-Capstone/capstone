@@ -38,7 +38,6 @@ def test_db():
 def test_user(test_db):
     user = User(
         email="hybrid_v2_tester@example.com",
-        hashed_password="not_used",
         role="trainee",
         full_name="Hybrid V2 Tester",
     )
@@ -83,7 +82,10 @@ def _spikes_json(score: float = 52.0) -> str:
         {
             "reviewer_version": "v2",
             "spikes_completion_score": score,
-            "spikes_annotations": [],
+            "spikes_annotations": [
+                {"turn_number": 2, "stage": "perception", "evidence_snippet": "q", "confidence": 0.9},
+                {"turn_number": 3, "stage": "invitation", "evidence_snippet": "q2", "confidence": 0.9},
+            ],
             "stage_turn_mapping": [],
             "spikes_sequencing_notes": None,
             "spikes_confidence": None,
@@ -165,21 +167,24 @@ async def test_hybrid_v2_plugin_smoke(test_db, test_user, test_case):
 async def test_hybrid_v2_success_three_calls_and_meta(
     test_db, test_user, test_case, monkeypatch
 ):
-    monkeypatch.delenv("LLM_REVIEWER_REAL_CALLS", raising=False)
+    # Baseline: force all v2 prompts to fail so we exercise graceful fallback.
+    import adapters.llm.openai_adapter as openai_adapter_module
+    baseline_mock = RoutingV2MockAdapter(empathy_body="{", spikes_body="{", comm_body="{")
+    monkeypatch.setattr(openai_adapter_module, "OpenAIAdapter", lambda: baseline_mock)
     baseline = await run_fixture_seeded_transcript_through_scoring(
         test_db, test_user, test_case, TEST_CONVERSATION_BAD, evaluator_plugin=V2_PLUGIN
     )
     base_scores = _scores_tuple(baseline["feedback"])
-    assert baseline["feedback"].evaluator_meta is None
+    bmeta = baseline["feedback"].evaluator_meta
+    assert bmeta is not None
+    assert bmeta.get("phase") == "hybrid_llm_v2"
+    assert bmeta.get("status") == "failed"
 
     mock = RoutingV2MockAdapter(
         _empathy_json(40.0),
         _spikes_json(41.0),
         _comm_json(42.0),
     )
-    monkeypatch.setenv("LLM_REVIEWER_REAL_CALLS", "true")
-    import adapters.llm.openai_adapter as openai_adapter_module
-
     monkeypatch.setattr(openai_adapter_module, "OpenAIAdapter", lambda: mock)
 
     result = await run_fixture_seeded_transcript_through_scoring(
@@ -191,7 +196,7 @@ async def test_hybrid_v2_success_three_calls_and_meta(
     meta = fb.evaluator_meta
     assert meta is not None
     assert meta.get("phase") == "hybrid_llm_v2"
-    assert meta.get("status") == "success"
+    assert meta.get("status") == "completed"
     assert meta.get("prompt_status") == {
         "empathy": "success",
         "spikes": "success",
@@ -212,6 +217,13 @@ async def test_hybrid_v2_success_three_calls_and_meta(
         "communication": "llm",
         "spikes": "llm",
     }
+    merged_covered = fb.spikes_coverage.get("covered") or []
+    assert "perception" in merged_covered
+    assert "invitation" in merged_covered
+    assert fb.spikes_completion_score == pytest.approx(round((len(merged_covered) / 6.0) * 100.0, 2))
+    assert fb.overall_score == pytest.approx(
+        round(0.5 * fb.empathy_score + 0.2 * fb.communication_score + 0.3 * fb.spikes_completion_score, 2)
+    )
 
     merged = meta.get("merged_scores") or {}
     rs = meta["rule_scores"]
@@ -222,7 +234,6 @@ async def test_hybrid_v2_success_three_calls_and_meta(
 async def test_hybrid_v2_empathy_prompt_failure_partial(
     test_db, test_user, test_case, monkeypatch
 ):
-    monkeypatch.setenv("LLM_REVIEWER_REAL_CALLS", "true")
     import adapters.llm.openai_adapter as openai_adapter_module
 
     mock = RoutingV2MockAdapter(
@@ -238,7 +249,7 @@ async def test_hybrid_v2_empathy_prompt_failure_partial(
     fb = result["feedback"]
     meta = fb.evaluator_meta
     assert meta.get("phase") == "hybrid_llm_v2"
-    assert meta.get("status") == "partial"
+    assert meta.get("status") == "failed"
     assert meta["prompt_status"]["empathy"] == "failed"
     assert meta["prompt_status"]["spikes"] == "success"
     assert meta["prompt_status"]["communication"] == "success"
@@ -253,7 +264,6 @@ async def test_hybrid_v2_empathy_prompt_failure_partial(
 async def test_hybrid_v2_spikes_prompt_failure_partial(
     test_db, test_user, test_case, monkeypatch
 ):
-    monkeypatch.setenv("LLM_REVIEWER_REAL_CALLS", "true")
     import adapters.llm.openai_adapter as openai_adapter_module
 
     mock = RoutingV2MockAdapter(
@@ -267,7 +277,7 @@ async def test_hybrid_v2_spikes_prompt_failure_partial(
         test_db, test_user, test_case, TEST_CONVERSATION_BAD, evaluator_plugin=V2_PLUGIN
     )
     meta = result["feedback"].evaluator_meta
-    assert meta.get("status") == "partial"
+    assert meta.get("status") == "failed"
     assert meta["prompt_status"]["spikes"] == "failed"
     assert (meta.get("llm_scores") or {}).get("spikes_completion_score") is None
 
@@ -276,7 +286,6 @@ async def test_hybrid_v2_spikes_prompt_failure_partial(
 async def test_hybrid_v2_communication_prompt_failure_partial(
     test_db, test_user, test_case, monkeypatch
 ):
-    monkeypatch.setenv("LLM_REVIEWER_REAL_CALLS", "true")
     import adapters.llm.openai_adapter as openai_adapter_module
 
     mock = RoutingV2MockAdapter(
@@ -290,7 +299,7 @@ async def test_hybrid_v2_communication_prompt_failure_partial(
         test_db, test_user, test_case, TEST_CONVERSATION_BAD, evaluator_plugin=V2_PLUGIN
     )
     meta = result["feedback"].evaluator_meta
-    assert meta.get("status") == "partial"
+    assert meta.get("status") == "failed"
     assert meta["prompt_status"]["communication"] == "failed"
 
 
@@ -298,13 +307,11 @@ async def test_hybrid_v2_communication_prompt_failure_partial(
 async def test_hybrid_v2_total_failure(
     test_db, test_user, test_case, monkeypatch
 ):
-    monkeypatch.delenv("LLM_REVIEWER_REAL_CALLS", raising=False)
     baseline = await run_fixture_seeded_transcript_through_scoring(
         test_db, test_user, test_case, TEST_CONVERSATION_BAD, evaluator_plugin=V2_PLUGIN
     )
     base_scores = _scores_tuple(baseline["feedback"])
 
-    monkeypatch.setenv("LLM_REVIEWER_REAL_CALLS", "true")
     import adapters.llm.openai_adapter as openai_adapter_module
 
     mock = RoutingV2MockAdapter(
@@ -324,6 +331,14 @@ async def test_hybrid_v2_total_failure(
     assert meta.get("status") == "failed"
     assert meta.get("llm_scores") is None
     assert meta.get("merged_scores") is None
+    # LLM merge gate fails when status is failed, so coverage should remain rule-only.
+    assert "perception" not in (fb.spikes_coverage.get("covered") or [])
+    assert "invitation" not in (fb.spikes_coverage.get("covered") or [])
+    covered = fb.spikes_coverage.get("covered") or []
+    assert fb.spikes_completion_score == pytest.approx(round((len(covered) / 6.0) * 100.0, 2))
+    assert fb.overall_score == pytest.approx(
+        round(0.5 * fb.empathy_score + 0.2 * fb.communication_score + 0.3 * fb.spikes_completion_score, 2)
+    )
 
 
 @pytest.mark.asyncio
@@ -336,7 +351,6 @@ async def test_hybrid_v2_textual_feedback_still_rule_based(
         captured.append((e, c, s))
         return ("s", "i")
 
-    monkeypatch.setenv("LLM_REVIEWER_REAL_CALLS", "true")
     import adapters.llm.openai_adapter as openai_adapter_module
 
     mock = RoutingV2MockAdapter()

@@ -10,7 +10,7 @@ interface FeedbackChartProps {
 }
 
 /**
- * Renders three horizontal bars and a footer with the overall score.
+ * Renders three horizontal bars and a highlighted Overall score summary tile.
  *
  * @param props - {@link FeedbackChartProps}
  * @returns Card with metric bars
@@ -32,11 +32,11 @@ export const FeedbackChart = ({ feedback }: FeedbackChartProps) => {
       accentClassName: 'text-purple-700',
     },
     {
-      label: 'Overall Score',
-      value: feedback.overallScore,
+      label: 'Communication Score',
+      value: feedback.communicationScore,
       max: 100,
-      barClassName: 'bg-emerald-500',
-      accentClassName: 'text-emerald-700',
+      barClassName: 'bg-orange-500',
+      accentClassName: 'text-orange-700',
     },
   ]
 

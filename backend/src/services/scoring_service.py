@@ -1,7 +1,7 @@
 """Scoring service for empathy, communication, and SPIKES metrics."""
 
 import json
-import os
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -165,6 +165,214 @@ def _compact_llm_output_for_evaluator_meta(llm_out: Any) -> dict[str, Any]:
     if truncated:
         d["_meta_truncated"] = True
     return d
+
+
+_SPIKES_CANONICAL_ORDER = [
+    "setting",
+    "perception",
+    "invitation",
+    "knowledge",
+    "emotion",
+    "strategy",
+]
+_SPIKES_LLM_CONFIDENCE_THRESHOLD = 0.6
+
+
+def _normalize_spikes_stage_key(raw: Any) -> str | None:
+    if not isinstance(raw, str):
+        return None
+    value = raw.strip().lower()
+    if not value:
+        return None
+    stage_map = {
+        "s": "setting",
+        "setting": "setting",
+        "p": "perception",
+        "perception": "perception",
+        "i": "invitation",
+        "invitation": "invitation",
+        "k": "knowledge",
+        "knowledge": "knowledge",
+        "e": "emotion",
+        "emotion": "emotion",
+        "emotions": "emotion",
+        "empathy": "emotion",
+        "s2": "strategy",
+        "strategy": "strategy",
+        "summary": "strategy",
+    }
+    return stage_map.get(value)
+
+
+def _stage_turn_mapping_rows_valid(mapping: list[Any]) -> bool:
+    """True when every row has int turn_number >= 1, unique turns, and normalizable stage."""
+    seen_turns: set[int] = set()
+    for row in mapping:
+        if not isinstance(row, dict):
+            return False
+        tn = row.get("turn_number")
+        if not isinstance(tn, int) or isinstance(tn, bool) or tn < 1:
+            return False
+        if tn in seen_turns:
+            return False
+        seen_turns.add(tn)
+        if _normalize_spikes_stage_key(row.get("stage")) is None:
+            return False
+    return True
+
+
+def _ensure_stage_turn_mapping(llm_output: dict[str, Any]) -> dict[str, Any]:
+    """Ensure `llm_output` has a canonical UI-ready `stage_turn_mapping`.
+
+    If `stage_turn_mapping` is a non-empty list and passes
+    `_stage_turn_mapping_rows_valid`, returns `llm_output` unchanged.
+    Otherwise derives one row per `turn_number` from `spikes_annotations` using
+    `_normalize_spikes_stage_key`, preferring the annotation with highest `confidence`
+    when present, else the first valid annotation per turn.
+    """
+    out = dict(llm_output)
+    existing = out.get("stage_turn_mapping")
+    if isinstance(existing, list) and len(existing) > 0 and _stage_turn_mapping_rows_valid(existing):
+        return out
+
+    annotations = out.get("spikes_annotations")
+    if not isinstance(annotations, list) or not annotations:
+        out["stage_turn_mapping"] = []
+        return out
+
+    by_turn: defaultdict[int, list[dict[str, Any]]] = defaultdict(list)
+    for a in annotations:
+        if not isinstance(a, dict):
+            continue
+        tn_raw = a.get("turn_number")
+        turn_number: int | None = None
+        if isinstance(tn_raw, int) and tn_raw >= 1:
+            turn_number = tn_raw
+        elif isinstance(tn_raw, float) and tn_raw.is_integer() and int(tn_raw) >= 1:
+            turn_number = int(tn_raw)
+        if turn_number is None:
+            continue
+        by_turn[turn_number].append(a)
+
+    mapping: list[dict[str, Any]] = []
+    for turn_number in sorted(by_turn.keys()):
+        items = by_turn[turn_number]
+        candidates_with_conf: list[tuple[float, str]] = []
+        for it in items:
+            norm = _normalize_spikes_stage_key(it.get("stage"))
+            if not norm:
+                continue
+            conf = it.get("confidence")
+            if conf is None:
+                continue
+            try:
+                cf = float(conf)
+            except (TypeError, ValueError):
+                continue
+            candidates_with_conf.append((cf, norm))
+
+        chosen: str | None = None
+        if candidates_with_conf:
+            chosen = max(candidates_with_conf, key=lambda x: x[0])[1]
+        else:
+            for it in items:
+                norm = _normalize_spikes_stage_key(it.get("stage"))
+                if norm:
+                    chosen = norm
+                    break
+
+        if chosen is not None:
+            mapping.append({"turn_number": turn_number, "stage": chosen})
+
+    out["stage_turn_mapping"] = mapping
+    return out
+
+
+def _build_spikes_coverage_payload(stage_set: set[str]) -> dict[str, Any]:
+    covered = [stage for stage in _SPIKES_CANONICAL_ORDER if stage in stage_set]
+    return {
+        "covered": covered,
+        "percent": (len(covered) / len(_SPIKES_CANONICAL_ORDER)) if _SPIKES_CANONICAL_ORDER else 0.0,
+    }
+
+
+def _calculate_spikes_completion_from_coverage(spikes_coverage: dict[str, Any] | None) -> float:
+    """Compute SPIKES completion from the final canonical coverage payload."""
+    covered_count = 0
+    if isinstance(spikes_coverage, dict):
+        covered = spikes_coverage.get("covered")
+        if isinstance(covered, list):
+            covered_count = len(
+                {stage for stage in covered if isinstance(stage, str) and stage in _SPIKES_CANONICAL_ORDER}
+            )
+    if not _SPIKES_CANONICAL_ORDER:
+        return 0.0
+    return round((covered_count / len(_SPIKES_CANONICAL_ORDER)) * 100.0, 2)
+
+
+def _extract_rule_spikes_stage_set(spikes_coverage: dict[str, Any] | None) -> set[str]:
+    covered_raw = []
+    if isinstance(spikes_coverage, dict):
+        maybe_covered = spikes_coverage.get("covered")
+        if isinstance(maybe_covered, list):
+            covered_raw = maybe_covered
+    out: set[str] = set()
+    for stage in covered_raw:
+        normalized = _normalize_spikes_stage_key(stage)
+        if normalized:
+            out.add(normalized)
+    return out
+
+
+def _should_apply_llm_spikes_merge(evaluator_meta: dict[str, Any] | None) -> bool:
+    if not isinstance(evaluator_meta, dict):
+        return False
+    if evaluator_meta.get("status") != "completed":
+        return False
+    llm_output = evaluator_meta.get("llm_output")
+    if not isinstance(llm_output, dict):
+        return False
+    spikes_annotations = llm_output.get("spikes_annotations")
+    return isinstance(spikes_annotations, list) and len(spikes_annotations) > 0
+
+
+def _extract_llm_spikes_stage_set(evaluator_meta: dict[str, Any] | None) -> set[str]:
+    if not _should_apply_llm_spikes_merge(evaluator_meta):
+        return set()
+    llm_output = evaluator_meta.get("llm_output") if isinstance(evaluator_meta, dict) else None
+    annotations = llm_output.get("spikes_annotations") if isinstance(llm_output, dict) else None
+    if not isinstance(annotations, list):
+        return set()
+    stages: set[str] = set()
+    for item in annotations:
+        if not isinstance(item, dict):
+            continue
+        normalized = _normalize_spikes_stage_key(item.get("stage"))
+        if not normalized:
+            continue
+        conf = item.get("confidence")
+        if conf is not None:
+            try:
+                if float(conf) < _SPIKES_LLM_CONFIDENCE_THRESHOLD:
+                    continue
+            except (TypeError, ValueError):
+                continue
+        stages.add(normalized)
+    return stages
+
+
+def _compute_spikes_coverage_merge(
+    rule_spikes_coverage: dict[str, Any] | None,
+    evaluator_meta: dict[str, Any] | None,
+) -> dict[str, Any]:
+    rule_stages = _extract_rule_spikes_stage_set(rule_spikes_coverage)
+    rule_payload = _build_spikes_coverage_payload(rule_stages)
+    if not _should_apply_llm_spikes_merge(evaluator_meta):
+        return rule_payload
+
+    llm_stages = _extract_llm_spikes_stage_set(evaluator_meta)
+    merged_stages = rule_stages | llm_stages
+    return _build_spikes_coverage_payload(merged_stages)
 
 
 @dataclass
@@ -527,20 +735,6 @@ class ScoringService:
             "spikes_completion_score": float(state.spikes_score),
             "overall_score": float(state.overall_score),
         }
-        real_llm_enabled = os.getenv("LLM_REVIEWER_REAL_CALLS", "").strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
-        if not real_llm_enabled:
-            return (
-                state.empathy_score,
-                state.communication_score,
-                state.spikes_score,
-                state.overall_score,
-                None,
-            )
 
         from schemas.llm_reviewer import LLMReviewerInput, TranscriptTurnLite
         from services.llm_reviewer_service import LLMReviewerService
@@ -604,9 +798,10 @@ class ScoringService:
                 "spikes_completion_score": ms,
                 "overall_score": mo,
             }
+            compacted_v1 = _compact_llm_output_for_evaluator_meta(llm_output)
             evaluator_meta = {
                 "phase": "hybrid_llm_v1",
-                "status": "success",
+                "status": "completed",
                 "merge_policy": {
                     "components": "0.7 * rule + 0.3 * llm",
                     "overall": "0.5 * merged_empathy + 0.2 * merged_communication + 0.3 * merged_spikes",
@@ -614,7 +809,7 @@ class ScoringService:
                 "rule_scores": rule_snapshot,
                 "llm_scores": llm_snapshot,
                 "merged_scores": merged_snapshot,
-                "llm_output": _compact_llm_output_for_evaluator_meta(llm_output),
+                "llm_output": _ensure_stage_turn_mapping(compacted_v1),
             }
             return (me, mc, ms, mo, evaluator_meta)
         except Exception as e:
@@ -645,20 +840,6 @@ class ScoringService:
             "spikes_completion_score": float(state.spikes_score),
             "overall_score": float(state.overall_score),
         }
-        real_llm_enabled = os.getenv("LLM_REVIEWER_REAL_CALLS", "").strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
-        if not real_llm_enabled:
-            return (
-                state.empathy_score,
-                state.communication_score,
-                state.spikes_score,
-                state.overall_score,
-                None,
-            )
 
         from schemas.llm_reviewer import LLMReviewerInput, TranscriptTurnLite
         from services.hybrid_v2_llm_service import (
@@ -744,10 +925,15 @@ class ScoringService:
                 outcome.communication,
             )
 
+            # Normalize status to completed|failed (no "partial" exposed at top-level).
+            status = "completed" if agg_status == "success" else "failed"
+            error = None if status == "completed" else "partial_llm_prompts_failed"
+            compacted_v2 = _compact_llm_output_for_evaluator_meta(compiled)
             evaluator_meta: dict[str, Any] = {
                 "phase": "hybrid_llm_v2",
-                "status": agg_status,
+                "status": status,
                 "prompt_status": outcome.prompt_status,
+                "error": error,
                 "merge_policy": {
                     "components": "0.7 * rule + 0.3 * llm",
                     "overall": "0.5 * merged_empathy + 0.2 * merged_communication + 0.3 * merged_spikes",
@@ -756,7 +942,7 @@ class ScoringService:
                 "rule_scores": rule_snapshot,
                 "llm_scores": llm_scores,
                 "merged_scores": merged_snapshot,
-                "llm_output": _compact_llm_output_for_evaluator_meta(compiled),
+                "llm_output": _ensure_stage_turn_mapping(compacted_v2),
                 "llm_adapter_calls": adapter_calls,
             }
             return (me, mc, ms, mo, evaluator_meta)
@@ -801,52 +987,44 @@ class ScoringService:
         feedback.communication_score = communication_score
         feedback.clinical_reasoning_score = None
         feedback.professionalism_score = None
-        feedback.spikes_completion_score = spikes_score
-        feedback.overall_score = overall_score
 
-        feedback.eo_counts_by_dimension = (
-            json.dumps(state.eo_counts_by_dimension) if state.eo_counts_by_dimension is not None else None
+        # Native Python objects here; FeedbackRepository serializes before commit (SQLite-safe).
+        feedback.eo_counts_by_dimension = state.eo_counts_by_dimension
+        feedback.elicitation_counts_by_type = state.elicitation_counts_by_type
+        feedback.response_counts_by_type = state.response_counts_by_type
+        feedback.linkage_stats = state.linkage_stats
+        feedback.missed_opportunities_by_dimension = state.missed_opportunities_by_dimension
+        feedback.eo_to_elicitation_links = state.eo_to_elicitation_links
+        feedback.eo_to_response_links = state.eo_to_response_links
+        feedback.missed_opportunities = state.missed_opportunities
+        # Single source of truth: persisted SPIKES coverage and persisted SPIKES score are
+        # both derived from this same final canonical merged payload.
+        feedback.spikes_coverage = _compute_spikes_coverage_merge(state.spikes_coverage, evaluator_meta)
+        feedback.spikes_completion_score = _calculate_spikes_completion_from_coverage(feedback.spikes_coverage)
+        feedback.overall_score = self._clamp_score(
+            round(
+                0.5 * float(feedback.empathy_score or 0.0)
+                + 0.2 * float(feedback.communication_score or 0.0)
+                + 0.3 * float(feedback.spikes_completion_score or 0.0),
+                2,
+            )
         )
-        feedback.elicitation_counts_by_type = (
-            json.dumps(state.elicitation_counts_by_type) if state.elicitation_counts_by_type is not None else None
-        )
-        feedback.response_counts_by_type = (
-            json.dumps(state.response_counts_by_type) if state.response_counts_by_type is not None else None
-        )
-
-        feedback.linkage_stats = json.dumps(state.linkage_stats) if state.linkage_stats is not None else None
-        feedback.missed_opportunities_by_dimension = (
-            json.dumps(state.missed_opportunities_by_dimension)
-            if state.missed_opportunities_by_dimension is not None
-            else None
-        )
-        feedback.eo_to_elicitation_links = (
-            json.dumps(state.eo_to_elicitation_links) if state.eo_to_elicitation_links is not None else None
-        )
-        feedback.eo_to_response_links = (
-            json.dumps(state.eo_to_response_links) if state.eo_to_response_links is not None else None
-        )
-        feedback.missed_opportunities = (
-            json.dumps(state.missed_opportunities) if state.missed_opportunities is not None else None
-        )
-
-        feedback.spikes_coverage = json.dumps(state.spikes_coverage) if state.spikes_coverage is not None else None
-        feedback.spikes_timestamps = json.dumps(state.spikes_timestamps) if state.spikes_timestamps is not None else None
-        feedback.spikes_strategies = json.dumps(state.spikes_strategies) if state.spikes_strategies is not None else None
-
-        feedback.question_breakdown = json.dumps(state.question_breakdown) if state.question_breakdown is not None else None
-
-        feedback.bias_probe_info = json.dumps(bias_probe_info) if bias_probe_info is not None else None
+        feedback.spikes_timestamps = state.spikes_timestamps
+        feedback.spikes_strategies = state.spikes_strategies
+        feedback.question_breakdown = state.question_breakdown
+        feedback.bias_probe_info = bias_probe_info
         meta_out: dict[str, Any] = dict(evaluator_meta) if evaluator_meta else {}
         meta_out["session_plugins"] = _session_plugin_context_for_evaluator_meta(state.session)
-        feedback.evaluator_meta = json.dumps(meta_out)
+        feedback.evaluator_meta = meta_out
         feedback.latency_ms_avg = state.latency_ms_avg
 
         feedback.strengths = state.strengths if state.strengths and state.strengths.strip() else None
         feedback.areas_for_improvement = (
             state.improvements if state.improvements and state.improvements.strip() else None
         )
-        feedback.detailed_feedback = f"Overall Score: {overall_score:.1f}/100" if overall_score >= 0 else None
+        feedback.detailed_feedback = (
+            f"Overall Score: {float(feedback.overall_score):.1f}/100" if float(feedback.overall_score) >= 0 else None
+        )
 
         if existing_feedback:
             saved_feedback = self.feedback_repo.update(feedback)
@@ -1400,9 +1578,9 @@ class ScoringService:
             "invitation": "invitation",
             "k": "knowledge",
             "knowledge": "knowledge",
-            "e": "empathy",
-            "emotion": "empathy",
-            "empathy": "empathy",
+            "e": "emotion",
+            "emotion": "emotion",
+            "empathy": "emotion",
             "s2": "strategy",
             "strategy": "strategy",
             "summary": "strategy",
@@ -1418,7 +1596,7 @@ class ScoringService:
                 covered.add(canonical)
 
         # Canonical six stages
-        canonical_stages = ["setting", "perception", "invitation", "knowledge", "empathy", "strategy"]
+        canonical_stages = ["setting", "perception", "invitation", "knowledge", "emotion", "strategy"]
         total_stages = len(canonical_stages)
 
         covered_count = len(covered & set(canonical_stages))

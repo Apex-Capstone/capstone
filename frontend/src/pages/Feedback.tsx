@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { fetchFeedback } from '@/api/feedback.api'
-import type { Feedback as FeedbackType } from '@/api/feedback.api'
+import type { Feedback as FeedbackType, FeedbackEvaluatorMeta } from '@/api/feedback.api'
 import { getSession } from '@/api/sessions.api'
 import type { SessionDetail } from '@/types/session'
 import { FeedbackChart } from '@/components/FeedbackChart'
@@ -47,8 +47,69 @@ const LETTER_TO_WORD: Record<string, string> = {
  */
 function normaliseSpikesCovered(covered: string[]): Set<string> {
   return new Set(
-    covered.map((s) => LETTER_TO_WORD[s] ?? s.toLowerCase())
+    covered.map((s) => {
+      const mapped = LETTER_TO_WORD[s] ?? s.toLowerCase()
+      return mapped === 'emotions' ? 'emotion' : mapped
+    })
   )
+}
+
+function getPreferredStrengths(
+  evaluatorMeta: FeedbackEvaluatorMeta | null | undefined,
+  fallbackStrengths: string | null | undefined,
+): string[] {
+  const llmOutput =
+    evaluatorMeta != null &&
+    typeof evaluatorMeta === 'object' &&
+    'llm_output' in evaluatorMeta
+      ? evaluatorMeta.llm_output
+      : null
+
+  const llmStrengths =
+    llmOutput != null &&
+    typeof llmOutput === 'object' &&
+    'strengths' in llmOutput
+      ? llmOutput.strengths
+      : null
+
+  if (Array.isArray(llmStrengths)) {
+    const lines = llmStrengths
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter(Boolean)
+    if (lines.length > 0) return lines
+  }
+
+  return splitLines(fallbackStrengths)
+}
+
+function getPreferredImprovements(
+  evaluatorMeta: FeedbackEvaluatorMeta | null | undefined,
+  fallbackImprovements: string | null | undefined,
+): string[] {
+  const llmOutput =
+    evaluatorMeta != null &&
+    typeof evaluatorMeta === 'object' &&
+    'llm_output' in evaluatorMeta
+      ? evaluatorMeta.llm_output
+      : null
+
+  const llmImprovements =
+    llmOutput != null &&
+    typeof llmOutput === 'object' &&
+    'areas_for_improvement' in llmOutput
+      ? llmOutput.areas_for_improvement
+      : null
+
+  if (Array.isArray(llmImprovements)) {
+    const lines = llmImprovements
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter(Boolean)
+    if (lines.length > 0) return lines
+  }
+
+  return splitLines(fallbackImprovements)
 }
 
 /**
@@ -173,11 +234,13 @@ export const Feedback = () => {
   const coveragePercent = feedback.spikesCoverage
     ? Math.round(feedback.spikesCoverage.percent * 100)
     : 0
-  const strengthsList = splitLines(feedback.strengths)
-  const improvementsList = splitLines(feedback.areasForImprovement)
-  const openRatio = feedback.questionBreakdown
-    ? Math.round(feedback.questionBreakdown.ratio_open * 100)
-    : null
+  const strengthsList = getPreferredStrengths(feedback.evaluatorMeta, feedback.strengths)
+  const improvementsList = getPreferredImprovements(
+    feedback.evaluatorMeta,
+    feedback.areasForImprovement,
+  )
+  const sessionMetricsDisplay =
+    sessionDetail != null ? formatMetricsPluginsDisplay(sessionDetail.metricsPlugins) : null
 
   return (
     <div className="h-screen flex flex-col">
@@ -216,15 +279,15 @@ export const Feedback = () => {
                 </div>
               </div>
 
-              {/* Hero: SPIKES Coverage & Empathy Score */}
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Hero: SPIKES Coverage, Empathy Score, Communication Score */}
+              <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-6 text-center">
                   <div className="text-sm font-medium text-purple-800 uppercase tracking-wide">SPIKES Coverage</div>
                   <div className="text-4xl font-bold text-purple-600 mt-1">
                     {coveragePercent}<span className="text-xl font-semibold text-purple-500">%</span>
                   </div>
                   <p className="text-xs text-purple-700 mt-1">
-                    {coveredStages.size}/6 stages reached
+                    Session spikes completion
                   </p>
                 </div>
                 <div className="rounded-xl border-2 border-apex-200 bg-apex-50 p-6 text-center">
@@ -234,230 +297,177 @@ export const Feedback = () => {
                   </div>
                   <p className="mt-1 text-xs text-apex-700">Session empathy recognition</p>
                 </div>
+                <div className="rounded-xl border-2 border-orange-200 bg-orange-50 p-6 text-center">
+                  <div className="text-sm font-medium uppercase tracking-wide text-orange-800">Communication Score</div>
+                  <div className="mt-1 text-4xl font-bold text-orange-600">
+                    {feedback.communicationScore.toFixed(1)}<span className="text-xl font-semibold text-orange-500">/100</span>
+                  </div>
+                  <p className="mt-1 text-xs text-orange-700">Session communication clarity</p>
+                </div>
               </div>
             </div>
-
-            {sessionDetail && (
-              <Card className="mb-8 border-slate-200 bg-slate-50/90">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg text-slate-900">Evaluation details</CardTitle>
-                  <p className="text-sm font-normal text-slate-600">
-                    Plugins recorded for this session (for reproducibility).
-                  </p>
-                </CardHeader>
-                <CardContent className="grid gap-4 sm:grid-cols-2 text-sm">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Evaluator
-                    </div>
-                    <div className="mt-1 font-medium text-slate-900">
-                      {sessionDetail.evaluatorPlugin
-                        ? formatPluginName(sessionDetail.evaluatorPlugin)
-                        : 'Server default'}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Patient model
-                    </div>
-                    <div className="mt-1 font-medium text-slate-900">
-                      {sessionDetail.patientModelPlugin
-                        ? formatPluginName(sessionDetail.patientModelPlugin)
-                        : 'Server default'}
-                    </div>
-                  </div>
-                  {formatMetricsPluginsDisplay(sessionDetail.metricsPlugins) ? (
-                    <div className="sm:col-span-2">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Metrics plugins
-                      </div>
-                      <div className="mt-1 font-medium text-slate-900">
-                        {formatMetricsPluginsDisplay(sessionDetail.metricsPlugins)}
-                      </div>
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
-            )}
 
             <div className="space-y-8">
               {/* SPIKES Coverage & Conversation Metrics */}
               <div className="grid gap-6 lg:grid-cols-2">
-                {/* SPIKES Coverage Checklist */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <span className="text-purple-600">📊</span>
-                      SPIKES Coverage
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {feedback.spikesCoverage && (
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <span className="text-purple-600">📊</span>
+                        SPIKES Coverage
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {feedback.spikesCoverage && (
+                        <div className="space-y-4">
+                          <div className="pt-1 text-sm font-medium text-gray-800">
+                            Overall Coverage:{' '}
+                            <span className="font-semibold text-purple-700">
+                              {feedback.spikesCoverage.coveredCount} / {feedback.spikesCoverage.total}{' '}
+                              stages
+                            </span>
+                            <span className="ml-2 text-gray-500">({coveragePercent}%)</span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            {SPIKES_STAGE_ORDER.map(({ key, label }) => {
+                              const covered = coveredStages.has(key)
+                              return (
+                                <div key={key} className="flex items-center justify-between">
+                                  <span className="text-sm font-medium">{label}</span>
+                                  <span
+                                    className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                      covered
+                                        ? 'bg-apex-100 text-apex-700'
+                                        : 'bg-gray-100 text-gray-500'
+                                    }`}
+                                  >
+                                    {covered ? '✓ Covered' : 'Missed'}
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Conversation Metrics</CardTitle>
+                    </CardHeader>
+                    <CardContent>
                       <div className="space-y-4">
-                        <div className="space-y-2">
-                          {[
-                            { key: 'setting', label: 'Setting' },
-                            { key: 'perception', label: 'Perception' },
-                            { key: 'invitation', label: 'Invitation' },
-                            { key: 'knowledge', label: 'Knowledge' },
-                            { key: 'emotion', label: 'Emotion' },
-                            { key: 'strategy', label: 'Strategy' },
-                          ].map((stage) => {
-                            const covered =
-                              feedback.spikesCoverage &&
-                              feedback.spikesCoverage[stage.key as keyof typeof feedback.spikesCoverage]
-
-                            return (
-                              <div
-                                key={stage.key}
-                                className="flex items-center justify-between py-1 border-b last:border-b-0 border-gray-100"
-                              >
-                                <span className="text-sm font-medium text-gray-800">
-                                  {stage.label}
-                                </span>
-                                {covered ? (
-                                  <span className="text-sm font-semibold text-apex-500">
-                                    ✓ Covered
-                                  </span>
-                                ) : (
-                                  <span className="text-sm font-semibold text-red-500">
-                                    ✗ Missed
-                                  </span>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
-
-                        <div className="pt-2 text-sm font-medium text-gray-800">
-                          Overall Coverage:{' '}
-                          <span className="font-semibold text-purple-700">
-                            {feedback.spikesCoverage.coveredCount} / {feedback.spikesCoverage.total}{' '}
-                            stages
-                          </span>
-                          <span className="ml-2 text-gray-500">
-                            (
-                            {Math.round(
-                              (feedback.spikesCoverage.coveredCount /
-                                feedback.spikesCoverage.total) *
-                                100,
-                            )}
-                            %)
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          {SPIKES_STAGE_ORDER.map(({ key, label }) => {
-                            const reached = coveredStages.has(key)
-                            return (
-                              <div key={key} className="flex items-center justify-between">
-                                <span className="text-sm font-medium">{label}</span>
-                                <span
-                                  className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                                    reached
-                                      ? 'bg-apex-100 text-apex-700'
-                                      : 'bg-gray-100 text-gray-500'
-                                  }`}
-                                >
-                                  {reached ? 'Reached' : 'Missed'}
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                        <div className="text-xs text-gray-500 pt-2 border-t">
-                          SPIKES Completion Score: {feedback.spikesCompletionScore.toFixed(1)}/100
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Conversation Metrics</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="rounded-lg bg-apex-50 p-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Empathy Score</span>
-                          <span className="text-xl font-bold text-apex-600">
-                            {feedback.empathyScore.toFixed(1)}/100
-                          </span>
-                        </div>
-                        <div className="w-full h-4 bg-gray-200 rounded-full mt-2 overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-apex-500 transition-[width]"
-                            style={{ width: `${empathyPercent}%` }}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">Band: red (low) → yellow → green (high)</p>
-                      </div>
-
-                      {openRatio !== null && (
                         <div className="rounded-lg bg-apex-50 p-4">
                           <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Open Question Ratio</span>
-                            <span className="text-lg font-bold text-apex-600">
-                              {openRatio}%
+                            <span className="text-sm font-medium">Empathy Score</span>
+                            <span className="text-xl font-bold text-apex-600">
+                              {feedback.empathyScore.toFixed(1)}/100
                             </span>
                           </div>
-                          <div className="mt-2 h-2 w-full rounded-full bg-apex-200">
+                          <div className="w-full h-4 bg-gray-200 rounded-full mt-2 overflow-hidden">
                             <div
-                              className="h-full rounded-full bg-apex-500"
-                              style={{ width: `${openRatio}%` }}
+                              className="h-full rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-apex-500 transition-[width]"
+                              style={{ width: `${empathyPercent}%` }}
                             />
                           </div>
+                          <p className="text-xs text-gray-500 mt-1">Band: red (low) → yellow → green (high)</p>
                         </div>
-                      )}
 
-                      {feedback.questionBreakdown && (
-                        <div className="grid grid-cols-3 gap-3 pt-2">
-                          <div className="rounded-lg bg-apex-50 p-3 text-center">
-                            <div className="text-lg font-bold text-apex-800">
-                              {feedback.questionBreakdown.open}
+                        {feedback.questionBreakdown && (
+                          <div className="pt-2">
+                            <div className="text-sm font-medium text-gray-800 mb-2">
+                              Question Type
                             </div>
-                            <div className="text-xs text-gray-600">Open</div>
-                          </div>
-                          <div className="text-center p-3 bg-orange-50 rounded-lg">
-                            <div className="text-lg font-bold text-orange-600">
-                              {feedback.questionBreakdown.closed}
+                            <div className="grid grid-cols-3 gap-3">
+                              <div className="rounded-lg bg-apex-50 p-3 text-center">
+                                <div className="text-lg font-bold text-apex-800">
+                                  {feedback.questionBreakdown.open}
+                                </div>
+                                <div className="text-xs text-gray-600">Open</div>
+                              </div>
+                              <div className="text-center p-3 bg-orange-50 rounded-lg">
+                                <div className="text-lg font-bold text-orange-600">
+                                  {feedback.questionBreakdown.closed}
+                                </div>
+                                <div className="text-xs text-gray-600">Closed</div>
+                              </div>
+                              <div className="text-center p-3 bg-purple-50 rounded-lg">
+                                <div className="text-lg font-bold text-purple-600">
+                                  {feedback.questionBreakdown.eliciting}
+                                </div>
+                                <div className="text-xs text-gray-600">Eliciting</div>
+                              </div>
                             </div>
-                            <div className="text-xs text-gray-600">Closed</div>
                           </div>
-                          <div className="text-center p-3 bg-purple-50 rounded-lg">
-                            <div className="text-lg font-bold text-purple-600">
-                              {feedback.questionBreakdown.eliciting}
-                            </div>
-                            <div className="text-xs text-gray-600">Eliciting</div>
-                          </div>
-                        </div>
-                      )}
+                        )}
 
-                      {feedback.linkageStats && (
-                        <div className="pt-2 border-t text-sm text-gray-600 space-y-1">
-                          <div className="flex justify-between">
-                            <span>Empathic Opportunities Detected</span>
-                            <span className="font-medium">{feedback.linkageStats.total_eos}</span>
+                        {feedback.linkageStats && (
+                          <div className="pt-2 border-t text-sm text-gray-600 space-y-1">
+                            <div className="flex justify-between">
+                              <span>Empathic Opportunities Detected</span>
+                              <span className="font-medium">{feedback.linkageStats.total_eos}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Addressed</span>
+                              <span className="font-medium text-apex-600">
+                                {feedback.linkageStats.addressed_count} ({Math.round(feedback.linkageStats.addressed_rate * 100)}%)
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Missed</span>
+                              <span className="font-medium text-orange-600">
+                                {feedback.linkageStats.missed_count} ({Math.round(feedback.linkageStats.missed_rate * 100)}%)
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex justify-between">
-                            <span>Addressed</span>
-                            <span className="font-medium text-apex-600">
-                              {feedback.linkageStats.addressed_count} ({Math.round(feedback.linkageStats.addressed_rate * 100)}%)
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Missed</span>
-                            <span className="font-medium text-orange-600">
-                              {feedback.linkageStats.missed_count} ({Math.round(feedback.linkageStats.missed_rate * 100)}%)
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="space-y-6">
+                  {strengthsList.length > 0 && (
+                    <Card className="h-80 flex flex-col overflow-hidden border-gray-200">
+                      <CardHeader className="flex-none border-b border-apex-100 bg-gradient-to-r from-apex-50 to-white px-5 py-4">
+                        <CardTitle className="text-lg text-apex-700">Strengths</CardTitle>
+                      </CardHeader>
+                      <CardContent className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-5 pr-1">
+                        <ul className="space-y-2">
+                          {strengthsList.map((strength, index) => (
+                            <li key={index} className="flex items-start gap-3 rounded-lg border border-apex-100 bg-apex-50/60 p-2.5">
+                              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-apex-100 text-xs font-bold text-apex-700">
+                                ✓
+                              </span>
+                              <span className="text-sm leading-6 text-gray-700">{strength}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {improvementsList.length > 0 && (
+                    <Card className="h-80 flex flex-col overflow-hidden border-gray-200">
+                      <CardHeader className="flex-none border-b border-orange-100 bg-gradient-to-r from-orange-50 to-white px-5 py-4">
+                        <CardTitle className="text-lg text-orange-700">Areas for Improvement</CardTitle>
+                      </CardHeader>
+                      <CardContent className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-5 pr-1">
+                        <ul className="space-y-2">
+                          {improvementsList.map((area, index) => (
+                            <li key={index} className="flex items-start gap-3 rounded-lg border border-orange-100 bg-orange-50/60 p-2.5">
+                              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-500" />
+                              <span className="text-sm leading-6 text-gray-700">{area}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
               </div>
 
               {/* Conversation Analysis Timeline */}
@@ -523,59 +533,7 @@ export const Feedback = () => {
                 </Card>
               </div>
 
-              {/* Row 2: Evaluation Framework (full width) */}
-              <Card className="overflow-hidden border-gray-200">
-                <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white px-5 py-4">
-                  <CardTitle className="text-lg">Evaluation Framework</CardTitle>
-                </CardHeader>
-                <CardContent className="px-5 pb-5 pt-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
-                      <div className="text-xs font-medium uppercase tracking-wide text-indigo-600">Evaluator</div>
-                      <div className="mt-1 text-sm font-semibold text-gray-900">
-                        {feedback.evaluatorMeta?.name
-                          ? String(feedback.evaluatorMeta.name)
-                          : feedback.evaluatorMeta?.evaluator
-                            ? String(feedback.evaluatorMeta.evaluator)
-                            : 'Apex Hybrid Evaluator'}
-                      </div>
-                    </div>
-                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
-                      <div className="text-xs font-medium uppercase tracking-wide text-indigo-600">Framework</div>
-                      <div className="mt-1 text-sm font-semibold text-gray-900">
-                        {feedback.evaluatorMeta?.framework
-                          ? String(feedback.evaluatorMeta.framework)
-                          : 'SPIKES + Clinical Empathy Analysis'}
-                      </div>
-                    </div>
-                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3 sm:col-span-2 lg:col-span-1">
-                      <div className="text-xs font-medium uppercase tracking-wide text-indigo-600">About</div>
-                      <div className="mt-1 text-xs text-gray-500">
-                        Scores and feedback were generated by the evaluation plugin configured for this session.
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {feedback.evaluatorMeta != null &&
-                Object.keys(feedback.evaluatorMeta).length > 0 && (
-                  <Card className="overflow-hidden border-gray-200">
-                    <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-5 py-4">
-                      <CardTitle className="text-lg">Evaluator metadata</CardTitle>
-                      <p className="text-sm text-gray-500 font-normal mt-1">
-                        Scoring pipeline details (phase, merge status, optional LLM fields).
-                      </p>
-                    </CardHeader>
-                    <CardContent className="px-5 pb-5 pt-5">
-                      <pre className="text-xs overflow-x-auto bg-gray-50 border border-gray-100 rounded-lg p-4 text-left whitespace-pre-wrap break-words">
-                        {JSON.stringify(feedback.evaluatorMeta, null, 2)}
-                      </pre>
-                    </CardContent>
-                  </Card>
-                )}
-
-              {/* AFCE Breakdown (if data available) */}
+              {/* Empathic opportunities & response types (above evaluation framework) */}
               {(feedback.eoCountsByDimension || feedback.responseCountsByType) && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {feedback.eoCountsByDimension && (
@@ -635,48 +593,67 @@ export const Feedback = () => {
                 </div>
               )}
 
-              {/* Strengths & Areas for Improvement */}
-              {(strengthsList.length > 0 || improvementsList.length > 0) && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {strengthsList.length > 0 && (
-                    <Card className="overflow-hidden border-gray-200">
-                      <CardHeader className="border-b border-apex-100 bg-gradient-to-r from-apex-50 to-white px-5 py-4">
-                        <CardTitle className="text-lg text-apex-700">Strengths</CardTitle>
-                      </CardHeader>
-                      <CardContent className="px-5 pb-5 pt-5">
-                        <ul className="space-y-2">
-                          {strengthsList.map((strength, index) => (
-                            <li key={index} className="flex items-start gap-3 rounded-lg border border-apex-100 bg-apex-50/60 p-2.5">
-                              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-apex-100 text-xs font-bold text-apex-700">
-                                ✓
-                              </span>
-                              <span className="text-sm leading-6 text-gray-700">{strength}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  )}
+              {/* Evaluation Framework: evaluator + patient model + metrics plugins */}
+              <Card className="overflow-hidden border-gray-200">
+                <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white px-5 py-4">
+                  <CardTitle className="text-lg">Evaluation Framework</CardTitle>
+                  <p className="text-sm font-normal text-gray-500 mt-1">
+                    Plugins recorded for this session and how scores were produced.
+                  </p>
+                </CardHeader>
+                <CardContent className="px-5 pb-5 pt-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
+                      <div className="text-xs font-medium uppercase tracking-wide text-indigo-600">Evaluator</div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        {sessionDetail?.evaluatorPlugin
+                          ? formatPluginName(sessionDetail.evaluatorPlugin)
+                          : feedback.evaluatorMeta?.name
+                            ? String(feedback.evaluatorMeta.name)
+                            : feedback.evaluatorMeta?.evaluator
+                              ? String(feedback.evaluatorMeta.evaluator)
+                              : 'Apex Hybrid Evaluator'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
+                      <div className="text-xs font-medium uppercase tracking-wide text-indigo-600">
+                        Patient model
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        {sessionDetail?.patientModelPlugin
+                          ? formatPluginName(sessionDetail.patientModelPlugin)
+                          : 'Server default'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3 sm:col-span-2 lg:col-span-1">
+                      <div className="text-xs font-medium uppercase tracking-wide text-indigo-600">
+                        Metrics plugins
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">
+                        {sessionMetricsDisplay || 'Server default'}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-                  {improvementsList.length > 0 && (
-                    <Card className="overflow-hidden border-gray-200">
-                      <CardHeader className="border-b border-orange-100 bg-gradient-to-r from-orange-50 to-white px-5 py-4">
-                        <CardTitle className="text-lg text-orange-700">Areas for Improvement</CardTitle>
-                      </CardHeader>
-                      <CardContent className="px-5 pb-5 pt-5">
-                        <ul className="space-y-2">
-                          {improvementsList.map((area, index) => (
-                            <li key={index} className="flex items-start gap-3 rounded-lg border border-orange-100 bg-orange-50/60 p-2.5">
-                              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-500" />
-                              <span className="text-sm leading-6 text-gray-700">{area}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              )}
+              {feedback.evaluatorMeta != null &&
+                Object.keys(feedback.evaluatorMeta).length > 0 && (
+                  <Card className="overflow-hidden border-gray-200">
+                    <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-5 py-4">
+                      <CardTitle className="text-lg">Evaluator metadata</CardTitle>
+                      <p className="text-sm text-gray-500 font-normal mt-1">
+                        Scoring pipeline details (phase, merge status, optional LLM fields).
+                      </p>
+                    </CardHeader>
+                    <CardContent className="px-5 pb-5 pt-5">
+                      <pre className="max-h-96 overflow-auto text-xs bg-gray-50 border border-gray-100 rounded-lg p-4 text-left whitespace-pre-wrap break-words">
+                        {JSON.stringify(feedback.evaluatorMeta, null, 2)}
+                      </pre>
+                    </CardContent>
+                  </Card>
+                )}
+
             </div>
           </div>
         </main>

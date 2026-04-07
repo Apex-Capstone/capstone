@@ -1,0 +1,85 @@
+{
+  "meta": {
+    "evaluator_family": "manual_external_llm",
+    "evaluator_version": "manual",
+    "status": "completed"
+  },
+  "scores": {
+    "empathy_score": 30.0,
+    "communication_score": 45.0,
+    "spikes_completion_score": 33.33,
+    "overall_score": 38.0
+  },
+  "spikes": {
+    "stages_present": ["knowledge", "emotion", "strategy"],
+    "stage_turn_mapping": [
+      {
+        "turn_number": 3,
+        "stage": "knowledge"
+      },
+      {
+        "turn_number": 5,
+        "stage": "knowledge"
+      },
+      {
+        "turn_number": 11,
+        "stage": "emotion"
+      },
+      {
+        "turn_number": 7,
+        "stage": "strategy"
+      },
+      {
+        "turn_number": 9,
+        "stage": "strategy"
+      }
+    ],
+    "missing_stages": ["setting", "perception", "invitation"],
+    "sequencing_notes": "Clinician did not establish setting (e.g., privacy, support person), did not assess patient's perception of the situation, and did not explicitly ask for permission/invitation to share results. Emotion stage was minimally addressed only after patient expressed distress multiple times."
+  },
+  "missed_opportunities": [
+    {
+      "turn_number": 2,
+      "cue_text": "I've been really nervous about this.",
+      "clinician_response_summary": "Ignored the expressed nervousness and proceeded to deliver results.",
+      "why_missed_or_weak": "Clinician did not acknowledge or validate the patient's emotion before delivering bad news.",
+      "suggested_response": "I can see you're nervous. That's completely understandable. Would it be okay if we go through the results together?",
+      "confidence": 0.9
+    },
+    {
+      "turn_number": 6,
+      "cue_text": "I'm really scared… I don't know what I'll do.",
+      "clinician_response_summary": "Responded with scheduling additional tests without addressing the fear.",
+      "why_missed_or_weak": "Patient expressed significant fear and helplessness; clinician moved to logistics instead of emotional support.",
+      "suggested_response": "I hear that you're scared, and this is a lot to take in. It's okay to feel that way. I'm here to support you through each step.",
+      "confidence": 0.95
+    },
+    {
+      "turn_number": 10,
+      "cue_text": "This is a lot…",
+      "clinician_response_summary": "Acknowledged the information load but did not explore the patient's emotional state further.",
+      "why_missed_or_weak": "Acknowledgment was factual ('a lot of information') rather than empathic ('this must feel overwhelming for you').",
+      "suggested_response": "Yes, this is a lot to take in. How are you feeling right now?",
+      "confidence": 0.85
+    }
+  ],
+  "feedback": {
+    "strength_tags": ["professionalism", "organized_conversation"],
+    "improvement_tags": ["missing_invitation", "weak_emotional_acknowledgment", "incomplete_spikes"],
+    "strengths_text": [
+      "Clinician provided clear next steps about diagnostic tests and treatment discussions.",
+      "Clinician maintained a professional and structured approach."
+    ],
+    "areas_for_improvement_text": [
+      "Failed to set up the conversation environment or check patient's perception and invitation.",
+      "Repeatedly missed opportunities to acknowledge and validate patient's fear and nervousness.",
+      "Emotion stage was underdeveloped; patient's distress was addressed only superficially."
+    ]
+  },
+  "confidence": {
+    "empathy_confidence": 0.9,
+    "communication_confidence": 0.85,
+    "spikes_confidence": 0.9,
+    "overall_confidence": 0.88
+  }
+}

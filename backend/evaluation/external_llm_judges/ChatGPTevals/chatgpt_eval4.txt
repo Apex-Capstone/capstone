@@ -1,0 +1,98 @@
+{
+"meta": {
+"evaluator_family": "manual_external_llm",
+"evaluator_version": "gpt-5.3",
+"status": "completed"
+},
+"scores": {
+"empathy_score": 15.0,
+"communication_score": 35.0,
+"spikes_completion_score": 33.0,
+"overall_score": 25.0
+},
+"spikes": {
+"stages_present": ["knowledge", "strategy"],
+"stage_turn_mapping": [
+{
+"turn_number": 3,
+"stage": "knowledge"
+},
+{
+"turn_number": 5,
+"stage": "knowledge"
+},
+{
+"turn_number": 7,
+"stage": "strategy"
+},
+{
+"turn_number": 9,
+"stage": "strategy"
+}
+],
+"missing_stages": ["setting", "perception", "invitation", "emotion"],
+"sequencing_notes": "Clinician delivers diagnostic information abruptly without establishing setting, assessing patient understanding, or inviting preferences. Emotional responses are not acknowledged before moving to next steps."
+},
+"missed_opportunities": [
+{
+"turn_number": 1,
+"cue_text": null,
+"clinician_response_summary": "Immediately delivers results without preparation or warning.",
+"why_missed_or_weak": "No effort to set the stage, ensure privacy, or prepare the patient for bad news.",
+"suggested_response": "Before discussing results, ask if this is a good time and prepare the patient: 'I have your results, and some of them are concerning. Is it okay if we talk about them now?'",
+"confidence": 0.9
+},
+{
+"turn_number": 2,
+"cue_text": "I've been worried.",
+"clinician_response_summary": "Ignores patient's expressed worry and proceeds to deliver diagnosis.",
+"why_missed_or_weak": "Missed opportunity to acknowledge anxiety and build rapport before delivering bad news.",
+"suggested_response": "Acknowledge emotion: 'I can see this has been weighing on you. Let's go through everything together.'",
+"confidence": 0.95
+},
+{
+"turn_number": 4,
+"cue_text": "are you saying I have cancer?",
+"clinician_response_summary": "Provides probabilistic answer without emotional support.",
+"why_missed_or_weak": "Fails to address fear and shock before clarifying information.",
+"suggested_response": "Respond with empathy first: 'I know that’s a frightening possibility. Based on the scan, we are concerned, but we need more tests to be certain.'",
+"confidence": 0.95
+},
+{
+"turn_number": 6,
+"cue_text": "That's terrifying…",
+"clinician_response_summary": "Ignores emotional expression and moves to logistics.",
+"why_missed_or_weak": "Strong emotional cue not acknowledged; lacks validation or support.",
+"suggested_response": "Validate emotion: 'I’m really sorry this is so scary. It’s completely understandable to feel that way.'",
+"confidence": 0.98
+},
+{
+"turn_number": 8,
+"cue_text": "I don't even know what to say…",
+"clinician_response_summary": "Continues with referral plan without addressing distress.",
+"why_missed_or_weak": "Missed opportunity to pause, support, and guide patient through emotional response.",
+"suggested_response": "Offer support and space: 'That’s okay. This is a lot to take in. I’m here with you, and we can go through this step by step.'",
+"confidence": 0.97
+}
+],
+"feedback": {
+"strength_tags": ["clear_communication", "organized_conversation", "professionalism"],
+"improvement_tags": ["weak_emotional_acknowledgment", "missing_invitation", "incomplete_spikes", "missed_opportunity"],
+"strengths_text": [
+"Provides clear and direct information about findings",
+"Outlines next steps in a structured manner",
+"Maintains a professional tone throughout"
+],
+"areas_for_improvement_text": [
+"Fails to acknowledge or validate patient emotions at multiple points",
+"Does not assess patient understanding or invite preferences before delivering bad news",
+"Moves too quickly to planning without supporting emotional processing"
+]
+},
+"confidence": {
+"empathy_confidence": 0.95,
+"communication_confidence": 0.9,
+"spikes_confidence": 0.92,
+"overall_confidence": 0.93
+}
+}

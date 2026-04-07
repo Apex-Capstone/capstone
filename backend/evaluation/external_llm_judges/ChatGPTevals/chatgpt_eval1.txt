@@ -1,0 +1,88 @@
+{
+"meta": {
+"evaluator_family": "manual_external_llm",
+"evaluator_version": "gpt-5.3",
+"status": "completed"
+},
+"scores": {
+"empathy_score": 92.0,
+"communication_score": 90.0,
+"spikes_completion_score": 95.0,
+"overall_score": 92.0
+},
+"spikes": {
+"stages_present": [
+"setting",
+"perception",
+"invitation",
+"knowledge",
+"emotion",
+"strategy"
+],
+"stage_turn_mapping": [
+{
+"turn_number": 1,
+"stage": "setting"
+},
+{
+"turn_number": 3,
+"stage": "perception"
+},
+{
+"turn_number": 5,
+"stage": "invitation"
+},
+{
+"turn_number": 7,
+"stage": "knowledge"
+},
+{
+"turn_number": 9,
+"stage": "emotion"
+},
+{
+"turn_number": 13,
+"stage": "strategy"
+}
+],
+"missing_stages": [],
+"sequencing_notes": "The clinician follows a logical SPIKES sequence with smooth transitions between stages and appropriate pacing."
+},
+"missed_opportunities": [
+{
+"turn_number": 7,
+"cue_text": "So… it really is cancer?",
+"clinician_response_summary": "Delivered serious news with a warning but transitioned quickly to uncertainty about confirmation.",
+"why_missed_or_weak": "Although empathetic language was used, the clinician could have paused more after delivering the news to allow emotional processing before adding additional information.",
+"suggested_response": "Pause and respond with: 'I can see this is a lot to take in. I'm here with you—would you like a moment before we talk more about what this means?'",
+"confidence": 0.87
+}
+],
+"feedback": {
+"strength_tags": [
+"validation_of_emotion",
+"clear_communication",
+"organized_conversation",
+"partnership_language"
+],
+"improvement_tags": [
+"missed_opportunity",
+"weak_emotional_acknowledgment"
+],
+"strengths_text": [
+"Consistently validates and normalizes patient emotions.",
+"Uses clear, structured communication aligned with SPIKES.",
+"Demonstrates strong partnership language and support."
+],
+"areas_for_improvement_text": [
+"Allow more silence and space immediately after delivering bad news.",
+"Deepen emotional exploration before moving to next steps."
+]
+},
+"confidence": {
+"empathy_confidence": 0.92,
+"communication_confidence": 0.9,
+"spikes_confidence": 0.95,
+"overall_confidence": 0.91
+}
+}
