@@ -1,6 +1,6 @@
 Collecting external judge files from: capstone/backend/evaluation/external_llm_judges
 
-Reading APEX scores: capstone/backend/print_and_structure.txt
+Reading APEX scores: capstone/backend/evaluation/validation_model_outputs.txt
 
 Wrote JSON report: capstone/backend/evaluation/panel_comparison_report.json
 
