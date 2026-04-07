@@ -54,6 +54,9 @@ export interface FeedbackEvaluatorMeta {
   phase?: string
   status?: string
   framework?: string
+  /** Display labels when present on stored metadata */
+  name?: string
+  evaluator?: string
 }
 
 /**
