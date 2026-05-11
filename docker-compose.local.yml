@@ -1,0 +1,37 @@
+# Optional local overlay: PostgreSQL 16 in Docker for development only.
+# Does NOT represent production (Supabase/managed DB stays external for real deploys).
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
+#
+# Ensure root `.env` sets other required variables (API keys, SUPABASE_JWT_SECRET, etc.).
+# This file overrides DATABASE_URL for the backend to use the local Postgres service.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: apex
+      POSTGRES_PASSWORD: apex
+      POSTGRES_DB: apex
+    volumes:
+      - apex_pg_data:/var/lib/postgresql/data
+    # Host port 5433 avoids clashing with a PostgreSQL instance already bound to 5432 on your machine.
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apex -d apex"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  backend:
+    environment:
+      DATABASE_URL: postgresql+psycopg2://apex:apex@postgres:5432/apex
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  apex_pg_data:
