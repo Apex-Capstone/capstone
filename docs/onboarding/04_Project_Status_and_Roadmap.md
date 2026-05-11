@@ -1,5 +1,7 @@
 # APEX Project Status (Implementation-Based)
 
+> **Active repository:** Status and roadmap for continued work live in **[McMasterNLP/APEX-VSP](https://github.com/McMasterNLP/APEX-VSP)**. Below reflects this capstone repository at archive time. See [`docs/PROJECT_CONTINUATION.md`](../PROJECT_CONTINUATION.md).
+
 This document describes **what the repository actually does today**, not a product roadmap. Details come from `backend/src` and `docs/vnv_alignment.md` (the latter is only a short strategy note; formal SRS/V&V PDFs in `docs/` are outside this audit).
 
 ---

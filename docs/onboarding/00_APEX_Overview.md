@@ -1,5 +1,7 @@
 # APEX Overview
 
+> **Active repository:** Ongoing development, issues, and pull requests are tracked in **[McMasterNLP/APEX-VSP](https://github.com/McMasterNLP/APEX-VSP)**. This repo remains the original capstone snapshot for history, grading, and reference. See also [`docs/PROJECT_CONTINUATION.md`](../PROJECT_CONTINUATION.md).
+
 **Audience:** New researchers onboarding to the **implemented** APEX backend and API.
 
 This document reflects the codebase under `backend/src` as of the repository state you are reading. For interface details, see `interfaces/` and `plugins/`.

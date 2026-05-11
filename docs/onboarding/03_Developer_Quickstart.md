@@ -1,5 +1,7 @@
 # APEX Developer Quickstart (Repository-Accurate)
 
+> **Active repository:** For current setup and contribution workflow, use **[McMasterNLP/APEX-VSP](https://github.com/McMasterNLP/APEX-VSP)**. This document describes this capstone repository as committed. See [`docs/PROJECT_CONTINUATION.md`](../PROJECT_CONTINUATION.md).
+
 **Root:** `backend/` — application package under **`backend/src`** (import path `src` on `PYTHONPATH`).
 
 ---

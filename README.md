@@ -2,6 +2,16 @@
 
 Welcome to the APEX (AI Patient Experience Simulator) Capstone Project.
 
+> **Project continuation notice**
+>
+> This repository contains the original capstone version of APEX. Active development has moved to the McMasterNLP repository:
+>
+> https://github.com/McMasterNLP/APEX-VSP
+>
+> Future development, deployment updates, issues, and research-platform work should be tracked in the new repository. This repository is preserved for capstone history, grading traceability, and reference.
+
+For a concise handoff summary, see **[docs/PROJECT_CONTINUATION.md](docs/PROJECT_CONTINUATION.md)**.
+
 ## Project Overview
 
 APEX is an AI-powered patient communication training platform for medical trainees.

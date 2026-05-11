@@ -1,5 +1,7 @@
 # Running APEX with Docker
 
+Docker support in this repository was added to make the project easier to reproduce and hand off. **Future Docker and deployment changes** should be made in the active repository: **[McMasterNLP/APEX-VSP](https://github.com/McMasterNLP/APEX-VSP)**. The **Render** setup and scripts here remain preserved for historical and reference purposes alongside this capstone snapshot.
+
 This guide covers the **optional** Docker workflow for the full stack (FastAPI backend + Vite/React frontend). It does **not** replace the existing Poetry + npm local setup in the repository root `README.md`.
 
 **Render (unchanged by this workflow):** these paths are not modified when you add or use Docker; Render continues to use your dashboard settings and:

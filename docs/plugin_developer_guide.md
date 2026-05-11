@@ -1,5 +1,7 @@
 # APEX Plugin Developer Guide
 
+> **Active repository:** Plugin and extension work going forward should target **[McMasterNLP/APEX-VSP](https://github.com/McMasterNLP/APEX-VSP)**. This guide matches the capstone codebase preserved here. See [`docs/PROJECT_CONTINUATION.md`](PROJECT_CONTINUATION.md).
+
 This guide explains how to extend APEX by writing and registering your own **PatientModel**, **Evaluator**, and **MetricsPlugin** implementations.
 
 ---
