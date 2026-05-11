@@ -2,7 +2,12 @@
 
 This guide covers the **optional** Docker workflow for the full stack (FastAPI backend + Vite/React frontend). It does **not** replace the existing Poetry + npm local setup in the repository root `README.md`.
 
-**Render:** `backend/render_predeploy.sh`, `backend/README.md` deployment notes, and the Render dashboard configuration are unchanged. Validate Docker in staging before turning off Render.
+**Render (unchanged by this workflow):** these paths are not modified when you add or use Docker; Render continues to use your dashboard settings and:
+
+- `backend/render_predeploy.sh`
+- `backend/README.md` (Render deployment section)
+
+Validate a Docker-based deployment in staging before turning off Render.
 
 ---
 
@@ -14,37 +19,81 @@ This guide covers the **optional** Docker workflow for the full stack (FastAPI b
 
 ---
 
+## Environment files
+
+- **Root** `.env.example` consolidates the same variables as `backend/.env.example` and `frontend/.env.example` (naming may differ in case; Pydantic accepts both).
+- Copy to **`.env`** at the repo root for Compose. **`.env` is listed in `.gitignore`** — do not commit secrets.
+
+---
+
+## `VITE_*` and rebuilds (important)
+
+`VITE_API_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY` are **embedded at frontend image build time** (`npm run build` inside the Dockerfile). Changing them in `.env` does **not** update a running frontend container until you **rebuild** the frontend image:
+
+```bash
+docker compose build frontend --no-cache
+docker compose up
+```
+
+Or rebuild everything:
+
+```bash
+docker compose build --no-cache
+docker compose up
+```
+
+---
+
 ## Quick start (external database)
 
-1. **Copy the environment template** at the repository root:
+### Bash (macOS / Linux / Git Bash)
 
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+cp .env.example .env
+# Edit .env: DATABASE_URL, SUPABASE_JWT_SECRET, OPENAI_API_KEY, GEMINI_API_KEY,
+#   CORS_ORIGINS, PUBLIC_BASE_URL, VITE_API_URL, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
 
-2. **Edit `.env`** and set at least:
+docker compose build
+docker compose up
+```
 
-   - `DATABASE_URL` — Supabase Postgres or other managed Postgres (not assumed to run inside Docker for production)
-   - `SUPABASE_JWT_SECRET`
-   - `OPENAI_API_KEY`, `GEMINI_API_KEY`
-   - `CORS_ORIGINS` — include the origin where the SPA is served (e.g. `http://localhost:8080` for the compose frontend port mapping)
-   - `PUBLIC_BASE_URL` — the URL browsers use to reach the API (e.g. `http://localhost:8000` when using default compose ports)
-   - `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — used **at frontend image build time** (see below)
+Equivalent one-shot (build if needed, then start):
 
-3. **Build and run:**
+```bash
+docker compose up --build
+```
 
-   ```bash
-   docker compose build
-   docker compose up
-   ```
+### PowerShell (Windows)
 
-4. **Verify the API:**
+```powershell
+Copy-Item .env.example .env
+# Edit .env with the same variables as above.
 
-   ```bash
-   curl http://localhost:8000/health
-   ```
+docker compose build
+docker compose up
+```
 
-5. **Open the UI:** [http://localhost:8080](http://localhost:8080)
+Or:
+
+```powershell
+docker compose up --build
+```
+
+### Verify API and open UI
+
+```bash
+curl http://localhost:8000/health
+```
+
+PowerShell (if `curl` is unavailable):
+
+```powershell
+Invoke-WebRequest -Uri http://localhost:8000/health -UseBasicParsing | Select-Object -ExpandProperty Content
+```
+
+**Web app:** open **http://localhost:8080** (Compose maps host `8080` → nginx `80`).
+
+**API / docs:** **http://localhost:8000** — OpenAPI: **http://localhost:8000/v1/docs**
 
 ---
 
@@ -52,20 +101,20 @@ This guide covers the **optional** Docker workflow for the full stack (FastAPI b
 
 For a **self-contained local database** only (not for production), use the overlay file. This starts **PostgreSQL 16** with user/password/database `apex` / `apex` / `apex` and a named volume for data. The backend’s `DATABASE_URL` is overridden to point at that service.
 
+### Bash
+
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
 ```
 
+### PowerShell
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
+```
+
 - Postgres is exposed on the host at **port 5433** (mapped to 5432 in the container) to reduce clashes with an existing Postgres on 5432.
-- You still need valid Supabase **Auth** configuration in `.env` if you exercise login flows (JWT verification uses `SUPABASE_JWT_SECRET`).
-
----
-
-## Frontend `VITE_*` variables (build-time)
-
-The frontend Docker image runs `npm run build` during **`docker compose build`**. Values such as `VITE_API_URL` and `VITE_SUPABASE_*` are **compiled into the static bundle**. Changing them requires **rebuilding** the frontend image (or passing new build args), not only restarting the container.
-
-Compose passes these from your root `.env` into the frontend build `args` section in `docker-compose.yml`.
+- You still need valid Supabase **Auth** configuration in `.env` if you exercise login flows (`SUPABASE_JWT_SECRET`).
 
 ---
 
@@ -74,7 +123,7 @@ Compose passes these from your root `.env` into the frontend build `args` sectio
 The backend container **entrypoint** runs `alembic upgrade head` before starting Uvicorn by default (similar in spirit to `backend/render_predeploy.sh` on Render).
 
 - To **skip** migrations in the container (e.g. multiple replicas; run migrations once elsewhere): set `RUN_MIGRATIONS=0` in `.env`.
-- For a **one-off migration** with compose:
+- **One-off migration** with Compose:
 
   ```bash
   docker compose run --rm backend poetry run alembic upgrade head
@@ -88,6 +137,55 @@ The backend container **entrypoint** runs `alembic upgrade head` before starting
 
 ---
 
+## Docker smoke / regression checklist
+
+After `docker compose up` (or `up --build`), run through these in order:
+
+| Step | Command or action | Expected |
+|------|-------------------|----------|
+| 1 | `curl http://localhost:8000/health` (or `Invoke-WebRequest` as above) | JSON includes `"status":"healthy"` |
+| 2 | Open **http://localhost:8080** | SPA loads without console errors for missing `VITE_*` |
+| 3 | Sign in (Supabase Auth) | Redirect to dashboard or protected route |
+| 4 | Open a case / start session | Session API responds |
+| 5 | Send a text turn | Patient reply returns |
+| 6 | End session → open feedback | Feedback loads for session |
+| 7 | Optional: voice / TTS | Requires valid `OPENAI_API_KEY` and related config |
+| 8 | Admin: Research / export (if applicable) | `CORS_ORIGINS` includes `http://localhost:8080`; admin role works |
+
+---
+
+## Backend tests with Poetry (not Docker)
+
+Run the automated suite from **`backend/`** with `PYTHONPATH` set so imports resolve (`config`, `controllers`, … live under `src/`).
+
+### Bash
+
+```bash
+cd backend
+export PYTHONPATH="$PWD/src"
+poetry install
+poetry run pytest
+```
+
+With coverage:
+
+```bash
+poetry run pytest --cov=src --cov-report=html
+```
+
+### PowerShell
+
+```powershell
+cd backend
+$env:PYTHONPATH = "$PWD\src"
+poetry install
+poetry run pytest
+```
+
+Other useful commands (from `backend/README.md`): `poetry run black src/`, `poetry run ruff src/`, `poetry run mypy src/`.
+
+---
+
 ## Troubleshooting
 
 - **CORS errors:** ensure `CORS_ORIGINS` includes the exact browser origin (scheme + host + port), e.g. `http://localhost:8080`.
@@ -98,4 +196,4 @@ The backend container **entrypoint** runs `alembic upgrade head` before starting
 
 ## Render unchanged
 
-Building these images does **not** modify Render services. Render continues to use its configured build/start commands and `backend/render_predeploy.sh` until you change hosting.
+Adding or using Docker images does **not** modify Render services. Render continues to use its configured build/start commands and `backend/render_predeploy.sh` until you change hosting in the Render dashboard.

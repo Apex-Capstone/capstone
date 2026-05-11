@@ -2,6 +2,9 @@
 .idea/
 .DS_Store
 
+# Local environment (secrets). Keep `.env.example` files committed; never commit real `.env`.
+.env
+
 # Local strategy / internal planning docs
 ARCHITECTURAL_ALIGNMENT_AND_DEPTH_REVIEW.md
 SUBSYSTEM_AUDIT.md

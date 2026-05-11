@@ -207,7 +207,7 @@ Plugins are **registered in code** (on import) and **selected** via configuratio
 
 ### Docker Compose (optional)
 
-To run the FastAPI backend and the Vite-built frontend in containers (with **Supabase/Postgres still external** unless you add the optional local Postgres overlay), see **[docs/docker.md](docs/docker.md)**. Copy the root **`.env.example`** to **`.env`**, fill in secrets and URLs, then run `docker compose build` and `docker compose up`. Do not remove or change **Render** until a Docker-based deployment is validated.
+To run the FastAPI backend and the Vite-built frontend in containers (with **Supabase/Postgres still external** unless you add the optional local Postgres overlay), see **[docs/docker.md](docs/docker.md)** for exact commands (bash and PowerShell), a Docker smoke checklist, Poetry/pytest commands, and notes on **`VITE_*` rebuilds** and migrations. Copy the root **`.env.example`** to **`.env`**, fill in secrets and URLs, then run `docker compose build` and `docker compose up`. Do not remove or change **Render** until a Docker-based deployment is validated.
 
 ### 1. Clone the repository
 
