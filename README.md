@@ -205,6 +205,10 @@ Plugins are **registered in code** (on import) and **selected** via configuratio
 - Node.js 18+ and npm
 - A Supabase project (or use the shared project — see `.env.example`)
 
+### Docker Compose (optional)
+
+To run the FastAPI backend and the Vite-built frontend in containers (with **Supabase/Postgres still external** unless you add the optional local Postgres overlay), see **[docs/docker.md](docs/docker.md)**. Copy the root **`.env.example`** to **`.env`**, fill in secrets and URLs, then run `docker compose build` and `docker compose up`. Do not remove or change **Render** until a Docker-based deployment is validated.
+
 ### 1. Clone the repository
 
 ```bash
